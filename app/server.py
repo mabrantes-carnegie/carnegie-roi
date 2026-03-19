@@ -4,7 +4,7 @@ from shiny import render, reactive, ui, req
 import plotly.graph_objects as go
 import pandas as pd
 
-from data_loader import Q1, Q2, Q3, Q4
+from data_loader import Q1, Q2, Q3, Q4, GOALS
 from metrics import (
     FUNNEL_COLS, COST_PER_DEFS,
     compute_funnel_kpis, compute_yoy_change,
@@ -87,9 +87,7 @@ PRIMARY_LABELS = {
     "total_net_deposits": "Net Deposits",
 }
 
-# Institution-level goal placeholders (CWU — no real goal data in CSV, so we skip)
-# Progress bars will show "No goal set" if goals are not available.
-GOALS = {}  # Populate with real data when available
+# GOALS imported from data_loader — institution-level aggregated from roi_goals.csv
 
 
 def server_logic(input, output, session):
@@ -327,18 +325,27 @@ def server_logic(input, output, session):
         badge_class = f"kpi-badge kpi-badge--{sentiment}"
         return ui.tags.span(text, class_=badge_class)
 
-    # --- Progress bars (placeholder — no goal data yet) ---
+    # --- Micro progress bars (KPI funnel strip cards) ---
+
+    def _goal_color(pct: float) -> str:
+        """Green >= 95%, Amber 80-95%, Red < 80%."""
+        if pct >= 95:
+            return "#0D7A4A"
+        elif pct >= 80:
+            return "#C48A1A"
+        return "#C93030"
 
     def _progress_bar(key: str):
         goal = GOALS.get(key)
-        if goal is None:
-            return ui.tags.div()  # Empty — no goal set, hide bar
+        if not goal or goal <= 0:
+            return ui.tags.div()  # No goal — hide bar
         actual = current_kpis().get(key, 0)
-        pct = min((actual / goal) * 100, 100) if goal > 0 else 0
-        color = CARNEGIE_GREEN if pct >= 95 else CARNEGIE_AMBER if pct >= 80 else CARNEGIE_RED
+        pct = (actual / goal) * 100
+        bar_width = min(pct, 100)
+        color = _goal_color(pct)
         return ui.tags.div(
             ui.tags.div(
-                style=f"width:{pct:.0f}%; height:4px; background:{color}; border-radius:2px;",
+                style=f"width:{bar_width:.0f}%; height:4px; background:{color}; border-radius:2px;",
             ),
             class_="progress-micro",
         )
@@ -488,11 +495,12 @@ def server_logic(input, output, session):
     @render.ui
     def progress_to_goal():
         kpis = current_kpis()
-        if not GOALS:
-            # No goal data yet
-            bars = []
-            for key in PRIMARY_KEYS:
-                label = PRIMARY_LABELS[key]
+        bars = []
+        for key in PRIMARY_KEYS:
+            label = PRIMARY_LABELS[key]
+            goal = GOALS.get(key)
+            if not goal or goal <= 0:
+                # No goal for this stage
                 bars.append(
                     ui.tags.div(
                         ui.tags.div(
@@ -507,15 +515,12 @@ def server_logic(input, output, session):
                         class_="goal-row",
                     )
                 )
-            return ui.tags.div(*bars, class_="goal-bars")
+                continue
 
-        bars = []
-        for key in PRIMARY_KEYS:
-            label = PRIMARY_LABELS[key]
             actual = kpis.get(key, 0)
-            goal = GOALS.get(key, 0)
-            pct = min((actual / goal) * 100, 100) if goal > 0 else 0
-            color = CARNEGIE_GREEN if pct >= 95 else CARNEGIE_AMBER if pct >= 80 else CARNEGIE_RED
+            pct = (actual / goal) * 100
+            bar_width = min(pct, 100)  # Cap visual fill at 100%
+            color = _goal_color(pct)
             bars.append(
                 ui.tags.div(
                     ui.tags.div(
@@ -524,7 +529,7 @@ def server_logic(input, output, session):
                         class_="goal-header",
                     ),
                     ui.tags.div(
-                        ui.tags.div(style=f"width:{pct:.0f}%; height:8px; background:{color}; border-radius:4px;"),
+                        ui.tags.div(style=f"width:{bar_width:.0f}%; height:8px; background:{color}; border-radius:4px;"),
                         class_="goal-bar-bg",
                     ),
                     class_="goal-row",

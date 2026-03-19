@@ -84,11 +84,25 @@ def _load_q4() -> pd.DataFrame:
     return df.reset_index(drop=True)
 
 
+def _load_goals() -> dict:
+    """Load roi_goals.csv and aggregate to institution-level goals."""
+    df = pd.read_csv(_DATA_DIR / "roi_goals.csv")
+    return {
+        "total_inquiries": int(df["Inquiry Goal"].sum()),
+        "total_app_starts": int(df["App Starts Goal"].sum()),
+        "total_app_submits": int(df["App Submit Goal"].sum()),
+        "total_admits": int(df["Admit Goal"].sum()),
+        "total_deposits": int(df["Deposit Goal"].sum()),
+        "total_net_deposits": int(df["Net Deposit Goal"].sum()),
+    }
+
+
 # Load once at import time
 Q1 = _load_q1()
 Q2 = _load_q2()
 Q3 = _load_q3()
 Q4 = _load_q4()
+GOALS = _load_goals()
 
 
 def get_institutions() -> list[str]:
