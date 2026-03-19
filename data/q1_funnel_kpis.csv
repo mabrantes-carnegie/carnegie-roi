@@ -1,0 +1,119 @@
+institution_name,institution_state,institution_city,term_year,term_semester,student_type,is_international,total_prospects,total_inquiries,total_app_starts,total_app_submits,total_admits,total_deposits,total_net_deposits,total_enrolled
+Central Washington University,Washington,Ellensburg,2030,Fall,First Year,false,0,0,1,1,1,1,1,1
+Central Washington University,Washington,Ellensburg,2030,Fall,,false,0,0,1,1,0,0,0,0
+Central Washington University,Washington,Ellensburg,2030,Fall,Transfer,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2030,Spring,First Year,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2030,Spring,,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2030,Spring,Transfer,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2030,Summer,,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2030,Summer,First Year,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2030,Summer,Transfer,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2029,Fall,Transfer,false,0,0,1,1,1,0,0,0
+Central Washington University,Washington,Ellensburg,2029,Fall,,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2029,Fall,Graduate,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2029,Fall,First Year,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2029,Spring,,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2029,Spring,First Year,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2029,Spring,Transfer,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2029,Summer,,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2029,Summer,First Year,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2029,Summer,Transfer,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2028,Fall,First Year,false,0,0,10,7,5,0,0,0
+Central Washington University,Washington,Ellensburg,2028,Fall,,false,0,0,1,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2028,Fall,Transfer,false,0,0,5,4,1,1,1,1
+Central Washington University,Washington,Ellensburg,2028,Spring,Transfer,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2028,Spring,,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2028,Spring,First Year,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2028,Summer,,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2028,Summer,First Year,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2028,Summer,Transfer,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2027,Fall,Transfer,false,0,0,741,731,730,160,60,171
+Central Washington University,Washington,Ellensburg,2027,Fall,,false,0,0,9,6,4,2,2,2
+Central Washington University,Washington,Ellensburg,2027,Fall,First Year,false,0,0,83,67,60,24,23,23
+Central Washington University,Washington,Ellensburg,2027,Fall,Readmit,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2027,Fall,Graduate,false,0,0,1,1,1,0,0,0
+Central Washington University,Washington,Ellensburg,2027,Fall,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2027,Spring,,false,0,0,8,6,0,0,0,0
+Central Washington University,Washington,Ellensburg,2027,Spring,First Year,false,0,0,14,14,13,6,6,6
+Central Washington University,Washington,Ellensburg,2027,Spring,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2027,Spring,Transfer,false,0,0,1,1,1,0,0,0
+Central Washington University,Washington,Ellensburg,2027,Spring,Graduate,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2027,Summer,First Year,false,0,0,3,3,1,1,1,1
+Central Washington University,Washington,Ellensburg,2027,Summer,Readmit,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2027,Summer,Transfer,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2027,Summer,,false,0,0,1,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2026,Fall,First Year,false,121485,24486,4002,3492,3249,804,777,817
+Central Washington University,Washington,Ellensburg,2026,Fall,,false,1922,1554,4181,3366,2876,805,794,805
+Central Washington University,Washington,Ellensburg,2026,Fall,Transfer,false,0,0,91,78,57,27,24,28
+Central Washington University,Washington,Ellensburg,2026,Fall,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2026,Fall,Readmit,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2026,Fall,Graduate,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2026,Spring,Transfer,false,0,0,10,7,5,3,3,3
+Central Washington University,Washington,Ellensburg,2026,Spring,Readmit,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2026,Spring,First Year,false,0,0,74,59,53,21,20,20
+Central Washington University,Washington,Ellensburg,2026,Spring,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2026,Spring,,false,0,0,18,14,11,6,4,6
+Central Washington University,Washington,Ellensburg,2026,Spring,Graduate,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2026,Summer,Transfer,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2026,Summer,First Year,false,0,0,21,19,14,4,4,4
+Central Washington University,Washington,Ellensburg,2026,Summer,,false,0,0,5,5,5,2,2,2
+Central Washington University,Washington,Ellensburg,2026,Summer,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2025,Fall,First Year,false,165967,23470,5003,4370,4077,1125,935,1193
+Central Washington University,Washington,Ellensburg,2025,Fall,,false,2338,1525,3960,2949,2479,934,775,994
+Central Washington University,Washington,Ellensburg,2025,Fall,Transfer,false,0,0,93,81,56,35,26,40
+Central Washington University,Washington,Ellensburg,2025,Fall,Graduate,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2025,Fall,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2025,Fall,Readmit,false,0,0,1,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2025,Spring,First Year,false,0,0,67,40,31,17,15,17
+Central Washington University,Washington,Ellensburg,2025,Spring,Graduate,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2025,Spring,,false,0,0,19,9,8,4,4,4
+Central Washington University,Washington,Ellensburg,2025,Spring,Readmit,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2025,Spring,Transfer,false,0,0,7,5,4,4,4,4
+Central Washington University,Washington,Ellensburg,2025,Spring,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2025,Summer,First Year,false,0,0,27,19,15,10,6,10
+Central Washington University,Washington,Ellensburg,2025,Summer,Readmit,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2025,Summer,,false,0,0,8,3,2,1,1,1
+Central Washington University,Washington,Ellensburg,2025,Summer,Graduate,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2025,Summer,Transfer,false,0,0,1,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2025,Summer,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2024,Fall,,false,2268,1228,4204,3387,2792,868,669,954
+Central Washington University,Washington,Ellensburg,2024,Fall,First Year,false,187547,20050,6015,5189,4883,1293,997,1400
+Central Washington University,Washington,Ellensburg,2024,Fall,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2024,Fall,Graduate,false,0,0,1,1,1,0,0,0
+Central Washington University,Washington,Ellensburg,2024,Fall,Transfer,false,0,0,139,114,72,44,37,46
+Central Washington University,Washington,Ellensburg,2024,Fall,Readmit,false,0,0,3,2,0,0,0,0
+Central Washington University,Washington,Ellensburg,2024,Spring,,false,0,0,6,4,3,2,0,2
+Central Washington University,Washington,Ellensburg,2024,Spring,First Year,false,0,0,76,60,48,23,15,23
+Central Washington University,Washington,Ellensburg,2024,Spring,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2024,Spring,Graduate,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2024,Spring,Transfer,false,0,0,5,4,1,1,1,1
+Central Washington University,Washington,Ellensburg,2024,Spring,Readmit,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2024,Summer,First Year,false,0,0,30,22,15,5,4,6
+Central Washington University,Washington,Ellensburg,2024,Summer,Graduate,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2024,Summer,Readmit,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2024,Summer,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2024,Summer,Transfer,false,0,0,4,3,3,1,0,1
+Central Washington University,Washington,Ellensburg,2024,Summer,,false,0,0,4,1,1,1,1,1
+Central Washington University,Washington,Ellensburg,2023,Fall,,false,0,0,16,11,9,3,3,3
+Central Washington University,Washington,Ellensburg,2023,Fall,Transfer,false,0,0,2,1,0,0,0,0
+Central Washington University,Washington,Ellensburg,2023,Fall,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2023,Fall,First Year,false,0,0,167,127,95,34,29,39
+Central Washington University,Washington,Ellensburg,2023,Fall,Graduate,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2023,Fall,Readmit,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2023,Spring,,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2023,Spring,Transfer,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2023,Spring,Readmit,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2023,Spring,First Year,false,0,0,10,5,3,2,2,2
+Central Washington University,Washington,Ellensburg,2023,Spring,Graduate,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2023,Spring,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2023,Summer,Readmit,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2023,Summer,Adult,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2023,Summer,Graduate,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2023,Summer,,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,2023,Summer,First Year,false,0,0,2,1,1,1,1,1
+Central Washington University,Washington,Ellensburg,2023,Summer,Transfer,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,,,,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,,,Transfer,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,,,Graduate,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,,,Readmit,false,0,0,0,0,0,0,0,0
+Central Washington University,Washington,Ellensburg,,,First Year,false,0,0,0,0,0,0,0,0

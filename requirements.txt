@@ -1,0 +1,5 @@
+shiny>=1.0.0
+pandas>=2.0.0
+plotly>=5.18.0
+shinyswatch>=0.7.0
+us>=3.0.0

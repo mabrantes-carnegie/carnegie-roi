@@ -1,0 +1,555 @@
+/* Carnegie ROI Dashboard — Carnegie Higher Ed Design System */
+
+@import url('https://fonts.googleapis.com/css2?family=Lora:wght@100;300;400&family=Manrope:wght@400;500;600;700&family=Inter:wght@400;500&display=swap');
+
+/* ── Design Tokens ────────────────────────────────────────── */
+
+:root {
+    --carnegie-bg: #f8f4f0;
+    --carnegie-navy: #021324;
+    --carnegie-red: #FA3320;
+    --carnegie-green: #2d8a4e;
+    --carnegie-amber: #c8962d;
+    --carnegie-gray-text: #6b7280;
+    --carnegie-gray-border: #e5e1dc;
+    --carnegie-white: #ffffff;
+    --carnegie-red-light: #fef2f2;
+    --carnegie-green-light: #ecfdf5;
+    --carnegie-amber-light: #fffbeb;
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
+    --radius-card: 12px;
+    --radius-badge: 9999px;
+    --radius-input: 8px;
+}
+
+/* ── Global Reset & Base ──────────────────────────────────── */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html, body {
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background-color: var(--carnegie-bg) !important;
+    color: var(--carnegie-navy);
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0;
+    padding: 0;
+}
+
+/* ════════════════════════════════════════════
+   CARNEGIE ROI — LAYOUT & NAVBAR
+   ════════════════════════════════════════════ */
+
+/* Navbar shell */
+.navbar {
+    background-color: #F8F4F0 !important;
+    border-bottom: 1px solid rgba(2, 19, 38, 0.15) !important;
+    min-height: 64px !important;
+    padding: 0 !important;
+}
+
+/* Navbar inner container — same padding as report body, no max-width cap */
+nav.navbar .container-fluid {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    padding-left: clamp(3rem, 2.286rem + 1.905vw, 4rem) !important;
+    padding-right: clamp(3rem, 2.286rem + 1.905vw, 4rem) !important;
+    box-sizing: border-box !important;
+}
+
+/* Brand takes no extra space — does NOT stretch */
+.navbar-brand {
+    padding: 0 !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+}
+
+/* Tab list — flex row, no wrapping */
+nav.navbar .navbar-nav {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+}
+
+/* Tab links */
+.navbar-nav .nav-link {
+    font-family: 'Manrope', sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.07813rem !important;
+    color: #021324 !important;
+    padding: 0 16px !important;
+    border-bottom: 2px solid transparent !important;
+    white-space: nowrap !important;
+    background: transparent !important;
+    text-decoration: none !important;
+    transition: color 0.15s, border-color 0.15s !important;
+}
+
+.navbar-nav .nav-link.active,
+.navbar-nav .nav-item .nav-link.active {
+    border-bottom: 2px solid #FA3320 !important;
+    background: transparent !important;
+}
+
+.navbar-nav .nav-link:hover {
+    color: #FA3320 !important;
+    background: transparent !important;
+}
+
+/* Title text */
+.navbar-title-text {
+    font-family: 'Lora', Georgia, serif !important;
+    font-size: 20px !important;
+    font-weight: 100 !important;
+    color: #FA3320 !important;
+    white-space: nowrap !important;
+}
+
+/* Remove Bootstrap toggler border */
+.navbar-toggler {
+    border: none !important;
+}
+
+/* Page content wrapper — zero out default padding */
+body > div.container-fluid {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Tab panes — no extra padding */
+.tab-content {
+    padding: 0 !important;
+}
+
+.tab-pane {
+    padding: 0 !important;
+}
+
+/* ── Override Shiny/Bootstrap defaults ─────────────────────── */
+
+.bslib-page-fill, .html-fill-container {
+    background-color: var(--carnegie-bg) !important;
+}
+
+/* ── Filter Bar ───────────────────────────────────────────── */
+
+.carnegie-card {
+    background: var(--carnegie-white);
+    border: 1px solid var(--carnegie-gray-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    padding: 24px;
+}
+
+.filter-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    align-items: end;
+}
+
+.filter-group label,
+.filter-bar .control-label,
+.filter-bar .shiny-input-container > label {
+    display: block;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: var(--carnegie-navy) !important;
+    margin-bottom: 6px !important;
+}
+
+.filter-bar .form-control,
+.filter-bar .form-select,
+.filter-bar select,
+.filter-bar input[type="text"] {
+    background: var(--carnegie-white) !important;
+    border: 1px solid var(--carnegie-gray-border) !important;
+    border-radius: var(--radius-input) !important;
+    font-size: 14px !important;
+    color: var(--carnegie-navy) !important;
+    height: 40px !important;
+    padding: 8px 12px !important;
+    transition: border-color 0.15s !important;
+}
+
+.filter-bar .form-control:focus,
+.filter-bar .form-select:focus {
+    border-color: var(--carnegie-red) !important;
+    box-shadow: 0 0 0 3px rgba(250, 51, 32, 0.1) !important;
+    outline: none !important;
+}
+
+/* Selectize overrides */
+.filter-bar .selectize-input {
+    background: var(--carnegie-white) !important;
+    border: 1px solid var(--carnegie-gray-border) !important;
+    border-radius: var(--radius-input) !important;
+    min-height: 40px !important;
+    font-size: 14px !important;
+    padding: 6px 12px !important;
+    box-shadow: none !important;
+}
+
+.filter-bar .selectize-input.focus {
+    border-color: var(--carnegie-red) !important;
+    box-shadow: 0 0 0 3px rgba(250, 51, 32, 0.1) !important;
+}
+
+.filter-bar .selectize-dropdown {
+    border: 1px solid var(--carnegie-gray-border) !important;
+    border-radius: var(--radius-input) !important;
+    box-shadow: var(--shadow-card) !important;
+}
+
+.filter-bar .selectize-dropdown .option.active {
+    background: var(--carnegie-red-light) !important;
+    color: var(--carnegie-navy) !important;
+}
+
+/* Toggle switch styling */
+.filter-bar .form-check-input:checked {
+    background-color: var(--carnegie-red) !important;
+    border-color: var(--carnegie-red) !important;
+}
+
+.filter-note {
+    font-size: 12px;
+    color: var(--carnegie-gray-text);
+    font-style: italic;
+    margin-top: 4px;
+    grid-column: 1 / -1;
+}
+
+/* Fix Shiny input containers in filter bar */
+.filter-bar .shiny-input-container {
+    margin-bottom: 0 !important;
+    width: 100% !important;
+}
+
+.filter-bar .shiny-input-container .form-switch {
+    padding-top: 8px;
+}
+
+/* ── Section Headings ─────────────────────────────────────── */
+
+.section-heading {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--carnegie-navy);
+    margin: 32px 0 16px;
+}
+
+.section-heading:first-child {
+    margin-top: 0;
+}
+
+/* ── KPI Cards ────────────────────────────────────────────── */
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+@media (max-width: 900px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.kpi-card {
+    background: var(--carnegie-white);
+    border: 1px solid var(--carnegie-gray-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.kpi-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--carnegie-gray-text);
+}
+
+.kpi-value {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--carnegie-navy);
+    line-height: 1.1;
+}
+
+.kpi-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    border-radius: var(--radius-badge);
+    font-size: 12px;
+    font-weight: 600;
+    width: fit-content;
+}
+
+.kpi-badge--positive {
+    background: var(--carnegie-green-light);
+    color: var(--carnegie-green);
+}
+
+.kpi-badge--negative {
+    background: var(--carnegie-red-light);
+    color: var(--carnegie-red);
+}
+
+.kpi-badge--neutral {
+    background: var(--carnegie-amber-light);
+    color: var(--carnegie-amber);
+}
+
+.kpi-badge--na {
+    background: #f3f4f6;
+    color: var(--carnegie-gray-text);
+}
+
+.kpi-sublabel {
+    font-size: 12px;
+    color: var(--carnegie-gray-text);
+}
+
+/* ── Chart Cards ──────────────────────────────────────────── */
+
+.chart-card {
+    background: var(--carnegie-white);
+    border: 1px solid var(--carnegie-gray-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    padding: 24px;
+    margin-bottom: 32px;
+}
+
+.chart-card .chart-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--carnegie-navy);
+    margin-bottom: 16px;
+}
+
+.chart-card .js-plotly-plot {
+    width: 100%;
+}
+
+/* Empty state message inside cards */
+.empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--carnegie-gray-text);
+    font-size: 14px;
+}
+
+/* ── Tables ───────────────────────────────────────────────── */
+
+.carnegie-table-card {
+    background: var(--carnegie-white);
+    border: 1px solid var(--carnegie-gray-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    padding: 24px;
+    margin-bottom: 32px;
+    overflow-x: auto;
+}
+
+.carnegie-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.carnegie-table thead th {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--carnegie-gray-text);
+    padding: 12px;
+    border-bottom: 2px solid var(--carnegie-gray-border);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.carnegie-table thead th.text-end {
+    text-align: right;
+}
+
+.carnegie-table tbody td {
+    padding: 10px 12px;
+    color: var(--carnegie-navy);
+    border-bottom: 1px solid var(--carnegie-gray-border);
+}
+
+.carnegie-table tbody tr:nth-child(even) {
+    background: var(--carnegie-bg);
+}
+
+.carnegie-table tbody tr:nth-child(odd) {
+    background: var(--carnegie-white);
+}
+
+.carnegie-table .text-end {
+    text-align: right;
+}
+
+/* Shiny DataGrid overrides */
+.shiny-data-grid {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.shiny-data-grid table {
+    font-family: 'Manrope', sans-serif !important;
+}
+
+.shiny-data-grid thead th {
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    color: var(--carnegie-gray-text) !important;
+    background: var(--carnegie-white) !important;
+    border-bottom: 2px solid var(--carnegie-gray-border) !important;
+    padding: 12px !important;
+}
+
+.shiny-data-grid tbody td {
+    font-size: 14px !important;
+    color: var(--carnegie-navy) !important;
+    padding: 10px 12px !important;
+    border-bottom: 1px solid var(--carnegie-gray-border) !important;
+}
+
+.shiny-data-grid tbody tr:nth-child(even) {
+    background: var(--carnegie-bg) !important;
+}
+
+.shiny-data-grid tbody tr:nth-child(odd) {
+    background: var(--carnegie-white) !important;
+}
+
+/* ── Map Section ──────────────────────────────────────────── */
+
+.map-layout {
+    display: grid;
+    grid-template-columns: 1fr 240px;
+    gap: 24px;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .map-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.top-states {
+    padding: 16px 0;
+}
+
+.top-states-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--carnegie-gray-text);
+    margin-bottom: 12px;
+}
+
+.top-state-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    font-size: 14px;
+    color: var(--carnegie-navy);
+    border-bottom: 1px solid var(--carnegie-gray-border);
+}
+
+.top-state-row .count {
+    font-weight: 600;
+    color: var(--carnegie-red);
+}
+
+/* ── Campaign Page ────────────────────────────────────────── */
+
+.metric-selector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.metric-selector label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--carnegie-navy);
+    white-space: nowrap;
+}
+
+.metric-selector select {
+    background: var(--carnegie-white);
+    border: 1px solid var(--carnegie-gray-border);
+    border-radius: var(--radius-input);
+    font-size: 14px;
+    color: var(--carnegie-navy);
+    height: 40px;
+    padding: 8px 12px;
+    min-width: 200px;
+}
+
+/* ── Cost Summary Table (Page 1) ──────────────────────────── */
+
+.cost-summary-card {
+    background: var(--carnegie-white);
+    border: 1px solid var(--carnegie-gray-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    padding: 24px;
+    margin-bottom: 32px;
+    overflow-x: auto;
+}
+
+/* ── Utility ──────────────────────────────────────────────── */
+
+.gap-32 {
+    gap: 32px;
+}
+
+.mb-32 {
+    margin-bottom: 32px;
+}
+
+/* Override card() defaults */
+.card {
+    background: var(--carnegie-white) !important;
+    border: 1px solid var(--carnegie-gray-border) !important;
+    border-radius: var(--radius-card) !important;
+    box-shadow: var(--shadow-card) !important;
+}
