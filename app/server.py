@@ -1,11 +1,10 @@
 """Carnegie ROI Dashboard — Reactive server logic."""
 
-from shiny import render, reactive, ui
-import plotly.express as px
+from shiny import render, reactive, ui, req
 import plotly.graph_objects as go
 import pandas as pd
 
-from data_loader import Q1, Q2, Q3
+from data_loader import Q1, Q2, Q3, Q4
 from metrics import (
     FUNNEL_COLS, COST_PER_DEFS,
     compute_funnel_kpis, compute_yoy_change,
@@ -16,13 +15,20 @@ from formatters import fmt_number, fmt_pct, fmt_currency, fmt_yoy
 
 # ── Carnegie brand colors for Plotly ─────────────────────────
 
-CARNEGIE_RED = "#c8372d"
-CARNEGIE_NAVY = "#1a2332"
+CARNEGIE_RED = "#FA3320"
+CARNEGIE_NAVY = "#021324"
 CARNEGIE_GRAY_TEXT = "#6b7280"
 CARNEGIE_GRAY_BORDER = "#e5e1dc"
 CARNEGIE_BG = "#f8f4f0"
 CARNEGIE_WHITE = "#ffffff"
-CARNEGIE_RED_15 = "rgba(200, 55, 45, 0.15)"
+CARNEGIE_GREEN = "#2d8a4e"
+CARNEGIE_AMBER = "#c8962d"
+
+# Secondary chart palette
+CHART_PALETTE = [
+    CARNEGIE_RED, CARNEGIE_NAVY, "#A8BDD6", "#C9D444", "#E8D9B8",
+    "#E8D8F6", "#B3C78D",
+]
 
 # Shared Plotly layout overrides
 PLOTLY_LAYOUT = dict(
@@ -61,6 +67,31 @@ def _apply_layout(fig, title: str = "", height: int = 400):
     return fig
 
 
+def _plotly_html(fig):
+    """Convert plotly figure to HTML widget."""
+    return ui.HTML(fig.to_html(full_html=False, include_plotlyjs="cdn"))
+
+
+# ── Primary funnel stages (6) ───────────────────────────────
+PRIMARY_KEYS = [
+    "total_inquiries", "total_app_starts", "total_app_submits",
+    "total_admits", "total_deposits", "total_net_deposits",
+]
+
+PRIMARY_LABELS = {
+    "total_inquiries": "Inquiries",
+    "total_app_starts": "App Starts",
+    "total_app_submits": "App Submits",
+    "total_admits": "Admits",
+    "total_deposits": "Deposits",
+    "total_net_deposits": "Net Deposits",
+}
+
+# Institution-level goal placeholders (CWU — no real goal data in CSV, so we skip)
+# Progress bars will show "No goal set" if goals are not available.
+GOALS = {}  # Populate with real data when available
+
+
 def server_logic(input, output, session):
 
     # ── Reactive filtered DataFrames ─────────────────────────
@@ -69,11 +100,14 @@ def server_logic(input, output, session):
     def filtered_q1():
         df = Q1.copy()
         df = df[df["institution_name"] == input.institution()]
-        years = [int(y) for y in input.term_year()]
-        df = df[df["term_year"].isin(years)]
+        df = df[df["term_year"] == int(input.term_year())]
         df = df[df["term_semester"] == input.term_semester()]
-        if input.student_type() != "All":
-            df = df[df["student_type"] == input.student_type()]
+        st = input.student_type()
+        if isinstance(st, (list, tuple)):
+            if "All" not in st and len(st) > 0:
+                df = df[df["student_type"].isin(st)]
+        elif st != "All":
+            df = df[df["student_type"] == st]
         if not input.is_international():
             df = df[df["is_international"] == False]  # noqa: E712
         return df
@@ -82,34 +116,51 @@ def server_logic(input, output, session):
     def prior_q1():
         df = Q1.copy()
         df = df[df["institution_name"] == input.institution()]
-        years = [int(y) - 1 for y in input.term_year()]
-        df = df[df["term_year"].isin(years)]
+        df = df[df["term_year"] == int(input.term_year()) - 1]
         df = df[df["term_semester"] == input.term_semester()]
-        if input.student_type() != "All":
-            df = df[df["student_type"] == input.student_type()]
+        st = input.student_type()
+        if isinstance(st, (list, tuple)):
+            if "All" not in st and len(st) > 0:
+                df = df[df["student_type"].isin(st)]
+        elif st != "All":
+            df = df[df["student_type"] == st]
         if not input.is_international():
             df = df[df["is_international"] == False]  # noqa: E712
         return df
 
     @reactive.calc
-    def trending_q1():
-        """All years — ignores term_year and term_semester filters."""
-        df = Q1.copy()
+    def trending_q4():
+        """Filtered Q4 monthly trending data for the chart."""
+        df = Q4.copy()
         df = df[df["institution_name"] == input.institution()]
-        if input.student_type() != "All":
-            df = df[df["student_type"] == input.student_type()]
+        df = df[df["term_semester"] == input.term_semester()]
+        st = input.student_type()
+        if isinstance(st, (list, tuple)):
+            if "All" not in st and len(st) > 0:
+                df = df[df["student_type"].isin(st)]
+        elif st != "All":
+            df = df[df["student_type"] == st]
         if not input.is_international():
             df = df[df["is_international"] == False]  # noqa: E712
-        return df.groupby(
-            ["term_year", "term_semester"], as_index=False
-        )["total_inquiries"].sum()
+        return df
 
     @reactive.calc
     def filtered_q2():
         df = Q2.copy()
         df = df[df["institution_name"] == input.institution()]
-        years = [int(y) for y in input.term_year()]
-        df = df[df["term_year"].isin(years)]
+        df = df[df["term_year"] == int(input.term_year())]
+        df = df[df["term_semester"] == input.term_semester()]
+        # Page-specific source filter
+        src = input.source_filter()
+        if src and len(src) > 0:
+            df = df[df["lead_source"].isin(src)]
+        return df
+
+    @reactive.calc
+    def prior_q2():
+        df = Q2.copy()
+        df = df[df["institution_name"] == input.institution()]
+        df = df[df["term_year"] == int(input.term_year()) - 1]
         df = df[df["term_semester"] == input.term_semester()]
         return df
 
@@ -117,24 +168,56 @@ def server_logic(input, output, session):
     def filtered_q3():
         df = Q3.copy()
         df = df[df["institution_name"] == input.institution()]
-        years = [int(y) for y in input.term_year()]
-        df = df[df["term_year"].isin(years)]
+        df = df[df["term_year"] == int(input.term_year())]
         df = df[df["term_semester"] == input.term_semester()]
         return df
 
-    # ── Page 1: KPI Cards ────────────────────────────────────
+    # ── Update source filter choices ─────────────────────────
+
+    @reactive.effect
+    def _update_source_choices():
+        df = Q2.copy()
+        df = df[df["institution_name"] == input.institution()]
+        sources = sorted(df["lead_source"].dropna().unique().tolist())
+        ui.update_selectize("source_filter", choices=sources, selected=[])
+
+    # ── KPI Calculations ─────────────────────────────────────
 
     @reactive.calc
     def current_kpis():
         return compute_funnel_kpis(filtered_q1())
 
     @reactive.calc
-    def yoy_changes():
-        current = compute_funnel_kpis(filtered_q1())
-        prior = compute_funnel_kpis(prior_q1())
-        return compute_yoy_change(current, prior)
+    def prior_kpis():
+        return compute_funnel_kpis(prior_q1())
 
-    # --- KPI value outputs ---
+    @reactive.calc
+    def yoy_changes():
+        return compute_yoy_change(current_kpis(), prior_kpis())
+
+    @reactive.calc
+    def cost_data():
+        return compute_cost_summary(filtered_q2())
+
+    # ── Page 1: ROI Overview ─────────────────────────────────
+
+    # Page subtitle
+    @render.ui
+    def page_subtitle():
+        inst = input.institution()
+        return ui.tags.span(f"\u2014 {inst}", class_="page-subtitle")
+
+    # Period badge
+    @render.ui
+    def period_badge():
+        sem = input.term_semester()
+        yr = input.term_year()
+        return ui.tags.span(
+            f"{sem} {yr} \u00b7 as of Mar 18, 2026",
+            class_="period-badge",
+        )
+
+    # --- Primary KPI outputs (6 funnel stages) ---
 
     @render.text
     def kpi_total_inquiries():
@@ -160,9 +243,7 @@ def server_logic(input, output, session):
     def kpi_total_net_deposits():
         return fmt_number(current_kpis()["total_net_deposits"])
 
-    @render.text
-    def kpi_total_enrolled():
-        return fmt_number(current_kpis()["total_enrolled"])
+    # --- Secondary metric outputs ---
 
     @render.text
     def kpi_admitted_rate():
@@ -171,6 +252,12 @@ def server_logic(input, output, session):
     @render.text
     def kpi_yield_rate():
         return fmt_pct(current_kpis()["yield_rate"])
+
+    @render.text
+    def kpi_cost_per_net_deposit():
+        cd = cost_data()
+        val = cd.get("cost_per_net_deposit")
+        return fmt_currency(val) if val else "\u2014"
 
     # --- YoY badge outputs ---
 
@@ -210,10 +297,6 @@ def server_logic(input, output, session):
         return _yoy_badge("total_net_deposits")
 
     @render.ui
-    def yoy_total_enrolled():
-        return _yoy_badge("total_enrolled")
-
-    @render.ui
     def yoy_admitted_rate():
         return _yoy_badge("admitted_rate")
 
@@ -221,102 +304,466 @@ def server_logic(input, output, session):
     def yoy_yield_rate():
         return _yoy_badge("yield_rate")
 
+    @render.ui
+    def yoy_cost_per_net_deposit():
+        # Cost YoY requires prior cost data
+        curr = cost_data().get("cost_per_net_deposit")
+        prior_cd = compute_cost_summary(prior_q2())
+        prev = prior_cd.get("cost_per_net_deposit")
+        if curr is None or prev is None or prev == 0:
+            return ui.tags.span("N/A", class_="kpi-badge kpi-badge--na")
+        pct = ((curr - prev) / abs(prev)) * 100
+        # For cost, lower is better — invert sentiment
+        text, _ = fmt_yoy(pct)
+        sentiment = "positive" if pct < 0 else "negative" if pct > 0 else "neutral"
+        badge_class = f"kpi-badge kpi-badge--{sentiment}"
+        return ui.tags.span(text, class_=badge_class)
+
+    # --- Progress bars (placeholder — no goal data yet) ---
+
+    def _progress_bar(key: str):
+        goal = GOALS.get(key)
+        if goal is None:
+            return ui.tags.div()  # Empty — no goal set, hide bar
+        actual = current_kpis().get(key, 0)
+        pct = min((actual / goal) * 100, 100) if goal > 0 else 0
+        color = CARNEGIE_GREEN if pct >= 95 else CARNEGIE_AMBER if pct >= 80 else CARNEGIE_RED
+        return ui.tags.div(
+            ui.tags.div(
+                style=f"width:{pct:.0f}%; height:4px; background:{color}; border-radius:2px;",
+            ),
+            class_="progress-micro",
+        )
+
+    @render.ui
+    def progress_total_inquiries():
+        return _progress_bar("total_inquiries")
+
+    @render.ui
+    def progress_total_app_starts():
+        return _progress_bar("total_app_starts")
+
+    @render.ui
+    def progress_total_app_submits():
+        return _progress_bar("total_app_submits")
+
+    @render.ui
+    def progress_total_admits():
+        return _progress_bar("total_admits")
+
+    @render.ui
+    def progress_total_deposits():
+        return _progress_bar("total_deposits")
+
+    @render.ui
+    def progress_total_net_deposits():
+        return _progress_bar("total_net_deposits")
+
     # ── Page 1: Trending Chart ───────────────────────────────
 
     @render.ui
     def trending_chart():
-        df = trending_q1()
+        stage = input.trending_metric()  # e.g. "net_deposits"
+        mode = input.trending_mode()     # "cumulative" or "monthly"
+        df = trending_q4()
         if df.empty:
             return ui.tags.div("No data available for the selected filters.", class_="empty-state")
 
-        df_sorted = df.sort_values("term_year")
-        semester_colors = {"Fall": CARNEGIE_RED, "Spring": CARNEGIE_NAVY, "Summer": CARNEGIE_GRAY_TEXT}
+        # Filter to selected stage
+        df = df[df["stage"] == stage].copy()
+        if df.empty:
+            return ui.tags.div("No data available for this stage.", class_="empty-state")
 
+        current_ty = int(input.term_year())
+        prior_ty = current_ty - 1
+
+        # Aggregate by term_year + acad_pos + month_label (sum across student_type etc.)
+        agg = df.groupby(["term_year", "acad_pos", "month_label"], as_index=False)["stage_count"].sum()
+
+        curr = agg[agg["term_year"] == current_ty].sort_values("acad_pos").copy()
+        prior = agg[agg["term_year"] == prior_ty].sort_values("acad_pos").copy()
+
+        if curr.empty and prior.empty:
+            return ui.tags.div("No data available for the selected filters.", class_="empty-state")
+
+        # Apply cumulative if needed
+        y_col = "stage_count"
+        if mode == "cumulative":
+            if not curr.empty:
+                curr["cumulative"] = curr["stage_count"].cumsum()
+            if not prior.empty:
+                prior["cumulative"] = prior["stage_count"].cumsum()
+            y_col = "cumulative"
+
+        # Build figure
+        stage_label = PRIMARY_LABELS.get(f"total_{stage}", stage.replace("_", " ").title())
         fig = go.Figure()
-        for semester in df_sorted["term_semester"].unique():
-            sdf = df_sorted[df_sorted["term_semester"] == semester]
-            color = semester_colors.get(semester, CARNEGIE_GRAY_TEXT)
+
+        # Prior year line (dashed gray)
+        if not prior.empty:
             fig.add_trace(go.Scatter(
-                x=sdf["term_year"], y=sdf["total_inquiries"],
-                mode="lines+markers", name=semester,
-                line=dict(color=color, width=2),
-                marker=dict(color=color, size=7),
-                hovertemplate="<b>%{x}</b><br>Inquiries: %{y:,}<extra></extra>",
+                x=prior["month_label"], y=prior[y_col],
+                mode="lines+markers",
+                name=f"{prior_ty - 1}-{str(prior_ty)[-2:]}",
+                line=dict(color="#B5B2AA", width=1.8, dash="dash"),
+                marker=dict(color="#B5B2AA", size=5),
+                hovertemplate="<b>%{x}</b><br>" + stage_label + ": %{y:,}<extra></extra>",
             ))
 
-        _apply_layout(fig, "Inquiry Volume by Term Year", height=400)
-        fig.update_layout(xaxis=dict(dtick=1))
-        return ui.HTML(fig.to_html(full_html=False, include_plotlyjs="cdn"))
+        # Current year line (solid red)
+        if not curr.empty:
+            fig.add_trace(go.Scatter(
+                x=curr["month_label"], y=curr[y_col],
+                mode="lines+markers",
+                name=f"{current_ty - 1}-{str(current_ty)[-2:]}",
+                line=dict(color="#EA332D", width=2.5),
+                marker=dict(color="#EA332D", size=7),
+                hovertemplate="<b>%{x}</b><br>" + stage_label + ": %{y:,}<extra></extra>",
+            ))
 
-    # ── Page 1: Cost Summary Table ───────────────────────────
+            # 3-month moving average trend line on current year
+            if len(curr) >= 3:
+                curr["trend"] = curr[y_col].rolling(window=3).mean()
+                trend_df = curr.dropna(subset=["trend"])
+                if not trend_df.empty:
+                    fig.add_trace(go.Scatter(
+                        x=trend_df["month_label"], y=trend_df["trend"],
+                        mode="lines",
+                        name="3-mo trend",
+                        line=dict(color="#E8A099", width=1.5, dash="dash"),
+                        hovertemplate="<b>%{x}</b><br>3-mo avg: %{y:,.0f}<extra></extra>",
+                    ))
 
-    @render.ui
-    def cost_summary_section():
-        df = filtered_q2()
-        summary = compute_cost_summary(df)
-        if summary["total_cost"] == 0 and df.empty:
-            return ui.tags.div(
-                ui.tags.div("No cost data available for the selected filters.", class_="empty-state"),
-                class_="cost-summary-card",
-            )
-        headers = [d[0] for d in COST_PER_DEFS]
-        values = [fmt_currency(summary[d[1]]) for d in COST_PER_DEFS]
-        return ui.tags.div(
-            ui.tags.table(
-                ui.tags.thead(
-                    ui.tags.tr(*[ui.tags.th(h, class_="text-end") for h in headers]),
-                ),
-                ui.tags.tbody(
-                    ui.tags.tr(*[ui.tags.td(v, class_="text-end") for v in values]),
-                ),
-                class_="carnegie-table",
+        # Academic month order for x-axis
+        month_order = ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+                       "Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+
+        fig.update_layout(
+            font=dict(family="Manrope, sans-serif", color=CARNEGIE_NAVY, size=10.5),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=48, r=16, t=8, b=40),
+            height=360,
+            xaxis=dict(
+                categoryorder="array",
+                categoryarray=month_order,
+                tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
+                showgrid=False,
+                title="",
             ),
-            class_="cost-summary-card",
+            yaxis=dict(
+                tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
+                gridcolor="#F0EEEA",
+                gridwidth=0.8,
+                showline=False,
+                nticks=5,
+                title="",
+            ),
+            legend=dict(
+                orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5,
+                font=dict(family="Manrope, sans-serif", size=10.5),
+            ),
+            hovermode="x unified",
+            hoverlabel=dict(
+                bgcolor=CARNEGIE_WHITE, bordercolor=CARNEGIE_GRAY_BORDER,
+                font=dict(family="Inter, sans-serif", size=13, color=CARNEGIE_NAVY),
+            ),
         )
 
-    # ── Page 2: Campaign Bar Chart ───────────────────────────
+        return ui.HTML(
+            fig.to_html(full_html=False, include_plotlyjs="cdn",
+                        config={"displayModeBar": False})
+        )
+
+    # ── Page 1: Progress to Goal ─────────────────────────────
 
     @render.ui
-    def campaign_bar_chart():
-        df = filtered_q2()
-        if df.empty:
+    def progress_to_goal():
+        kpis = current_kpis()
+        if not GOALS:
+            # No goal data yet
+            bars = []
+            for key in PRIMARY_KEYS:
+                label = PRIMARY_LABELS[key]
+                bars.append(
+                    ui.tags.div(
+                        ui.tags.div(
+                            ui.tags.span(label, class_="goal-label"),
+                            ui.tags.span("No goal set", class_="goal-pct muted"),
+                            class_="goal-header",
+                        ),
+                        ui.tags.div(
+                            ui.tags.div(style="width:0%; height:8px; background:#ddd; border-radius:4px;"),
+                            class_="goal-bar-bg",
+                        ),
+                        class_="goal-row",
+                    )
+                )
+            return ui.tags.div(*bars, class_="goal-bars")
+
+        bars = []
+        for key in PRIMARY_KEYS:
+            label = PRIMARY_LABELS[key]
+            actual = kpis.get(key, 0)
+            goal = GOALS.get(key, 0)
+            pct = min((actual / goal) * 100, 100) if goal > 0 else 0
+            color = CARNEGIE_GREEN if pct >= 95 else CARNEGIE_AMBER if pct >= 80 else CARNEGIE_RED
+            bars.append(
+                ui.tags.div(
+                    ui.tags.div(
+                        ui.tags.span(label, class_="goal-label"),
+                        ui.tags.span(f"{pct:.0f}%", class_="goal-pct"),
+                        class_="goal-header",
+                    ),
+                    ui.tags.div(
+                        ui.tags.div(style=f"width:{pct:.0f}%; height:8px; background:{color}; border-radius:4px;"),
+                        class_="goal-bar-bg",
+                    ),
+                    class_="goal-row",
+                )
+            )
+        return ui.tags.div(*bars, class_="goal-bars")
+
+    # ── Page 1: Attention Panel ──────────────────────────────
+
+    @render.ui
+    def attention_bullets():
+        changes = yoy_changes()
+        # Find top positive and top negative shifts across primary funnel
+        shifts = []
+        for key in PRIMARY_KEYS:
+            val = changes.get(key)
+            if val is not None:
+                shifts.append((key, val))
+
+        if not shifts:
+            return ui.tags.p("Insufficient comparison data for this period.",
+                             style="color:var(--carnegie-gray-text); font-size:14px;")
+
+        shifts.sort(key=lambda x: x[1])
+        bullets = []
+
+        # Biggest decline
+        worst_key, worst_val = shifts[0]
+        if worst_val < 0:
+            bullets.append(ui.tags.li(
+                ui.tags.span(f"{PRIMARY_LABELS[worst_key]} declined {abs(worst_val):.1f}% vs. prior year",
+                             style="color:var(--carnegie-red);"),
+                class_="attention-bullet",
+            ))
+
+        # Biggest gain
+        best_key, best_val = shifts[-1]
+        if best_val > 0:
+            bullets.append(ui.tags.li(
+                ui.tags.span(f"{PRIMARY_LABELS[best_key]} grew {best_val:.1f}% vs. prior year",
+                             style="color:var(--carnegie-green);"),
+                class_="attention-bullet",
+            ))
+
+        # Add a net summary
+        total_positive = sum(1 for _, v in shifts if v > 0)
+        total_negative = sum(1 for _, v in shifts if v < 0)
+        if total_positive > 0 and total_negative > 0:
+            bullets.append(ui.tags.li(
+                f"{total_positive} of {len(shifts)} funnel stages are trending up vs. prior year.",
+                class_="attention-bullet",
+            ))
+
+        if not bullets:
+            return ui.tags.p("No significant changes detected.",
+                             style="color:var(--carnegie-gray-text); font-size:14px;")
+
+        return ui.tags.ul(*bullets, class_="attention-list")
+
+    # ── Page 2: Funnel Waterfall ─────────────────────────────
+
+    @render.ui
+    def funnel_waterfall():
+        df_curr = filtered_q2()
+        df_prior = prior_q2()
+        if df_curr.empty:
             return ui.tags.div("No data available for the selected filters.", class_="empty-state")
 
-        breakdown = compute_campaign_breakdown(df)
-        metric = input.campaign_metric()
+        curr_kpis = compute_funnel_kpis(filtered_q1())
+        prior_kpi = compute_funnel_kpis(prior_q1())
 
-        if metric.startswith("cost_per"):
-            breakdown[metric] = breakdown[metric].fillna(0)
+        stages = PRIMARY_KEYS
+        labels = [PRIMARY_LABELS[k] for k in stages]
+        curr_vals = [curr_kpis.get(k, 0) for k in stages]
+        prior_vals = [prior_kpi.get(k, 0) for k in stages]
 
-        label = metric.replace("_", " ").title()
-        fig = px.bar(
-            breakdown, x="lead_source", y=metric,
-            labels={"lead_source": "Lead Source", metric: label},
-            color_discrete_sequence=[CARNEGIE_RED],
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=labels, y=curr_vals, name="Current Year",
+            marker_color=CARNEGIE_RED,
+            text=[f"{v:,}" for v in curr_vals], textposition="outside",
+            hovertemplate="<b>%{x}</b><br>Current: %{y:,}<extra></extra>",
+        ))
+        fig.add_trace(go.Bar(
+            x=labels, y=prior_vals, name="Prior Year",
+            marker_color="#A8BDD6",
+            text=[f"{v:,}" for v in prior_vals], textposition="outside",
+            hovertemplate="<b>%{x}</b><br>Prior: %{y:,}<extra></extra>",
+            opacity=0.5,
+        ))
+
+        # Add conversion rate annotations between stages
+        for i in range(len(stages) - 1):
+            if curr_vals[i] > 0:
+                rate = (curr_vals[i + 1] / curr_vals[i]) * 100
+                fig.add_annotation(
+                    x=(i + i + 1) / 2, y=max(curr_vals[i], curr_vals[i + 1]) * 1.05,
+                    text=f"{rate:.1f}%", showarrow=False,
+                    font=dict(size=11, color=CARNEGIE_GRAY_TEXT),
+                )
+
+        _apply_layout(fig, "", height=380)
+        fig.update_layout(
+            barmode="group",
+            xaxis=dict(title=""),
+            yaxis=dict(title=""),
         )
-        fig.update_traces(
-            hovertemplate="<b>%{x}</b><br>" + label + ": %{y:,.0f}<extra></extra>",
-        )
-        _apply_layout(fig, f"{label} by Lead Source", height=420)
-        fig.update_layout(showlegend=False)
-        return ui.HTML(fig.to_html(full_html=False, include_plotlyjs="cdn"))
+        return _plotly_html(fig)
 
-    # ── Page 2: Campaign Detail Table ────────────────────────
+    # ── Page 2: Source Performance Table ──────────────────────
 
     @render.data_frame
-    def campaign_detail_table():
+    def source_table():
         df = filtered_q2()
         breakdown = compute_campaign_breakdown(df)
         if breakdown.empty:
             return render.DataGrid(pd.DataFrame({"No data available": []}))
+
+        # Prior year for YoY
+        prior_bd = compute_campaign_breakdown(prior_q2())
+
         display = pd.DataFrame()
-        display["Lead Source"] = breakdown["lead_source"]
-        display["Total Spend"] = breakdown["total_cost"].apply(fmt_currency)
-        for display_name, col_name, _ in COST_PER_DEFS:
-            display[display_name] = breakdown[col_name].apply(
-                lambda x: fmt_currency(x) if x is not None else "\u2014"
-            )
-        return render.DataGrid(display, filters=True)
+        display["Source"] = breakdown["lead_source"]
+        display["Inquiries"] = breakdown["total_inquiries"].apply(lambda x: f"{int(x):,}")
+        display["App Submits"] = breakdown["total_app_submits"].apply(lambda x: f"{int(x):,}")
+        display["Admits"] = breakdown["total_admits"].apply(lambda x: f"{int(x):,}")
+        display["Net Deposits"] = breakdown["total_net_deposits"].apply(lambda x: f"{int(x):,}")
+
+        # YoY delta on net deposits
+        yoy_col = []
+        for _, row in breakdown.iterrows():
+            src = row["lead_source"]
+            curr_nd = row["total_net_deposits"]
+            prior_row = prior_bd[prior_bd["lead_source"] == src]
+            if prior_row.empty or prior_row.iloc[0]["total_net_deposits"] == 0:
+                yoy_col.append("\u2014")
+            else:
+                prev_nd = prior_row.iloc[0]["total_net_deposits"]
+                pct = ((curr_nd - prev_nd) / abs(prev_nd)) * 100
+                yoy_col.append(f"{pct:+.1f}%")
+        display["YoY \u0394"] = yoy_col
+
+        return render.DataGrid(
+            display.sort_values("Net Deposits", ascending=False, key=lambda x: x.str.replace(",", "").astype(int)),
+            filters=False,
+        )
+
+    # ── Page 2: Source Trend Chart ───────────────────────────
+
+    @render.ui
+    def source_trend_chart():
+        # Show top sources across all years
+        df = Q2.copy()
+        df = df[df["institution_name"] == input.institution()]
+        df = df[df["term_semester"] == input.term_semester()]
+        metric = input.source_trend_metric()
+
+        if df.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+
+        # Get top 5 sources by current year volume
+        curr_year = int(input.term_year())
+        curr_df = df[df["term_year"] == curr_year]
+        top_sources = (
+            curr_df.groupby("lead_source")[metric].sum()
+            .nlargest(5).index.tolist()
+        )
+        if not top_sources:
+            return ui.tags.div("No source data available.", class_="empty-state")
+
+        fig = go.Figure()
+        for i, src in enumerate(top_sources):
+            sdf = df[df["lead_source"] == src].groupby("term_year", as_index=False)[metric].sum()
+            sdf = sdf.sort_values("term_year")
+            color = CHART_PALETTE[i % len(CHART_PALETTE)]
+            fig.add_trace(go.Scatter(
+                x=sdf["term_year"], y=sdf[metric],
+                mode="lines+markers", name=src,
+                line=dict(color=color, width=2),
+                marker=dict(size=6),
+                hovertemplate=f"<b>{src}</b><br>%{{x}}: %{{y:,}}<extra></extra>",
+            ))
+
+        _apply_layout(fig, "", height=320)
+        fig.update_layout(xaxis=dict(dtick=1, title=""), yaxis=dict(title=""))
+        return _plotly_html(fig)
+
+    # ── Page 2: Conversion Rates by Source ────────────────────
+
+    @render.ui
+    def conversion_by_source_chart():
+        df = filtered_q2()
+        if df.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+
+        breakdown = compute_campaign_breakdown(df)
+        if breakdown.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+
+        # Compute admit rate and yield rate per source
+        breakdown["admit_rate"] = breakdown.apply(
+            lambda r: (r["total_admits"] / r["total_app_submits"] * 100)
+            if r["total_app_submits"] > 0 else 0, axis=1
+        )
+        breakdown["yield_rate"] = breakdown.apply(
+            lambda r: (r["total_net_deposits"] / r["total_admits"] * 100)
+            if r["total_admits"] > 0 else 0, axis=1
+        )
+
+        bd = breakdown.nlargest(6, "total_inquiries")
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=bd["lead_source"], y=bd["admit_rate"],
+            name="Admit Rate", marker_color=CARNEGIE_NAVY,
+            hovertemplate="<b>%{x}</b><br>Admit Rate: %{y:.1f}%<extra></extra>",
+        ))
+        fig.add_trace(go.Bar(
+            x=bd["lead_source"], y=bd["yield_rate"],
+            name="Yield Rate", marker_color=CARNEGIE_RED,
+            hovertemplate="<b>%{x}</b><br>Yield Rate: %{y:.1f}%<extra></extra>",
+        ))
+
+        _apply_layout(fig, "", height=340)
+        fig.update_layout(
+            barmode="group",
+            xaxis=dict(title=""),
+            yaxis=dict(title="", ticksuffix="%"),
+        )
+        return _plotly_html(fig)
+
+    # ── Page 3: Programs (placeholder — Q3 has geo but no program data) ──
+
+    @render.ui
+    def programs_bar_chart():
+        # Q3 does not have program data, show placeholder
+        return ui.tags.div(
+            "Program-level data is not available in the current dataset. "
+            "This view will populate when program data is connected.",
+            class_="empty-state",
+        )
+
+    @render.data_frame
+    def program_detail_table():
+        return render.DataGrid(pd.DataFrame({
+            "Program data is not available": ["Connect program data source to enable this view."]
+        }))
 
     # ── Page 3: Geography Map + Top States ───────────────────
 
@@ -333,20 +780,24 @@ def server_logic(input, output, session):
             return ui.tags.div("No mappable state data available.", class_="empty-state")
 
         # Choropleth with Carnegie red gradient
-        fig = px.choropleth(
-            map_df,
-            locations="student_state",
+        fig = go.Figure(go.Choropleth(
+            locations=map_df["student_state"],
             locationmode="USA-states",
-            color="total_inquiries",
-            scope="usa",
-            color_continuous_scale=[
+            z=map_df["total_inquiries"],
+            colorscale=[
                 [0, "#fce4ec"],
                 [0.3, "#ef9a9a"],
                 [0.6, "#e57373"],
                 [1, CARNEGIE_RED],
             ],
-            labels={"student_state": "State", "total_inquiries": "Inquiries"},
-        )
+            hovertemplate="<b>%{location}</b><br>Inquiries: %{z:,}<extra></extra>",
+            colorbar=dict(
+                title="Inquiries",
+                thickness=12, len=0.6,
+                tickfont=dict(size=11, color=CARNEGIE_GRAY_TEXT),
+                title_font=dict(size=11, color=CARNEGIE_GRAY_TEXT),
+            ),
+        ))
         fig.update_layout(
             font=dict(family="Inter, sans-serif", color=CARNEGIE_NAVY),
             paper_bgcolor="rgba(0,0,0,0)",
@@ -359,18 +810,9 @@ def server_logic(input, output, session):
                 landcolor="#eae6e1",
                 showlakes=True,
                 showframe=False,
+                scope="usa",
                 projection_type="albers usa",
             ),
-            coloraxis_colorbar=dict(
-                title="Inquiries",
-                thickness=12,
-                len=0.6,
-                tickfont=dict(size=11, color=CARNEGIE_GRAY_TEXT),
-                title_font=dict(size=11, color=CARNEGIE_GRAY_TEXT),
-            ),
-        )
-        fig.update_traces(
-            hovertemplate="<b>%{location}</b><br>Inquiries: %{z:,}<extra></extra>",
         )
 
         # Top states sidebar
@@ -385,9 +827,7 @@ def server_logic(input, output, session):
         ]
 
         return ui.tags.div(
-            ui.tags.div(
-                ui.HTML(fig.to_html(full_html=False, include_plotlyjs="cdn")),
-            ),
+            ui.tags.div(_plotly_html(fig)),
             ui.tags.div(
                 ui.tags.div("TOP STATES", class_="top-states-title"),
                 *top_rows,
@@ -411,8 +851,8 @@ def server_logic(input, output, session):
             "total_app_starts": "App Starts",
             "total_app_submits": "App Submits",
             "total_deposits": "Deposits",
-            "total_enrolled": "Enrolled",
+            "total_net_deposits": "Net Deposits",
         })
         show_cols = ["State", "City", "Inquiries", "App Starts",
-                     "App Submits", "Deposits", "Enrolled"]
-        return render.DataGrid(display[show_cols], filters=True)
+                     "App Submits", "Deposits", "Net Deposits"]
+        return render.DataGrid(display[show_cols], filters=False)

@@ -38,7 +38,10 @@
       "Bash(/c/Users/mabrantes/Documents/Projects/carnegie-roi-1/.venv/Scripts/python.exe -c \":*)",
       "Bash(/c/Users/mabrantes/Documents/Projects/carnegie-roi-1/.venv/Scripts/python.exe -c \"from shiny import ui; print\\(hasattr\\(ui, ''nav_spacer''\\)\\)\")",
       "Bash(git status:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git push:*)"
     ]
   }
 }

@@ -86,6 +86,9 @@ Reference: `docs/carnegie-brand.md`
 - When changing layout:
   - prefer structure changes in `app.py` over brute-force CSS
 - Do not claim success based only on code edits; validate visually or by app behavior
+- After completing each task or phase, always run `git add`, `git commit` with a clear message, and `git push`
+- Commit messages should be concise and describe what changed (e.g., "Add collapsible filter sidebar with global filters")
+- Do not batch multiple phases into a single commit — one commit per completed phase or task
 
 ## Skills and Extensions
 
