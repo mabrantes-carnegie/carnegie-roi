@@ -255,9 +255,11 @@ def server_logic(input, output, session):
 
     @render.text
     def kpi_cost_per_net_deposit():
-        cd = cost_data()
-        val = cd.get("cost_per_net_deposit")
-        return fmt_currency(val) if val else "\u2014"
+        total_spend = filtered_q2()["total_cost"].sum()
+        net_deps = current_kpis().get("total_net_deposits", 0)
+        if net_deps > 0 and total_spend > 0:
+            return fmt_currency(total_spend / net_deps)
+        return "\u2014"
 
     # --- YoY badge outputs ---
 
@@ -306,13 +308,19 @@ def server_logic(input, output, session):
 
     @render.ui
     def yoy_cost_per_net_deposit():
-        # Cost YoY requires prior cost data
-        curr = cost_data().get("cost_per_net_deposit")
-        prior_cd = compute_cost_summary(prior_q2())
-        prev = prior_cd.get("cost_per_net_deposit")
-        if curr is None or prev is None or prev == 0:
+        # Cost per Net Deposit = total spend (Q2) / net deposits (Q1)
+        curr_spend = filtered_q2()["total_cost"].sum()
+        curr_nd = current_kpis().get("total_net_deposits", 0)
+        curr_cpnd = (curr_spend / curr_nd) if curr_nd > 0 and curr_spend > 0 else None
+
+        prior_spend = prior_q2()["total_cost"].sum()
+        prior_nd = prior_kpis().get("total_net_deposits", 0)
+        prior_cpnd = (prior_spend / prior_nd) if prior_nd > 0 and prior_spend > 0 else None
+
+        if curr_cpnd is None or prior_cpnd is None or prior_cpnd == 0:
             return ui.tags.span("N/A", class_="kpi-badge kpi-badge--na")
-        pct = ((curr - prev) / abs(prev)) * 100
+
+        pct = ((curr_cpnd - prior_cpnd) / abs(prior_cpnd)) * 100
         # For cost, lower is better — invert sentiment
         text, _ = fmt_yoy(pct)
         sentiment = "positive" if pct < 0 else "negative" if pct > 0 else "neutral"
@@ -523,58 +531,6 @@ def server_logic(input, output, session):
                 )
             )
         return ui.tags.div(*bars, class_="goal-bars")
-
-    # ── Page 1: Attention Panel ──────────────────────────────
-
-    @render.ui
-    def attention_bullets():
-        changes = yoy_changes()
-        # Find top positive and top negative shifts across primary funnel
-        shifts = []
-        for key in PRIMARY_KEYS:
-            val = changes.get(key)
-            if val is not None:
-                shifts.append((key, val))
-
-        if not shifts:
-            return ui.tags.p("Insufficient comparison data for this period.",
-                             style="color:var(--carnegie-gray-text); font-size:14px;")
-
-        shifts.sort(key=lambda x: x[1])
-        bullets = []
-
-        # Biggest decline
-        worst_key, worst_val = shifts[0]
-        if worst_val < 0:
-            bullets.append(ui.tags.li(
-                ui.tags.span(f"{PRIMARY_LABELS[worst_key]} declined {abs(worst_val):.1f}% vs. prior year",
-                             style="color:var(--carnegie-red);"),
-                class_="attention-bullet",
-            ))
-
-        # Biggest gain
-        best_key, best_val = shifts[-1]
-        if best_val > 0:
-            bullets.append(ui.tags.li(
-                ui.tags.span(f"{PRIMARY_LABELS[best_key]} grew {best_val:.1f}% vs. prior year",
-                             style="color:var(--carnegie-green);"),
-                class_="attention-bullet",
-            ))
-
-        # Add a net summary
-        total_positive = sum(1 for _, v in shifts if v > 0)
-        total_negative = sum(1 for _, v in shifts if v < 0)
-        if total_positive > 0 and total_negative > 0:
-            bullets.append(ui.tags.li(
-                f"{total_positive} of {len(shifts)} funnel stages are trending up vs. prior year.",
-                class_="attention-bullet",
-            ))
-
-        if not bullets:
-            return ui.tags.p("No significant changes detected.",
-                             style="color:var(--carnegie-gray-text); font-size:14px;")
-
-        return ui.tags.ul(*bullets, class_="attention-list")
 
     # ── Page 2: Funnel Waterfall ─────────────────────────────
 

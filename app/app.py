@@ -215,15 +215,6 @@ page_overview = ui.nav_panel(
             class_="main-content-row",
         ),
 
-        # Section 5: Attention panel
-        ui.tags.div(
-            ui.tags.div(
-                ui.tags.span("What changed this period", class_="card-heading"),
-                ui.output_ui("attention_bullets"),
-            ),
-            class_="attention-card",
-        ),
-
         style=_CW,
     ),
 )
