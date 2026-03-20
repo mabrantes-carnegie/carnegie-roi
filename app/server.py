@@ -526,25 +526,29 @@ def server_logic(input, output, session):
 
     @render.data_frame
     def source_table():
-        df = filtered_q2()
-        breakdown = compute_campaign_breakdown(df)
-        if breakdown.empty:
+        """Source performance table using Q6 origin_source_first (Slate lead source)."""
+        df_curr = filtered_main()
+        df_prior = prior_main()
+        if df_curr.empty:
             return render.DataGrid(pd.DataFrame({"No data available": []}))
 
-        prior_bd = compute_campaign_breakdown(prior_q2())
+        funnel_cols = ["total_inquiries", "total_app_submits", "total_admits",
+                       "total_deposits", "total_net_deposits"]
+        curr_agg = df_curr.groupby("origin_source_first", as_index=False)[funnel_cols].sum()
+        prior_agg = df_prior.groupby("origin_source_first", as_index=False)[funnel_cols].sum()
 
         display = pd.DataFrame()
-        display["Campaign Source"] = breakdown["lead_source"]
-        display["Inquiries"] = breakdown["total_inquiries"].apply(lambda x: f"{int(x):,}")
-        display["App Submits"] = breakdown["total_app_submits"].apply(lambda x: f"{int(x):,}")
-        display["Admits"] = breakdown["total_admits"].apply(lambda x: f"{int(x):,}")
-        display["Net Deposits"] = breakdown["total_net_deposits"].apply(lambda x: f"{int(x):,}")
+        display["Lead Source"] = curr_agg["origin_source_first"]
+        display["Inquiries"] = curr_agg["total_inquiries"].apply(lambda x: f"{int(x):,}")
+        display["App Submits"] = curr_agg["total_app_submits"].apply(lambda x: f"{int(x):,}")
+        display["Admits"] = curr_agg["total_admits"].apply(lambda x: f"{int(x):,}")
+        display["Net Deposits"] = curr_agg["total_net_deposits"].apply(lambda x: f"{int(x):,}")
 
         yoy_col = []
-        for _, row in breakdown.iterrows():
-            src = row["lead_source"]
+        for _, row in curr_agg.iterrows():
+            src = row["origin_source_first"]
             curr_nd = row["total_net_deposits"]
-            prior_row = prior_bd[prior_bd["lead_source"] == src]
+            prior_row = prior_agg[prior_agg["origin_source_first"] == src]
             if prior_row.empty or prior_row.iloc[0]["total_net_deposits"] == 0:
                 yoy_col.append("\u2014")
             else:
@@ -554,7 +558,8 @@ def server_logic(input, output, session):
         display["YoY \u0394"] = yoy_col
 
         return render.DataGrid(
-            display.sort_values("Net Deposits", ascending=False, key=lambda x: x.str.replace(",", "").astype(int)),
+            display.sort_values("Net Deposits", ascending=False,
+                                key=lambda x: x.str.replace(",", "").astype(int)),
             filters=False,
         )
 
@@ -612,24 +617,24 @@ def server_logic(input, output, session):
 
     @render.ui
     def conversion_by_source_chart():
-        df = filtered_q2()
+        """Conversion rates by origin_source_first from Q6."""
+        df = filtered_main()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        breakdown = compute_campaign_breakdown(df)
-        if breakdown.empty:
-            return ui.tags.div("No data available.", class_="empty-state")
+        funnel_cols = ["total_inquiries", "total_app_submits", "total_admits", "total_net_deposits"]
+        src_agg = df.groupby("origin_source_first", as_index=False)[funnel_cols].sum()
 
-        breakdown["admit_rate"] = breakdown.apply(
+        src_agg["admit_rate"] = src_agg.apply(
             lambda r: (r["total_admits"] / r["total_app_submits"] * 100)
             if r["total_app_submits"] > 0 else 0, axis=1
         )
-        breakdown["yield_rate"] = breakdown.apply(
+        src_agg["yield_rate"] = src_agg.apply(
             lambda r: (r["total_net_deposits"] / r["total_admits"] * 100)
             if r["total_admits"] > 0 else 0, axis=1
         )
 
-        bd = breakdown.nlargest(6, "total_inquiries")
+        bd = src_agg.nlargest(8, "total_inquiries")
 
         def _wrap_label(text, max_chars=20):
             if len(text) <= max_chars:
@@ -646,7 +651,7 @@ def server_logic(input, output, session):
                 lines.append(" ".join(current))
             return "<br>".join(lines)
 
-        x_labels = [_wrap_label(s) for s in bd["lead_source"]]
+        x_labels = [_wrap_label(s) for s in bd["origin_source_first"]]
 
         fig = go.Figure()
         fig.add_trace(go.Bar(
