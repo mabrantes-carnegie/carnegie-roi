@@ -229,7 +229,7 @@ page_funnel = ui.nav_panel(
         ui.tags.div(
             ui.tags.div(
                 ui.input_selectize(
-                    "source_filter", "Source",
+                    "source_filter", "Lead Source",
                     choices=[],
                     multiple=True,
                 ),
@@ -251,13 +251,12 @@ page_funnel = ui.nav_panel(
                 ui.tags.div(
                     ui.tags.div(
                         ui.input_selectize(
-                            "campaign_service_filter", "Campaign Service",
+                            "program_level_adv", "Program Level",
                             choices=[],
                             multiple=True,
                         ),
                         class_="inline-filter",
                     ),
-                    # TODO: Add App Round filter when data is available
                     class_="advanced-filters-panel",
                     style="display:none;",
                 ),

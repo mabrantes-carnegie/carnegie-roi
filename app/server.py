@@ -117,17 +117,36 @@ def server_logic(input, output, session):
         return _apply_global_filters(Q6.copy())
 
     @reactive.calc
+    def filtered_deep_dive():
+        """Q6 current year + page-specific Lead Source and Program Level filters."""
+        df = filtered_main()
+        src = input.source_filter()
+        if src and len(src) > 0:
+            df = df[df["origin_source_first"].isin(src)]
+        pl = input.program_level_adv()
+        if pl and len(pl) > 0:
+            df = df[df["program_level"].isin(pl)]
+        return df
+
+    @reactive.calc
+    def prior_deep_dive():
+        """Q6 prior year + page-specific Lead Source filter."""
+        df = prior_main()
+        src = input.source_filter()
+        if src and len(src) > 0:
+            df = df[df["origin_source_first"].isin(src)]
+        pl = input.program_level_adv()
+        if pl and len(pl) > 0:
+            df = df[df["program_level"].isin(pl)]
+        return df
+
+    @reactive.calc
     def filtered_q2():
+        """Q2 for cost metrics only (no page-specific source filter)."""
         df = Q2.copy()
         df = df[df["institution_name"] == input.institution()]
         df = df[df["term_year"] == int(input.term_year())]
         df = df[df["term_semester"] == input.term_semester()]
-        src = input.source_filter()
-        if src and len(src) > 0:
-            df = df[df["lead_source"].isin(src)]
-        svc = input.campaign_service_filter()
-        if svc and len(svc) > 0:
-            df = df[df["campaign_service"].isin(svc)]
         return df
 
     @reactive.calc
@@ -151,13 +170,21 @@ def server_logic(input, output, session):
 
     @reactive.effect
     def _update_source_choices():
-        sources = sorted(Q2[Q2["institution_name"] == input.institution()]["lead_source"].dropna().unique().tolist())
+        """Populate Lead Source filter from Q6 origin_source_first, sorted by inquiry volume."""
+        df = filtered_main()
+        if df.empty:
+            ui.update_selectize("source_filter", choices=[], selected=[])
+            return
+        src_totals = df.groupby("origin_source_first")["total_inquiries"].sum().sort_values(ascending=False)
+        sources = [s for s in src_totals.index.tolist() if s and str(s).strip() and s != "Unknown"]
         ui.update_selectize("source_filter", choices=sources, selected=[])
 
     @reactive.effect
-    def _update_campaign_service_choices():
-        services = sorted(Q2[Q2["institution_name"] == input.institution()]["campaign_service"].dropna().unique().tolist())
-        ui.update_selectize("campaign_service_filter", choices=services, selected=[])
+    def _update_program_level_choices():
+        """Populate Program Level advanced filter from Q6."""
+        df = filtered_main()
+        levels = sorted([l for l in df["program_level"].dropna().unique().tolist() if l and str(l).strip()])
+        ui.update_selectize("program_level_adv", choices=levels, selected=[])
 
     # ══════════════════════════════════════════════════════════
     # KPI CALCULATIONS (from Q6)
@@ -480,8 +507,8 @@ def server_logic(input, output, session):
 
     @render.ui
     def funnel_waterfall():
-        curr = current_kpis()
-        prior = prior_kpis()
+        curr = _aggregate_kpis(filtered_deep_dive())
+        prior = _aggregate_kpis(prior_deep_dive())
 
         if all(curr.get(k, 0) == 0 for k in PRIMARY_KEYS):
             return ui.tags.div("No data available for the selected filters.", class_="empty-state")
@@ -527,8 +554,8 @@ def server_logic(input, output, session):
     @render.data_frame
     def source_table():
         """Source performance table using Q6 origin_source_first (Slate lead source)."""
-        df_curr = filtered_main()
-        df_prior = prior_main()
+        df_curr = filtered_deep_dive()
+        df_prior = prior_deep_dive()
         if df_curr.empty:
             return render.DataGrid(pd.DataFrame({"No data available": []}))
 
@@ -568,7 +595,7 @@ def server_logic(input, output, session):
     @render.ui
     def source_trend_chart():
         metric_col = input.source_trend_metric()  # e.g. "total_inquiries"
-        df = filtered_main()
+        df = filtered_deep_dive()
 
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -618,7 +645,7 @@ def server_logic(input, output, session):
     @render.ui
     def conversion_by_source_chart():
         """Conversion rates by origin_source_first from Q6."""
-        df = filtered_main()
+        df = filtered_deep_dive()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
