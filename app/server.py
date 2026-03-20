@@ -733,10 +733,28 @@ def server_logic(input, output, session):
 
         bd = breakdown.nlargest(6, "total_inquiries")
 
+        # Wrap long source names to keep x-axis labels horizontal
+        def _wrap_label(text, max_chars=20):
+            if len(text) <= max_chars:
+                return text
+            words = text.split()
+            lines, current = [], []
+            for word in words:
+                if len(" ".join(current + [word])) > max_chars and current:
+                    lines.append(" ".join(current))
+                    current = [word]
+                else:
+                    current.append(word)
+            if current:
+                lines.append(" ".join(current))
+            return "<br>".join(lines)
+
+        x_labels = [_wrap_label(s) for s in bd["lead_source"]]
+
         fig = go.Figure()
         # Vertical bars — Admit Rate (Carnegie Blue)
         fig.add_trace(go.Bar(
-            x=bd["lead_source"], y=bd["admit_rate"],
+            x=x_labels, y=bd["admit_rate"],
             name="Admit Rate",
             marker=dict(color="#021326", line=dict(width=0)),
             text=[f"{v:.0f}%" for v in bd["admit_rate"]],
@@ -747,7 +765,7 @@ def server_logic(input, output, session):
         ))
         # Vertical bars — Yield Rate (Carnegie Red)
         fig.add_trace(go.Bar(
-            x=bd["lead_source"], y=bd["yield_rate"],
+            x=x_labels, y=bd["yield_rate"],
             name="Yield Rate",
             marker=dict(color="#EA332D", line=dict(width=0)),
             text=[f"{v:.0f}%" for v in bd["yield_rate"]],
@@ -768,8 +786,8 @@ def server_logic(input, output, session):
             bargroupgap=0.1,
             xaxis=dict(
                 title="",
-                tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
-                tickangle=-30,
+                tickfont=dict(family="Manrope, sans-serif", size=10, color="#4A4843"),
+                tickangle=0,
                 showgrid=False,
             ),
             yaxis=dict(
