@@ -97,11 +97,37 @@ def _load_goals() -> dict:
     }
 
 
+def _load_q5() -> pd.DataFrame:
+    """Load monthly source trending data (q5_monthly_source_trending.csv)."""
+    df = pd.read_csv(_DATA_DIR / "q5_monthly_source_trending.csv")
+    df["term_year"] = df["term_year"].astype(int)
+    df["event_year"] = df["event_year"].astype(int)
+    df["event_month"] = df["event_month"].astype(int)
+
+    # Create event_date for filtering future months
+    df["event_date"] = pd.to_datetime(
+        df["event_year"].astype(str) + "-" + df["event_month"].astype(str).str.zfill(2) + "-01"
+    )
+    today_first = pd.Timestamp(date.today().replace(day=1))
+    df = df[df["event_date"] <= today_first]
+
+    # Academic cycle position: Jul=1 ... Jun=12
+    acad_order = {7: 1, 8: 2, 9: 3, 10: 4, 11: 5, 12: 6,
+                  1: 7, 2: 8, 3: 9, 4: 10, 5: 11, 6: 12}
+    df["acad_pos"] = df["event_month"].map(acad_order)
+    month_labels = {1: "Jul", 2: "Aug", 3: "Sep", 4: "Oct", 5: "Nov", 6: "Dec",
+                    7: "Jan", 8: "Feb", 9: "Mar", 10: "Apr", 11: "May", 12: "Jun"}
+    df["month_label"] = df["acad_pos"].map(month_labels)
+
+    return df.reset_index(drop=True)
+
+
 # Load once at import time
 Q1 = _load_q1()
 Q2 = _load_q2()
 Q3 = _load_q3()
 Q4 = _load_q4()
+Q5 = _load_q5()
 GOALS = _load_goals()
 
 

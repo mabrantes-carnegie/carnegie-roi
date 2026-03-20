@@ -4,7 +4,7 @@ from shiny import render, reactive, ui, req
 import plotly.graph_objects as go
 import pandas as pd
 
-from data_loader import Q1, Q2, Q3, Q4, GOALS
+from data_loader import Q1, Q2, Q3, Q4, Q5, GOALS
 from metrics import (
     FUNNEL_COLS, COST_PER_DEFS,
     compute_funnel_kpis, compute_yoy_change,
@@ -642,42 +642,53 @@ def server_logic(input, output, session):
 
     @render.ui
     def source_trend_chart():
-        # TODO: Create monthly-by-source query for proper source trend chart
-        # Currently Q2 has term-level data only (no monthly granularity by source).
-        # Shows year-over-year comparison by source using term_year as X-axis.
-        df = Q2.copy()
+        # Monthly source trend from q5_monthly_source_trending.csv
+        stage = input.source_trend_metric()  # e.g. "total_inquiries" -> "inquiries"
+        # Map from total_ prefix to stage name in Q5
+        stage_key = stage.replace("total_", "")
+
+        df = Q5.copy()
         df = df[df["institution_name"] == input.institution()]
         df = df[df["term_semester"] == input.term_semester()]
-        metric = input.source_trend_metric()
+        df = df[df["stage"] == stage_key]
 
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        curr_year = int(input.term_year())
-        curr_df = df[df["term_year"] == curr_year]
-        top_sources = (
-            curr_df.groupby("lead_source")[metric].sum()
-            .nlargest(5).index.tolist()
-        )
+        current_ty = int(input.term_year())
+        df = df[df["term_year"] == current_ty]
+
+        if df.empty:
+            return ui.tags.div("No data for current term year.", class_="empty-state")
+
+        # Aggregate by lead_source + acad_pos + month_label
+        agg = df.groupby(["lead_source", "acad_pos", "month_label"], as_index=False)["stage_count"].sum()
+
+        # Top 5 sources by total volume
+        src_totals = agg.groupby("lead_source")["stage_count"].sum().nlargest(5)
+        top_sources = src_totals.index.tolist()
+
         if not top_sources:
             return ui.tags.div("No source data available.", class_="empty-state")
 
-        # Source-specific colors: first = Carnegie Red, rest from palette
-        source_colors = [CARNEGIE_RED, "#A8BDD6", "#C9D444", "#E8D9B8", "#E8D8F6"]
+        # Color palette: top source Carnegie Red, others muted
+        source_colors = ["#EA332D", "#4A7FB5", "#8B6EBD", "#D4A843", "#6B9E8A"]
 
         fig = go.Figure()
         for i, src in enumerate(top_sources):
-            sdf = df[df["lead_source"] == src].groupby("term_year", as_index=False)[metric].sum()
-            sdf = sdf.sort_values("term_year")
+            sdf = agg[agg["lead_source"] == src].sort_values("acad_pos")
             color = source_colors[i % len(source_colors)]
-            # Current year solid, prior year implied by the line connecting points
+            dash = "solid" if i < 3 else "dash"
             fig.add_trace(go.Scatter(
-                x=sdf["term_year"], y=sdf[metric],
+                x=sdf["month_label"], y=sdf["stage_count"],
                 mode="lines+markers", name=src,
-                line=dict(color=color, width=2),
-                marker=dict(color=color, size=6),
+                line=dict(color=color, width=2.5 if i == 0 else 1.8, dash=dash),
+                marker=dict(color=color, size=6 if i == 0 else 5),
                 hovertemplate=f"<b>{src}</b><br>%{{x}}: %{{y:,}}<extra></extra>",
             ))
+
+        month_order = ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+                       "Jan", "Feb", "Mar", "Apr", "May", "Jun"]
 
         fig.update_layout(
             font=dict(family="Manrope, sans-serif", color=CARNEGIE_NAVY, size=10.5),
@@ -686,9 +697,9 @@ def server_logic(input, output, session):
             margin=dict(l=48, r=16, t=8, b=40),
             height=320,
             xaxis=dict(
-                dtick=1, title="",
+                categoryorder="array", categoryarray=month_order,
                 tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
-                showgrid=False,
+                showgrid=False, title="",
             ),
             yaxis=dict(
                 tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
