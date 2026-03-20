@@ -731,59 +731,57 @@ def server_logic(input, output, session):
             if r["total_admits"] > 0 else 0, axis=1
         )
 
-        bd = breakdown.nlargest(6, "total_inquiries").sort_values("admit_rate")
+        bd = breakdown.nlargest(6, "total_inquiries")
 
         fig = go.Figure()
-        # Horizontal bars — Admit Rate (Carnegie Blue)
+        # Vertical bars — Admit Rate (Carnegie Blue)
         fig.add_trace(go.Bar(
-            y=bd["lead_source"], x=bd["admit_rate"],
+            x=bd["lead_source"], y=bd["admit_rate"],
             name="Admit Rate",
-            orientation="h",
             marker=dict(color="#021326", line=dict(width=0)),
             text=[f"{v:.0f}%" for v in bd["admit_rate"]],
-            textposition="auto",
-            insidetextfont=dict(family="Manrope", size=10, color="white"),
-            outsidetextfont=dict(family="Manrope", size=10, color="#021326"),
-            insidetextanchor="end",
+            textposition="outside",
+            textfont=dict(family="Manrope", size=10, color="#021326"),
             cliponaxis=False,
-            hovertemplate="<b>%{y}</b><br>Admit Rate: %{x:.1f}%<extra></extra>",
+            hovertemplate="<b>%{x}</b><br>Admit Rate: %{y:.1f}%<extra></extra>",
         ))
-        # Horizontal bars — Yield Rate (Carnegie Red)
+        # Vertical bars — Yield Rate (Carnegie Red)
         fig.add_trace(go.Bar(
-            y=bd["lead_source"], x=bd["yield_rate"],
+            x=bd["lead_source"], y=bd["yield_rate"],
             name="Yield Rate",
-            orientation="h",
             marker=dict(color="#EA332D", line=dict(width=0)),
             text=[f"{v:.0f}%" for v in bd["yield_rate"]],
-            textposition="auto",
-            insidetextfont=dict(family="Manrope", size=10, color="white"),
-            outsidetextfont=dict(family="Manrope", size=10, color="#EA332D"),
-            insidetextanchor="end",
+            textposition="outside",
+            textfont=dict(family="Manrope", size=10, color="#EA332D"),
             cliponaxis=False,
-            hovertemplate="<b>%{y}</b><br>Yield Rate: %{x:.1f}%<extra></extra>",
+            hovertemplate="<b>%{x}</b><br>Yield Rate: %{y:.1f}%<extra></extra>",
         ))
 
         fig.update_layout(
             font=dict(family="Manrope, sans-serif", color=CARNEGIE_NAVY, size=10.5),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=200, r=40, t=8, b=40),
-            height=max(280, len(bd) * 60),
+            margin=dict(l=48, r=16, t=24, b=80),
+            height=380,
             barmode="group",
-            bargap=0.25,
+            bargap=0.3,
             bargroupgap=0.1,
             xaxis=dict(
+                title="",
+                tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
+                tickangle=-30,
+                showgrid=False,
+            ),
+            yaxis=dict(
                 title="", ticksuffix="%",
+                range=[0, 110],
+                dtick=20,
                 tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
                 gridcolor="#F0EEEA", gridwidth=0.8,
                 showline=False,
             ),
-            yaxis=dict(
-                title="", automargin=True,
-                tickfont=dict(family="Manrope, sans-serif", size=11, color=CARNEGIE_NAVY),
-            ),
             legend=dict(
-                orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5,
+                orientation="h", yanchor="top", y=-0.25, xanchor="center", x=0.5,
                 font=dict(family="Manrope, sans-serif", size=10.5),
             ),
             hoverlabel=dict(
