@@ -825,6 +825,32 @@ body > div.container-fluid {
     flex-wrap: wrap;
 }
 
+/* Advanced filters */
+.advanced-filters-wrap {
+    flex-basis: 100%;
+}
+
+.advanced-toggle {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--carnegie-gray-text);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.advanced-toggle:hover {
+    color: var(--carnegie-navy);
+}
+
+.advanced-filters-panel {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--carnegie-gray-border);
+    flex-wrap: wrap;
+}
+
 .inline-filter {
     min-width: 200px;
     max-width: 300px;

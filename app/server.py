@@ -152,6 +152,10 @@ def server_logic(input, output, session):
         src = input.source_filter()
         if src and len(src) > 0:
             df = df[df["lead_source"].isin(src)]
+        # Advanced filter: Campaign Service
+        svc = input.campaign_service_filter()
+        if svc and len(svc) > 0:
+            df = df[df["campaign_service"].isin(svc)]
         return df
 
     @reactive.calc
@@ -178,6 +182,13 @@ def server_logic(input, output, session):
         df = df[df["institution_name"] == input.institution()]
         sources = sorted(df["lead_source"].dropna().unique().tolist())
         ui.update_selectize("source_filter", choices=sources, selected=[])
+
+    @reactive.effect
+    def _update_campaign_service_choices():
+        df = Q2.copy()
+        df = df[df["institution_name"] == input.institution()]
+        services = sorted(df["campaign_service"].dropna().unique().tolist())
+        ui.update_selectize("campaign_service_filter", choices=services, selected=[])
 
     # ── KPI Calculations ─────────────────────────────────────
 
@@ -559,12 +570,14 @@ def server_logic(input, output, session):
             x=labels, y=curr_vals, name="Current Year",
             marker_color=CARNEGIE_RED,
             text=[f"{v:,}" for v in curr_vals], textposition="outside",
+            textfont=dict(family="Manrope, sans-serif", size=11),
             hovertemplate="<b>%{x}</b><br>Current: %{y:,}<extra></extra>",
         ))
         fig.add_trace(go.Bar(
             x=labels, y=prior_vals, name="Prior Year",
             marker_color="#A8BDD6",
             text=[f"{v:,}" for v in prior_vals], textposition="outside",
+            textfont=dict(family="Manrope, sans-serif", size=11),
             hovertemplate="<b>%{x}</b><br>Prior: %{y:,}<extra></extra>",
             opacity=0.5,
         ))
@@ -576,7 +589,7 @@ def server_logic(input, output, session):
                 fig.add_annotation(
                     x=(i + i + 1) / 2, y=max(curr_vals[i], curr_vals[i + 1]) * 1.05,
                     text=f"{rate:.1f}%", showarrow=False,
-                    font=dict(size=11, color=CARNEGIE_GRAY_TEXT),
+                    font=dict(family="Manrope, sans-serif", size=11, color=CARNEGIE_GRAY_TEXT),
                 )
 
         _apply_layout(fig, "", height=380)
@@ -629,7 +642,9 @@ def server_logic(input, output, session):
 
     @render.ui
     def source_trend_chart():
-        # Show top sources across all years
+        # TODO: Create monthly-by-source query for proper source trend chart
+        # Currently Q2 has term-level data only (no monthly granularity by source).
+        # Shows year-over-year comparison by source using term_year as X-axis.
         df = Q2.copy()
         df = df[df["institution_name"] == input.institution()]
         df = df[df["term_semester"] == input.term_semester()]
@@ -638,7 +653,6 @@ def server_logic(input, output, session):
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        # Get top 5 sources by current year volume
         curr_year = int(input.term_year())
         curr_df = df[df["term_year"] == curr_year]
         top_sources = (
@@ -648,22 +662,53 @@ def server_logic(input, output, session):
         if not top_sources:
             return ui.tags.div("No source data available.", class_="empty-state")
 
+        # Source-specific colors: first = Carnegie Red, rest from palette
+        source_colors = [CARNEGIE_RED, "#A8BDD6", "#C9D444", "#E8D9B8", "#E8D8F6"]
+
         fig = go.Figure()
         for i, src in enumerate(top_sources):
             sdf = df[df["lead_source"] == src].groupby("term_year", as_index=False)[metric].sum()
             sdf = sdf.sort_values("term_year")
-            color = CHART_PALETTE[i % len(CHART_PALETTE)]
+            color = source_colors[i % len(source_colors)]
+            # Current year solid, prior year implied by the line connecting points
             fig.add_trace(go.Scatter(
                 x=sdf["term_year"], y=sdf[metric],
                 mode="lines+markers", name=src,
                 line=dict(color=color, width=2),
-                marker=dict(size=6),
+                marker=dict(color=color, size=6),
                 hovertemplate=f"<b>{src}</b><br>%{{x}}: %{{y:,}}<extra></extra>",
             ))
 
-        _apply_layout(fig, "", height=320)
-        fig.update_layout(xaxis=dict(dtick=1, title=""), yaxis=dict(title=""))
-        return _plotly_html(fig)
+        fig.update_layout(
+            font=dict(family="Manrope, sans-serif", color=CARNEGIE_NAVY, size=10.5),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=48, r=16, t=8, b=40),
+            height=320,
+            xaxis=dict(
+                dtick=1, title="",
+                tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
+                showgrid=False,
+            ),
+            yaxis=dict(
+                tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
+                gridcolor="#F0EEEA", gridwidth=0.8,
+                showline=False, nticks=5, title="",
+            ),
+            legend=dict(
+                orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5,
+                font=dict(family="Manrope, sans-serif", size=10.5),
+            ),
+            hovermode="x unified",
+            hoverlabel=dict(
+                bgcolor=CARNEGIE_WHITE, bordercolor=CARNEGIE_GRAY_BORDER,
+                font=dict(family="Inter, sans-serif", size=13, color=CARNEGIE_NAVY),
+            ),
+        )
+        return ui.HTML(
+            fig.to_html(full_html=False, include_plotlyjs="cdn",
+                        config={"displayModeBar": False})
+        )
 
     # ── Page 2: Conversion Rates by Source ────────────────────
 
@@ -677,7 +722,6 @@ def server_logic(input, output, session):
         if breakdown.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        # Compute admit rate and yield rate per source
         breakdown["admit_rate"] = breakdown.apply(
             lambda r: (r["total_admits"] / r["total_app_submits"] * 100)
             if r["total_app_submits"] > 0 else 0, axis=1
@@ -687,27 +731,70 @@ def server_logic(input, output, session):
             if r["total_admits"] > 0 else 0, axis=1
         )
 
-        bd = breakdown.nlargest(6, "total_inquiries")
+        bd = breakdown.nlargest(6, "total_inquiries").sort_values("admit_rate")
 
         fig = go.Figure()
+        # Horizontal bars — Admit Rate (Carnegie Blue)
         fig.add_trace(go.Bar(
-            x=bd["lead_source"], y=bd["admit_rate"],
-            name="Admit Rate", marker_color=CARNEGIE_NAVY,
-            hovertemplate="<b>%{x}</b><br>Admit Rate: %{y:.1f}%<extra></extra>",
+            y=bd["lead_source"], x=bd["admit_rate"],
+            name="Admit Rate",
+            orientation="h",
+            marker=dict(color="#021326", line=dict(width=0)),
+            text=[f"{v:.0f}%" for v in bd["admit_rate"]],
+            textposition="auto",
+            insidetextfont=dict(family="Manrope", size=10, color="white"),
+            outsidetextfont=dict(family="Manrope", size=10, color="#021326"),
+            insidetextanchor="end",
+            cliponaxis=False,
+            hovertemplate="<b>%{y}</b><br>Admit Rate: %{x:.1f}%<extra></extra>",
         ))
+        # Horizontal bars — Yield Rate (Carnegie Red)
         fig.add_trace(go.Bar(
-            x=bd["lead_source"], y=bd["yield_rate"],
-            name="Yield Rate", marker_color=CARNEGIE_RED,
-            hovertemplate="<b>%{x}</b><br>Yield Rate: %{y:.1f}%<extra></extra>",
+            y=bd["lead_source"], x=bd["yield_rate"],
+            name="Yield Rate",
+            orientation="h",
+            marker=dict(color="#EA332D", line=dict(width=0)),
+            text=[f"{v:.0f}%" for v in bd["yield_rate"]],
+            textposition="auto",
+            insidetextfont=dict(family="Manrope", size=10, color="white"),
+            outsidetextfont=dict(family="Manrope", size=10, color="#EA332D"),
+            insidetextanchor="end",
+            cliponaxis=False,
+            hovertemplate="<b>%{y}</b><br>Yield Rate: %{x:.1f}%<extra></extra>",
         ))
 
-        _apply_layout(fig, "", height=340)
         fig.update_layout(
+            font=dict(family="Manrope, sans-serif", color=CARNEGIE_NAVY, size=10.5),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=200, r=40, t=8, b=40),
+            height=max(280, len(bd) * 60),
             barmode="group",
-            xaxis=dict(title=""),
-            yaxis=dict(title="", ticksuffix="%"),
+            bargap=0.25,
+            bargroupgap=0.1,
+            xaxis=dict(
+                title="", ticksuffix="%",
+                tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
+                gridcolor="#F0EEEA", gridwidth=0.8,
+                showline=False,
+            ),
+            yaxis=dict(
+                title="", automargin=True,
+                tickfont=dict(family="Manrope, sans-serif", size=11, color=CARNEGIE_NAVY),
+            ),
+            legend=dict(
+                orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5,
+                font=dict(family="Manrope, sans-serif", size=10.5),
+            ),
+            hoverlabel=dict(
+                bgcolor=CARNEGIE_WHITE, bordercolor=CARNEGIE_GRAY_BORDER,
+                font=dict(family="Inter, sans-serif", size=13, color=CARNEGIE_NAVY),
+            ),
         )
-        return _plotly_html(fig)
+        return ui.HTML(
+            fig.to_html(full_html=False, include_plotlyjs="cdn",
+                        config={"displayModeBar": False})
+        )
 
     # ── Page 3: Programs (placeholder — Q3 has geo but no program data) ──
 

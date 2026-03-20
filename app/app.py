@@ -235,6 +235,34 @@ page_funnel = ui.nav_panel(
                 ),
                 class_="inline-filter",
             ),
+            # Advanced filters (collapsible)
+            ui.tags.div(
+                ui.tags.a(
+                    "+ Advanced filters",
+                    href="#",
+                    class_="advanced-toggle",
+                    onclick=(
+                        "var panel=this.nextElementSibling;"
+                        "panel.style.display=panel.style.display==='none'?'flex':'none';"
+                        "this.textContent=panel.style.display==='none'?'+ Advanced filters':'− Advanced filters';"
+                        "return false;"
+                    ),
+                ),
+                ui.tags.div(
+                    ui.tags.div(
+                        ui.input_selectize(
+                            "campaign_service_filter", "Campaign Service",
+                            choices=[],
+                            multiple=True,
+                        ),
+                        class_="inline-filter",
+                    ),
+                    # TODO: Add App Round filter when data is available
+                    class_="advanced-filters-panel",
+                    style="display:none;",
+                ),
+                class_="advanced-filters-wrap",
+            ),
             class_="page-filter-bar",
         ),
 
