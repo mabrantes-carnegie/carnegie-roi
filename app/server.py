@@ -421,14 +421,13 @@ def server_logic(input, output, session):
                         hovertemplate="<b>%{x}</b><br>3-mo avg: %{y:,.0f}<extra></extra>",
                     ))
 
-        fig.update_layout(
-            **_base_chart_layout(360),
-            xaxis=dict(
-                categoryorder="array", categoryarray=MONTH_ORDER,
-                tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
-                showgrid=False, title="",
-            ),
+        layout = _base_chart_layout(360)
+        layout["xaxis"] = dict(
+            categoryorder="array", categoryarray=MONTH_ORDER,
+            tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
+            showgrid=False, title="",
         )
+        fig.update_layout(**layout)
         return _plotly_html(fig)
 
     # --- Progress to Goal ---
@@ -596,18 +595,17 @@ def server_logic(input, output, session):
                 hovertemplate=f"<b>{src}</b><br>%{{x}}: %{{y:,}}<extra></extra>",
             ))
 
-        fig.update_layout(
-            **_base_chart_layout(320),
-            xaxis=dict(
-                categoryorder="array", categoryarray=MONTH_ORDER,
-                tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
-                showgrid=False, title="",
-            ),
-            legend=dict(
-                orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5,
-                font=dict(family="Manrope, sans-serif", size=10.5),
-            ),
+        layout = _base_chart_layout(320)
+        layout["xaxis"] = dict(
+            categoryorder="array", categoryarray=MONTH_ORDER,
+            tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
+            showgrid=False, title="",
         )
+        layout["legend"] = dict(
+            orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5,
+            font=dict(family="Manrope, sans-serif", size=10.5),
+        )
+        fig.update_layout(**layout)
         return _plotly_html(fig)
 
     # --- Conversion Rates by Source (Q2) ---
@@ -670,25 +668,26 @@ def server_logic(input, output, session):
             hovertemplate="<b>%{x}</b><br>Yield Rate: %{y:.1f}%<extra></extra>",
         ))
 
-        fig.update_layout(
-            **_base_chart_layout(380),
-            margin=dict(l=48, r=16, t=24, b=80),
-            barmode="group", bargap=0.3, bargroupgap=0.1,
-            xaxis=dict(
-                title="",
-                tickfont=dict(family="Manrope, sans-serif", size=10, color="#4A4843"),
-                tickangle=0, showgrid=False,
-            ),
-            yaxis=dict(
-                title="", ticksuffix="%", range=[0, 110], dtick=20,
-                tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
-                gridcolor="#F0EEEA", gridwidth=0.8, showline=False,
-            ),
-            legend=dict(
-                orientation="h", yanchor="top", y=-0.25, xanchor="center", x=0.5,
-                font=dict(family="Manrope, sans-serif", size=10.5),
-            ),
+        layout = _base_chart_layout(380)
+        layout["margin"] = dict(l=48, r=16, t=24, b=80)
+        layout["barmode"] = "group"
+        layout["bargap"] = 0.3
+        layout["bargroupgap"] = 0.1
+        layout["xaxis"] = dict(
+            title="",
+            tickfont=dict(family="Manrope, sans-serif", size=10, color="#4A4843"),
+            tickangle=0, showgrid=False,
         )
+        layout["yaxis"] = dict(
+            title="", ticksuffix="%", range=[0, 110], dtick=20,
+            tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
+            gridcolor="#F0EEEA", gridwidth=0.8, showline=False,
+        )
+        layout["legend"] = dict(
+            orientation="h", yanchor="top", y=-0.25, xanchor="center", x=0.5,
+            font=dict(family="Manrope, sans-serif", size=10.5),
+        )
+        fig.update_layout(**layout)
         return _plotly_html(fig)
 
     # ══════════════════════════════════════════════════════════
