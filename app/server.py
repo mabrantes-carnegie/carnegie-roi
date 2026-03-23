@@ -726,21 +726,182 @@ def server_logic(input, output, session):
     # PAGE 3: GEOGRAPHY
     # ══════════════════════════════════════════════════════════
 
-    # --- Programs placeholder ---
+    # ══════════════════════════════════════════════════════════
+    # PAGE 3 — PROGRAMS TAB
+    # ══════════════════════════════════════════════════════════
+
+    def _clean_program_name(name) -> str:
+        """Title-case a program name, fixing common acronyms."""
+        if not name or str(name).strip() == "":
+            return "Not Specified"
+        display = str(name).strip().title()
+        for old, new in [
+            ("Baed", "BAEd"), ("Bsba", "BSBA"), ("Bm ", "BM "),
+            ("Ems ", "EMS "), ("Pre ", "Pre-"),
+        ]:
+            display = display.replace(old, new)
+        return display
+
+    @reactive.calc
+    def filtered_programs():
+        """Q6 filtered by global + program_name_filter, programs only."""
+        df = filtered_main()
+        df = df[df["program_name"].notna() & (df["program_name"].str.strip() != "")]
+        df = df.copy()
+        df["program_display"] = df["program_name"].apply(_clean_program_name)
+        sel = input.program_name_filter()
+        if sel and len(sel) > 0:
+            df = df[df["program_display"].isin(sel)]
+        return df
+
+    @reactive.calc
+    def prior_programs():
+        """Q6 prior year filtered the same way as filtered_programs."""
+        df = prior_main()
+        df = df[df["program_name"].notna() & (df["program_name"].str.strip() != "")]
+        df = df.copy()
+        df["program_display"] = df["program_name"].apply(_clean_program_name)
+        sel = input.program_name_filter()
+        if sel and len(sel) > 0:
+            df = df[df["program_display"].isin(sel)]
+        return df
+
+    @reactive.effect
+    def _update_program_name_choices():
+        df = filtered_main()
+        df = df[df["program_name"].notna() & (df["program_name"].str.strip() != "")].copy()
+        df["program_display"] = df["program_name"].apply(_clean_program_name)
+        totals = (
+            df.groupby("program_display")["total_inquiries"]
+            .sum()
+            .sort_values(ascending=False)
+        )
+        opts = [p for p in totals.index.tolist() if p != "Not Specified"]
+        ui.update_selectize("program_name_filter", choices=opts, selected=[])
 
     @render.ui
     def programs_bar_chart():
-        return ui.tags.div(
-            "Program-level data is not available in the current dataset. "
-            "This view will populate when program data is connected.",
-            class_="empty-state",
+        df = filtered_programs()
+        if df.empty:
+            return ui.tags.div("No program data for the selected filters.", class_="empty-state")
+
+        metric = input.program_metric()
+        metric_labels = {
+            "total_net_deposits": "Net Deposits",
+            "total_inquiries": "Inquiries",
+            "total_admits": "Admits",
+        }
+        metric_label = metric_labels.get(metric, metric)
+
+        # Current year aggregation
+        curr = (
+            df.groupby("program_display")[metric]
+            .sum()
+            .reset_index()
+            .sort_values(metric, ascending=False)
+            .head(15)
         )
+
+        # Prior year for YoY colouring
+        py_df = prior_programs()
+        if not py_df.empty:
+            py_agg = py_df.groupby("program_display")[metric].sum().reset_index()
+            py_agg.columns = ["program_display", "metric_py"]
+            curr = curr.merge(py_agg, on="program_display", how="left")
+            curr["yoy"] = (
+                (curr[metric] - curr["metric_py"]) / curr["metric_py"].replace(0, float("nan")) * 100
+            )
+        else:
+            curr["yoy"] = float("nan")
+
+        # Sort ascending for horizontal bar (plotly renders bottom-to-top)
+        curr = curr.sort_values(metric, ascending=True)
+        bar_colors = [
+            CARNEGIE_RED if (pd.isna(y) or y >= 0) else "#E8B9A4"
+            for y in curr["yoy"]
+        ]
+
+        fig = go.Figure(go.Bar(
+            x=curr[metric],
+            y=curr["program_display"],
+            orientation="h",
+            marker_color=bar_colors,
+            text=[f"{int(v):,}" for v in curr[metric]],
+            textposition="outside",
+            textfont=dict(family="Manrope, sans-serif", size=10, color=CARNEGIE_NAVY),
+            hovertemplate="<b>%{y}</b><br>" + metric_label + ": %{x:,}<extra></extra>",
+        ))
+
+        max_val = int(curr[metric].max()) if not curr.empty else 1
+        layout = _base_chart_layout(max(340, len(curr) * 28 + 60))
+        layout["margin"] = dict(l=200, r=80, t=16, b=24)
+        layout["xaxis"] = dict(
+            range=[0, max_val * 1.25],
+            tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
+            showgrid=True, gridcolor="#F0EEEA", title="",
+        )
+        layout["yaxis"] = dict(
+            tickfont=dict(family="Manrope, sans-serif", size=10.5, color=CARNEGIE_NAVY),
+            showgrid=False, title="",
+        )
+        layout["hovermode"] = "y unified"
+        fig.update_layout(**layout)
+        return _plotly_html(fig)
 
     @render.data_frame
     def program_detail_table():
-        return render.DataGrid(pd.DataFrame({
-            "Program data is not available": ["Connect program data source to enable this view."]
-        }))
+        df = filtered_programs()
+        if df.empty:
+            return render.DataGrid(pd.DataFrame({"No data available": []}))
+
+        curr = df.groupby("program_display").agg(
+            total_inquiries=("total_inquiries", "sum"),
+            total_app_starts=("total_app_starts", "sum"),
+            total_app_submits=("total_app_submits", "sum"),
+            total_admits=("total_admits", "sum"),
+            total_deposits=("total_deposits", "sum"),
+            total_net_deposits=("total_net_deposits", "sum"),
+        ).reset_index().sort_values("total_inquiries", ascending=False).head(20)
+
+        curr["Admit Rate"] = curr.apply(
+            lambda r: f"{r['total_admits'] / r['total_app_submits'] * 100:.1f}%"
+            if r["total_app_submits"] > 0 else "—", axis=1
+        )
+        curr["Yield"] = curr.apply(
+            lambda r: f"{r['total_net_deposits'] / r['total_admits'] * 100:.1f}%"
+            if r["total_admits"] > 0 else "—", axis=1
+        )
+
+        py_df = prior_programs()
+        if not py_df.empty:
+            py_agg = py_df.groupby("program_display")["total_net_deposits"].sum().reset_index()
+            py_agg.columns = ["program_display", "nd_py"]
+            curr = curr.merge(py_agg, on="program_display", how="left")
+            curr["YoY Δ"] = curr.apply(
+                lambda r: f"▲ {((r['total_net_deposits'] - r['nd_py']) / r['nd_py'] * 100):.0f}%"
+                if r.get("nd_py", 0) > 0 and r["total_net_deposits"] >= r["nd_py"]
+                else (
+                    f"▼ {abs((r['total_net_deposits'] - r['nd_py']) / r['nd_py'] * 100):.0f}%"
+                    if r.get("nd_py", 0) > 0
+                    else "N/A"
+                ),
+                axis=1,
+            )
+        else:
+            curr["YoY Δ"] = "N/A"
+
+        display = curr.rename(columns={
+            "program_display": "Program",
+            "total_inquiries": "Inquiries",
+            "total_app_starts": "App Starts",
+            "total_app_submits": "App Submits",
+            "total_admits": "Admits",
+            "total_deposits": "Deposits",
+            "total_net_deposits": "Net Deposits",
+        })
+        cols = ["Program", "Inquiries", "App Starts", "App Submits",
+                "Admits", "Deposits", "Net Deposits", "Admit Rate", "Yield", "YoY Δ"]
+        return render.DataGrid(display[cols], filters=False)
 
     # --- Geography Map + Top States (Q6 state data) ---
 

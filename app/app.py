@@ -330,7 +330,7 @@ page_geography = ui.nav_panel(
                     # Program filter bar
                     ui.tags.div(
                         ui.input_selectize(
-                            "program_level_filter", "Program Level",
+                            "program_name_filter", "Program",
                             choices=[],
                             multiple=True,
                         ),
