@@ -1028,3 +1028,38 @@ body > div.container-fluid {
     border-radius: var(--radius-card) !important;
     box-shadow: var(--shadow-card) !important;
 }
+
+/* ═══════════════════════════════════════════
+   DIGITAL PERFORMANCE
+   ═══════════════════════════════════════════ */
+
+.dig-metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+/* Creative tables */
+.creative-table th {
+    text-align: left;
+    padding: 8px 10px;
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--carnegie-gray-text);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+.creative-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--carnegie-gray-border);
+    color: var(--carnegie-navy);
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.creative-table tr:hover td {
+    background: rgba(0,0,0,0.02);
+}

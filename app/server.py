@@ -13,6 +13,7 @@ from metrics import (
     compute_geo_detail,
 )
 from formatters import fmt_number, fmt_pct, fmt_currency, fmt_yoy
+from digital_server import digital_server
 
 # ── Carnegie brand colors for Plotly ─────────────────────────
 
@@ -1090,3 +1091,8 @@ def server_logic(input, output, session):
         show_cols = ["State", "City", "Inquiries", "App Starts",
                      "App Submits", "Deposits", "Net Deposits"]
         return render.DataGrid(display[show_cols], filters=False)
+
+    # ══════════════════════════════════════════════════════════
+    # PAGE 4: DIGITAL PERFORMANCE
+    # ══════════════════════════════════════════════════════════
+    digital_server(input, output, session)
