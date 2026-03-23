@@ -744,11 +744,59 @@ def server_logic(input, output, session):
 
     # --- Geography Map + Top States (Q6 state data) ---
 
+    _GEO_METRIC_LABELS = {
+        "total_inquiries": "Student inquiries by state",
+        "total_app_submits": "App submits by state",
+        "total_admits": "Admits by state",
+        "total_net_deposits": "Net deposits by state",
+    }
+
+    _GEO_METRIC_SHORT = {
+        "total_inquiries": "Inquiries",
+        "total_app_submits": "App Submits",
+        "total_admits": "Admits",
+        "total_net_deposits": "Net Deposits",
+    }
+
+    # Small states where text labels won't fit inside the state shape
+    _SMALL_STATES = {"CT", "DE", "DC", "MA", "MD", "NH", "NJ", "RI", "VT"}
+
+    # Approximate centroids for label placement (lat, lon)
+    _STATE_CENTROIDS = {
+        "AL": (32.7, -86.7), "AK": (64.2, -153.4), "AZ": (34.3, -111.1),
+        "AR": (34.9, -92.4), "CA": (37.2, -119.5), "CO": (39.0, -105.5),
+        "CT": (41.6, -72.7), "DE": (39.0, -75.5), "FL": (27.8, -81.7),
+        "GA": (32.7, -83.4), "HI": (20.3, -156.4), "ID": (44.4, -114.6),
+        "IL": (40.0, -89.2), "IN": (40.3, -86.1), "IA": (42.0, -93.5),
+        "KS": (38.5, -98.4), "KY": (37.5, -85.3), "LA": (31.1, -91.9),
+        "ME": (45.4, -69.0), "MD": (39.1, -76.8), "MA": (42.3, -71.8),
+        "MI": (44.3, -85.4), "MN": (46.4, -93.1), "MS": (32.7, -89.7),
+        "MO": (38.3, -92.5), "MT": (46.9, -110.5), "NE": (41.5, -99.9),
+        "NV": (39.3, -116.6), "NH": (43.7, -71.6), "NJ": (40.1, -74.5),
+        "NM": (34.5, -106.2), "NY": (42.9, -75.5), "NC": (35.5, -79.4),
+        "ND": (47.4, -100.5), "OH": (40.4, -82.8), "OK": (35.6, -96.9),
+        "OR": (44.0, -120.5), "PA": (40.9, -77.8), "RI": (41.7, -71.5),
+        "SC": (33.8, -80.9), "SD": (44.4, -100.4), "TN": (35.9, -86.7),
+        "TX": (31.5, -99.3), "UT": (39.3, -111.1), "VT": (44.1, -72.7),
+        "VA": (37.5, -78.9), "WA": (47.4, -120.6), "WV": (38.6, -80.6),
+        "WI": (44.3, -89.8), "WY": (43.0, -107.6),
+        "DC": (38.9, -77.0), "PR": (18.2, -66.5),
+    }
+
+    @render.ui
+    def geo_map_title():
+        metric = input.geo_map_metric() if hasattr(input, "geo_map_metric") else "total_inquiries"
+        label = _GEO_METRIC_LABELS.get(metric, "Student inquiries by state")
+        return ui.tags.h2(label, class_="section-heading", style="margin:0;")
+
     @render.ui
     def geo_map_section():
         df = filtered_main()
         if df.empty:
             return ui.tags.div("No data available for the selected filters.", class_="empty-state")
+
+        metric = input.geo_map_metric() if hasattr(input, "geo_map_metric") else "total_inquiries"
+        metric_short = _GEO_METRIC_SHORT.get(metric, "Inquiries")
 
         # Aggregate by state + location_type from Q6
         funnel = ["total_inquiries", "total_app_starts", "total_app_submits",
@@ -763,14 +811,14 @@ def server_logic(input, output, session):
         fig = go.Figure(go.Choropleth(
             locations=map_df["student_state"],
             locationmode="USA-states",
-            z=map_df["total_inquiries"],
+            z=map_df[metric],
             colorscale=[
                 [0, "#fce4ec"], [0.3, "#ef9a9a"],
                 [0.6, "#e57373"], [1, CARNEGIE_RED],
             ],
-            hovertemplate="<b>%{location}</b><br>Inquiries: %{z:,}<extra></extra>",
+            hovertemplate=f"<b>%{{location}}</b><br>{metric_short}: %{{z:,}}<extra></extra>",
             colorbar=dict(
-                title="Inquiries", thickness=12, len=0.6,
+                title=metric_short, thickness=12, len=0.6,
                 tickfont=dict(size=11, color=CARNEGIE_GRAY_TEXT),
                 title_font=dict(size=11, color=CARNEGIE_GRAY_TEXT),
             ),
@@ -786,21 +834,44 @@ def server_logic(input, output, session):
             ),
         )
 
+        # Overlay text labels for large states with data
+        label_rows = map_df[
+            map_df["student_state"].isin(_STATE_CENTROIDS) &
+            ~map_df["student_state"].isin(_SMALL_STATES) &
+            (map_df[metric] > 0)
+        ]
+        if not label_rows.empty:
+            lats = [_STATE_CENTROIDS[s][0] for s in label_rows["student_state"]]
+            lons = [_STATE_CENTROIDS[s][1] for s in label_rows["student_state"]]
+            texts = [
+                f"{s}<br>{int(v):,}"
+                for s, v in zip(label_rows["student_state"], label_rows[metric])
+            ]
+            fig.add_scattergeo(
+                lat=lats, lon=lons,
+                text=texts,
+                mode="text",
+                textfont=dict(family="Manrope, sans-serif", size=9, color="#1A1A1A"),
+                showlegend=False,
+                hoverinfo="skip",
+                geo="geo",
+            )
+
         # Top 5 US states
-        top_states = map_df.nlargest(5, "total_inquiries")
+        top_states = map_df.nlargest(5, metric)
         top_rows = [
             ui.tags.div(
                 ui.tags.span(row["student_state"]),
-                ui.tags.span(f"{int(row['total_inquiries']):,}", class_="count"),
+                ui.tags.span(f"{int(row[metric]):,}", class_="count"),
                 class_="top-state-row",
             )
             for _, row in top_states.iterrows()
         ]
 
         # International and Unknown summary
-        total_all = state_df["total_inquiries"].sum()
-        intl_total = state_df.loc[state_df["location_type"] == "International", "total_inquiries"].sum()
-        unknown_total = state_df.loc[state_df["location_type"] == "Unknown", "total_inquiries"].sum()
+        total_all = state_df[metric].sum()
+        intl_total = state_df.loc[state_df["location_type"] == "International", metric].sum()
+        unknown_total = state_df.loc[state_df["location_type"] == "Unknown", metric].sum()
         intl_pct = (intl_total / total_all * 100) if total_all > 0 else 0
         unknown_pct = (unknown_total / total_all * 100) if total_all > 0 else 0
 

@@ -367,7 +367,26 @@ page_geography = ui.nav_panel(
             ui.nav_panel(
                 "Geographic markets",
                 ui.tags.div(
-                    ui.tags.h2("Student inquiries by state", class_="section-heading"),
+                    # Map section heading + metric toggle
+                    ui.tags.div(
+                        ui.output_ui("geo_map_title"),
+                        ui.tags.div(
+                            ui.input_radio_buttons(
+                                "geo_map_metric", None,
+                                choices={
+                                    "total_inquiries": "Inquiries",
+                                    "total_app_submits": "App Submits",
+                                    "total_admits": "Admits",
+                                    "total_net_deposits": "Net Deposits",
+                                },
+                                selected="total_inquiries",
+                                inline=True,
+                            ),
+                            class_="pill-toggle",
+                        ),
+                        class_="card-header-row",
+                        style="margin-bottom:12px;",
+                    ),
                     ui.tags.div(
                         ui.output_ui("geo_map_section"),
                         class_="chart-card",
