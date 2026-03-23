@@ -813,6 +813,21 @@ body > div.container-fluid {
     color: var(--carnegie-red);
 }
 
+.top-state-row.muted-row {
+    color: #9B9893;
+}
+
+.top-state-row.muted-row .count {
+    color: #9B9893;
+    font-weight: 500;
+}
+
+.top-states-divider {
+    border: none;
+    border-top: 1px solid var(--carnegie-gray-border);
+    margin: 8px 0;
+}
+
 /* ════════════════════════════════════════════
    PAGE-SPECIFIC FILTERS (inline)
    ════════════════════════════════════════════ */

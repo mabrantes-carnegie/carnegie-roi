@@ -1,5 +1,6 @@
 """Load and clean CSV data once at startup."""
 
+import re
 from datetime import date
 from pathlib import Path
 import pandas as pd
@@ -37,6 +38,10 @@ def _load_q6() -> pd.DataFrame:
     # Mark non-US states as International
     mask = ~df["student_state"].isin(VALID_US_STATES | {"Unknown"})
     df.loc[mask, "student_state"] = "International"
+    # Location type for easy filtering
+    df["location_type"] = df["student_state"].apply(
+        lambda s: "US" if s in VALID_US_STATES else s  # "Unknown" or "International"
+    )
 
     # Academic month position and label
     df["acad_pos"] = df["event_month"].map(ACAD_ORDER)
@@ -61,6 +66,17 @@ def _load_q2() -> pd.DataFrame:
     return df
 
 
+def _clean_city(city: str, state: str) -> str:
+    """Clean city name: remove trailing state abbreviation, title case."""
+    if not city or city == "Unknown":
+        return city
+    # Remove trailing state code case-insensitively (e.g., "Centralia WA", "centralia wa")
+    if state and state in VALID_US_STATES:
+        city = re.sub(r"\s+" + re.escape(state) + r"$", "", city, flags=re.IGNORECASE)
+    result = city.strip()
+    return result.title() if result else "Unknown"
+
+
 def _load_q3() -> pd.DataFrame:
     """Load city-level geography detail."""
     df = pd.read_csv(_DATA_DIR / "q3_geography.csv")
@@ -68,8 +84,16 @@ def _load_q3() -> pd.DataFrame:
     df.loc[df["student_state"] == "", "student_state"] = "Unknown"
     mask = ~df["student_state"].isin(VALID_US_STATES | {"Unknown"})
     df.loc[mask, "student_state"] = "International"
-    df["student_city"] = df["student_city"].fillna("").str.strip().str.title()
+    # Location type
+    df["location_type"] = df["student_state"].apply(
+        lambda s: "US" if s in VALID_US_STATES else s
+    )
+    # City cleaning — clean before title case (title case is applied in _clean_city)
+    df["student_city"] = df["student_city"].fillna("").str.strip()
     df.loc[df["student_city"] == "", "student_city"] = "Unknown"
+    df["student_city"] = df.apply(
+        lambda r: _clean_city(r["student_city"], r["student_state"]), axis=1
+    )
     df["term_year"] = df["term_year"].astype(int)
     return df.reset_index(drop=True)
 

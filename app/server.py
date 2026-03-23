@@ -750,13 +750,13 @@ def server_logic(input, output, session):
         if df.empty:
             return ui.tags.div("No data available for the selected filters.", class_="empty-state")
 
-        # Aggregate by state from Q6
-        state_df = df.groupby("student_state", as_index=False)[
-            ["total_inquiries", "total_app_starts", "total_app_submits",
-             "total_admits", "total_deposits", "total_net_deposits"]
-        ].sum()
+        # Aggregate by state + location_type from Q6
+        funnel = ["total_inquiries", "total_app_starts", "total_app_submits",
+                   "total_admits", "total_deposits", "total_net_deposits"]
+        state_df = df.groupby(["student_state", "location_type"], as_index=False)[funnel].sum()
 
-        map_df = state_df[~state_df["student_state"].isin(["Unknown", "International"])].copy()
+        # US-only for the map
+        map_df = state_df[state_df["location_type"] == "US"].copy()
         if map_df.empty:
             return ui.tags.div("No mappable state data available.", class_="empty-state")
 
@@ -786,6 +786,7 @@ def server_logic(input, output, session):
             ),
         )
 
+        # Top 5 US states
         top_states = map_df.nlargest(5, "total_inquiries")
         top_rows = [
             ui.tags.div(
@@ -796,21 +797,52 @@ def server_logic(input, output, session):
             for _, row in top_states.iterrows()
         ]
 
+        # International and Unknown summary
+        total_all = state_df["total_inquiries"].sum()
+        intl_total = state_df.loc[state_df["location_type"] == "International", "total_inquiries"].sum()
+        unknown_total = state_df.loc[state_df["location_type"] == "Unknown", "total_inquiries"].sum()
+        intl_pct = (intl_total / total_all * 100) if total_all > 0 else 0
+        unknown_pct = (unknown_total / total_all * 100) if total_all > 0 else 0
+
+        summary_rows = []
+        if intl_total > 0:
+            summary_rows.append(ui.tags.div(
+                ui.tags.span("International"),
+                ui.tags.span(f"{int(intl_total):,}  ({intl_pct:.1f}%)", class_="count"),
+                class_="top-state-row muted-row",
+            ))
+        if unknown_total > 0:
+            summary_rows.append(ui.tags.div(
+                ui.tags.span("Unknown"),
+                ui.tags.span(f"{int(unknown_total):,}  ({unknown_pct:.1f}%)", class_="count"),
+                class_="top-state-row muted-row",
+            ))
+
         return ui.tags.div(
             ui.tags.div(_plotly_html(fig, no_toolbar=False)),
             ui.tags.div(
                 ui.tags.div("TOP STATES", class_="top-states-title"),
                 *top_rows,
+                *(
+                    [ui.tags.hr(class_="top-states-divider"), *summary_rows]
+                    if summary_rows else []
+                ),
                 class_="top-states",
             ),
             class_="map-layout",
         )
 
-    # --- Geography City Detail Table (Q3) ---
+    # --- Geography City Detail Table (Q3 — US only by default) ---
 
     @render.data_frame
     def geo_detail_table():
         df = filtered_q3()
+        if df.empty:
+            return render.DataGrid(pd.DataFrame({"No data available": []}))
+        # Filter to US only by default; include_intl toggle if present
+        include_all = getattr(input, "include_intl_unknown", lambda: False)()
+        if not include_all:
+            df = df[df["location_type"] == "US"]
         detail = compute_geo_detail(df)
         if detail.empty:
             return render.DataGrid(pd.DataFrame({"No data available": []}))

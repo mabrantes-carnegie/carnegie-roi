@@ -374,6 +374,14 @@ page_geography = ui.nav_panel(
                     ),
                     ui.tags.h2("State / City detail", class_="section-heading"),
                     ui.tags.div(
+                        ui.input_switch(
+                            "include_intl_unknown",
+                            "Include international & unknown",
+                            value=False,
+                        ),
+                        style="margin-bottom:12px;",
+                    ),
+                    ui.tags.div(
                         ui.output_data_frame("geo_detail_table"),
                         class_="carnegie-table-card",
                     ),
