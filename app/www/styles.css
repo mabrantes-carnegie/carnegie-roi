@@ -1063,3 +1063,129 @@ body > div.container-fluid {
 .creative-table tr:hover td {
     background: rgba(0,0,0,0.02);
 }
+
+/* ════════════════════════════════════════════
+   FUNNEL AT A GLANCE
+   ════════════════════════════════════════════ */
+
+.fg-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 4px 0;
+}
+
+.fg-stage {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 5px 0;
+}
+
+.fg-stage-label {
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    color: #4A4843;
+    font-weight: 500;
+}
+
+.fg-stage-value {
+    font-family: 'Manrope', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--carnegie-navy);
+}
+
+.fg-conversion {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 1px 0 1px 4px;
+}
+
+.fg-arrow {
+    font-size: 12px;
+    color: #C0BBB5;
+    line-height: 1;
+}
+
+.fg-rate {
+    font-family: 'Manrope', sans-serif;
+    font-size: 11px;
+    color: var(--carnegie-gray-text);
+}
+
+.fg-rate--good {
+    color: var(--carnegie-green);
+    background: var(--carnegie-green-light);
+    padding: 1px 6px;
+    border-radius: 9999px;
+}
+
+.fg-rate--warn {
+    color: var(--carnegie-amber);
+    background: var(--carnegie-amber-light);
+    padding: 1px 6px;
+    border-radius: 9999px;
+}
+
+.fg-rate--bad {
+    color: var(--carnegie-red);
+    background: var(--carnegie-red-light);
+    padding: 1px 6px;
+    border-radius: 9999px;
+}
+
+.fg-melt {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--carnegie-gray-border);
+}
+
+.fg-melt-value {
+    font-family: 'Manrope', sans-serif;
+    font-size: 12px;
+    color: var(--carnegie-gray-text);
+}
+
+.fg-melt--good { color: var(--carnegie-green); }
+.fg-melt--warn { color: var(--carnegie-amber); }
+.fg-melt--bad  { color: var(--carnegie-red); }
+
+/* ════════════════════════════════════════════
+   KPI CARD EXTRAS (goal text, melt note)
+   ════════════════════════════════════════════ */
+
+.goal-context-text {
+    font-family: 'Manrope', sans-serif;
+    font-size: 10px;
+    color: #9B9893;
+    margin-top: 2px;
+    line-height: 1.3;
+}
+
+.melt-note {
+    font-family: 'Manrope', sans-serif;
+    font-size: 10px;
+    color: var(--carnegie-amber);
+    margin-top: 1px;
+    cursor: help;
+}
+
+/* ════════════════════════════════════════════
+   COST EXPAND LINK
+   ════════════════════════════════════════════ */
+
+.cost-expand-link {
+    font-family: 'Manrope', sans-serif;
+    font-size: 11px;
+    color: var(--carnegie-gray-text);
+    text-decoration: none;
+    padding: 2px 0;
+    white-space: nowrap;
+}
+
+.cost-expand-link:hover {
+    color: var(--carnegie-navy);
+    text-decoration: underline;
+}

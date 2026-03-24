@@ -270,6 +270,43 @@ def server_logic(input, output, session):
         return fmt_pct(current_kpis()["yield_rate"])
 
     @render.text
+    def kpi_total_enrolled():
+        return fmt_number(current_kpis().get("total_enrolled", 0))
+
+    def _cost_per(denominator_key):
+        """Return formatted cost per funnel stage metric."""
+        total_spend = filtered_q2()["total_cost"].sum()
+        denom = current_kpis().get(denominator_key, 0)
+        if denom > 0 and total_spend > 0:
+            return fmt_currency(total_spend / denom)
+        return "\u2014"
+
+    def _prior_cost_per(denominator_key):
+        prior_spend = prior_q2()["total_cost"].sum()
+        denom = prior_kpis().get(denominator_key, 0)
+        return (prior_spend / denom) if denom > 0 and prior_spend > 0 else None
+
+    @render.text
+    def kpi_cost_per_inquiry():
+        return _cost_per("total_inquiries")
+
+    @render.text
+    def kpi_cost_per_app_start():
+        return _cost_per("total_app_starts")
+
+    @render.text
+    def kpi_cost_per_app_submit():
+        return _cost_per("total_app_submits")
+
+    @render.text
+    def kpi_cost_per_admit():
+        return _cost_per("total_admits")
+
+    @render.text
+    def kpi_cost_per_deposit():
+        return _cost_per("total_deposits")
+
+    @render.text
     def kpi_cost_per_net_deposit():
         total_spend = filtered_q2()["total_cost"].sum()
         net_deps = current_kpis().get("total_net_deposits", 0)
@@ -318,22 +355,49 @@ def server_logic(input, output, session):
         return _yoy_badge("yield_rate")
 
     @render.ui
-    def yoy_cost_per_net_deposit():
+    def yoy_total_enrolled():
+        return _yoy_badge("total_enrolled")
+
+    def _cost_yoy_badge(denominator_key):
+        """YoY badge for a cost metric — inverted sentiment (cost down = green)."""
         curr_spend = filtered_q2()["total_cost"].sum()
-        curr_nd = current_kpis().get("total_net_deposits", 0)
-        curr_cpnd = (curr_spend / curr_nd) if curr_nd > 0 and curr_spend > 0 else None
+        curr_denom = current_kpis().get(denominator_key, 0)
+        curr_val = (curr_spend / curr_denom) if curr_denom > 0 and curr_spend > 0 else None
 
         prior_spend = prior_q2()["total_cost"].sum()
-        prior_nd = prior_kpis().get("total_net_deposits", 0)
-        prior_cpnd = (prior_spend / prior_nd) if prior_nd > 0 and prior_spend > 0 else None
+        prior_denom = prior_kpis().get(denominator_key, 0)
+        prior_val = (prior_spend / prior_denom) if prior_denom > 0 and prior_spend > 0 else None
 
-        if curr_cpnd is None or prior_cpnd is None or prior_cpnd == 0:
+        if curr_val is None or prior_val is None or prior_val == 0:
             return ui.tags.span("N/A", class_="kpi-badge kpi-badge--na")
-
-        pct = ((curr_cpnd - prior_cpnd) / abs(prior_cpnd)) * 100
+        pct = ((curr_val - prior_val) / abs(prior_val)) * 100
         text, _ = fmt_yoy(pct)
         sentiment = "positive" if pct < 0 else "negative" if pct > 0 else "neutral"
         return ui.tags.span(text, class_=f"kpi-badge kpi-badge--{sentiment}")
+
+    @render.ui
+    def yoy_cost_per_inquiry():
+        return _cost_yoy_badge("total_inquiries")
+
+    @render.ui
+    def yoy_cost_per_app_start():
+        return _cost_yoy_badge("total_app_starts")
+
+    @render.ui
+    def yoy_cost_per_app_submit():
+        return _cost_yoy_badge("total_app_submits")
+
+    @render.ui
+    def yoy_cost_per_admit():
+        return _cost_yoy_badge("total_admits")
+
+    @render.ui
+    def yoy_cost_per_deposit():
+        return _cost_yoy_badge("total_deposits")
+
+    @render.ui
+    def yoy_cost_per_net_deposit():
+        return _cost_yoy_badge("total_net_deposits")
 
     # --- Progress bars ---
 
@@ -395,14 +459,17 @@ def server_logic(input, output, session):
         prior_ty = current_ty - 1
         stage_label = PRIMARY_LABELS.get(metric_col, metric_col)
 
-        def _monthly_series(term_year):
+        def _monthly_series(term_year, cap_current_month=False):
             sub = df[df["term_year"] == term_year]
+            if cap_current_month and not sub.empty:
+                cutoff = pd.Timestamp(date.today().replace(day=1))
+                sub = sub[sub["event_date"] <= cutoff]
             if sub.empty:
                 return pd.DataFrame()
             agg = sub.groupby(["acad_pos", "month_label"], as_index=False)[metric_col].sum()
             return agg.sort_values("acad_pos")
 
-        curr = _monthly_series(current_ty)
+        curr = _monthly_series(current_ty, cap_current_month=True)
         prior = _monthly_series(prior_ty)
 
         if curr.empty and prior.empty:
@@ -458,47 +525,150 @@ def server_logic(input, output, session):
         fig.update_layout(**layout)
         return _plotly_html(fig)
 
-    # --- Progress to Goal ---
+    # --- Funnel at a Glance ---
 
     @render.ui
-    def progress_to_goal():
+    def funnel_at_glance():
         kpis = current_kpis()
-        bars = []
-        for key in PRIMARY_KEYS:
-            label = PRIMARY_LABELS[key]
-            goal = GOALS.get(key)
-            if not goal or goal <= 0:
-                bars.append(ui.tags.div(
-                    ui.tags.div(
-                        ui.tags.span(label, class_="goal-label"),
-                        ui.tags.span("No goal set", class_="goal-pct muted"),
-                        class_="goal-header",
-                    ),
-                    ui.tags.div(
-                        ui.tags.div(style="width:0%; height:8px; background:#ddd; border-radius:4px;"),
-                        class_="goal-bar-bg",
-                    ),
-                    class_="goal-row",
-                ))
-                continue
+        prior = prior_kpis()
 
-            actual = kpis.get(key, 0)
-            pct = (actual / goal) * 100
-            bar_width = min(pct, 100)
-            color = _goal_color(pct)
-            bars.append(ui.tags.div(
-                ui.tags.div(
-                    ui.tags.span(label, class_="goal-label"),
-                    ui.tags.span(f"{pct:.0f}%", class_="goal-pct"),
-                    class_="goal-header",
-                ),
-                ui.tags.div(
-                    ui.tags.div(style=f"width:{bar_width:.0f}%; height:8px; background:{color}; border-radius:4px;"),
-                    class_="goal-bar-bg",
-                ),
-                class_="goal-row",
+        stages = [
+            ("Inquiries", "total_inquiries"),
+            ("App Starts", "total_app_starts"),
+            ("App Submits", "total_app_submits"),
+            ("Admits", "total_admits"),
+            ("Deposits", "total_deposits"),
+            ("Net Deposits", "total_net_deposits"),
+        ]
+
+        if all(kpis.get(k, 0) == 0 for _, k in stages):
+            return ui.tags.div("No data.", class_="empty-state")
+
+        items = []
+        for i, (label, key) in enumerate(stages):
+            val = kpis.get(key, 0)
+            items.append(ui.tags.div(
+                ui.tags.span(label, class_="fg-stage-label"),
+                ui.tags.span(fmt_number(val), class_="fg-stage-value"),
+                class_="fg-stage",
             ))
-        return ui.tags.div(*bars, class_="goal-bars")
+            if i < len(stages) - 1:
+                next_key = stages[i + 1][1]
+                curr_rate = (kpis.get(next_key, 0) / val * 100) if val > 0 else None
+                prior_val = prior.get(key, 0)
+                prior_rate = (prior.get(next_key, 0) / prior_val * 100) if prior_val > 0 else None
+
+                if curr_rate is not None:
+                    if prior_rate is None:
+                        rate_cls = ""
+                    elif curr_rate >= prior_rate:
+                        rate_cls = "fg-rate--good"
+                    elif curr_rate >= prior_rate - 5:
+                        rate_cls = "fg-rate--warn"
+                    else:
+                        rate_cls = "fg-rate--bad"
+                    label_text = "retain" if i == len(stages) - 2 else "convert"
+                    items.append(ui.tags.div(
+                        ui.tags.span("\u2193", class_="fg-arrow"),
+                        ui.tags.span(f"{curr_rate:.1f}% {label_text}", class_=f"fg-rate {rate_cls}"),
+                        class_="fg-conversion",
+                    ))
+                else:
+                    items.append(ui.tags.div(
+                        ui.tags.span("\u2193", class_="fg-arrow"),
+                        ui.tags.span("\u2014", class_="fg-rate"),
+                        class_="fg-conversion",
+                    ))
+
+        # Melt rate
+        deposits = kpis.get("total_deposits", 0)
+        net_deposits = kpis.get("total_net_deposits", 0)
+        if deposits > 0:
+            melt = (1 - net_deposits / deposits) * 100
+            melt_cls = "fg-melt--good" if melt < 3 else "fg-melt--warn" if melt <= 5 else "fg-melt--bad"
+            melt_el = ui.tags.div(
+                ui.tags.span(f"Melt Rate: {melt:.1f}%", class_=f"fg-melt-value {melt_cls}"),
+                class_="fg-melt",
+            )
+        else:
+            melt_el = ui.tags.div()
+
+        return ui.tags.div(*items, melt_el, class_="fg-panel")
+
+    # --- Goal context text (shown below YoY badge on each KPI card) ---
+
+    def _goal_text_ui(key: str):
+        goal = GOALS.get(key)
+        if not goal or goal <= 0:
+            return ui.tags.div()
+        actual = current_kpis().get(key, 0)
+        pct = (actual / goal) * 100
+        return ui.tags.div(
+            f"Goal: {fmt_number(goal)} \u00b7 {pct:.0f}%",
+            class_="goal-context-text",
+        )
+
+    @render.ui
+    def goal_text_total_inquiries():
+        return _goal_text_ui("total_inquiries")
+
+    @render.ui
+    def goal_text_total_app_starts():
+        return _goal_text_ui("total_app_starts")
+
+    @render.ui
+    def goal_text_total_app_submits():
+        return _goal_text_ui("total_app_submits")
+
+    @render.ui
+    def goal_text_total_admits():
+        return _goal_text_ui("total_admits")
+
+    @render.ui
+    def goal_text_total_deposits():
+        return _goal_text_ui("total_deposits")
+
+    @render.ui
+    def goal_text_total_net_deposits():
+        return _goal_text_ui("total_net_deposits")
+
+    # --- Melt note (only shown on Deposits card) ---
+
+    def _empty_melt():
+        return ui.tags.div()
+
+    @render.ui
+    def melt_note_total_inquiries():
+        return _empty_melt()
+
+    @render.ui
+    def melt_note_total_app_starts():
+        return _empty_melt()
+
+    @render.ui
+    def melt_note_total_app_submits():
+        return _empty_melt()
+
+    @render.ui
+    def melt_note_total_admits():
+        return _empty_melt()
+
+    @render.ui
+    def melt_note_total_deposits():
+        deposits = current_kpis().get("total_deposits", 0)
+        net_deposits = current_kpis().get("total_net_deposits", 0)
+        if deposits > 0:
+            melt = (1 - net_deposits / deposits) * 100
+            return ui.tags.span(
+                f"{melt:.1f}% melt rate",
+                class_="melt-note",
+                title=f"{melt:.1f}% of deposited students withdrew (melt rate).",
+            )
+        return _empty_melt()
+
+    @render.ui
+    def melt_note_total_net_deposits():
+        return _empty_melt()
 
     # ══════════════════════════════════════════════════════════
     # PAGE 2: FUNNEL DEEP DIVE

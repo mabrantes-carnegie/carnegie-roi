@@ -106,19 +106,24 @@ PRIMARY_FUNNEL = [
     ("Net Deposits", "total_net_deposits"),
 ]
 
-SECONDARY_METRICS = [
-    ("Admit Rate", "admitted_rate"),
-    ("Yield Rate", "yield_rate"),
-    ("Cost per Net Deposit", "cost_per_net_deposit"),
+_COST_METRICS = [
+    ("Cost/Inquiry", "cost_per_inquiry"),
+    ("Cost/App Start", "cost_per_app_start"),
+    ("Cost/App Submit", "cost_per_app_submit"),
+    ("Cost/Admit", "cost_per_admit"),
+    ("Cost/Deposit", "cost_per_deposit"),
+    ("Cost/Net Deposit", "cost_per_net_deposit"),
 ]
 
 
 def _funnel_kpi_card(label: str, key: str):
-    """Compact funnel KPI card with value, YoY delta, and progress bar."""
+    """Compact funnel KPI card with value, YoY delta, goal text, melt note, and progress bar."""
     return ui.tags.div(
         ui.tags.div(label, class_="funnel-label"),
         ui.tags.div(ui.output_text(f"kpi_{key}"), class_="funnel-value"),
         ui.output_ui(f"yoy_{key}"),
+        ui.output_ui(f"goal_text_{key}"),
+        ui.output_ui(f"melt_note_{key}"),
         ui.output_ui(f"progress_{key}"),
         class_="funnel-card",
     )
@@ -167,10 +172,57 @@ page_overview = ui.nav_panel(
             class_="funnel-strip",
         ),
 
-        # Section 3: Secondary metrics row
+        # Section 3: Secondary metrics row + expandable cost panel
         ui.tags.div(
-            *[_secondary_badge(label, key) for label, key in SECONDARY_METRICS],
+            _secondary_badge("Admit Rate", "admitted_rate"),
+            _secondary_badge("Yield Rate", "yield_rate"),
+            # Enrolled badge with tooltip
+            ui.tags.div(
+                ui.tags.div("Enrolled", class_="secondary-label"),
+                ui.tags.div(ui.output_text("kpi_total_enrolled"), class_="secondary-value"),
+                ui.output_ui("yoy_total_enrolled"),
+                title="Students who completed enrollment. May differ from Net Deposits due to enrollment timing and process variations.",
+                class_="secondary-badge",
+            ),
+            # Cost/Net Deposit badge + expand link
+            ui.tags.div(
+                ui.tags.div(
+                    ui.tags.div("Cost per Net Deposit", class_="secondary-label"),
+                    ui.tags.div(ui.output_text("kpi_cost_per_net_deposit"), class_="secondary-value"),
+                    ui.output_ui("yoy_cost_per_net_deposit"),
+                    class_="secondary-badge",
+                    style="margin-bottom:0;",
+                ),
+                ui.tags.a(
+                    "View all costs \u2197",
+                    href="#",
+                    class_="cost-expand-link",
+                    onclick=(
+                        "var p=document.getElementById('cost-expand-panel');"
+                        "p.style.display=p.style.display==='none'?'flex':'none';"
+                        "this.textContent=p.style.display==='none'?'View all costs \u2197':'Hide costs \u2197';"
+                        "return false;"
+                    ),
+                ),
+                style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;",
+            ),
             class_="secondary-row",
+        ),
+        # Expandable cost detail panel (hidden by default)
+        ui.tags.div(
+            *[
+                ui.tags.div(
+                    ui.tags.div(label, class_="secondary-label"),
+                    ui.tags.div(ui.output_text(f"kpi_{key}"), class_="secondary-value"),
+                    ui.output_ui(f"yoy_{key}"),
+                    class_="secondary-badge",
+                )
+                for label, key in _COST_METRICS
+            ],
+            id="cost-expand-panel",
+            class_="secondary-row",
+            style="display:none; flex-wrap:wrap; margin-top:0; padding-top:8px; border-top:1px solid var(--carnegie-gray-border);",
+            title="Cost metrics reflect Carnegie campaign spend divided by total funnel volume.",
         ),
 
         # Section 4: Main content (side by side)
@@ -184,11 +236,11 @@ page_overview = ui.nav_panel(
                             ui.input_radio_buttons(
                                 "trending_metric", None,
                                 choices={
-                                    "net_deposits": "Net Deposits",
                                     "inquiries": "Inquiries",
+                                    "net_deposits": "Net Deposits",
                                     "admits": "Admits",
                                 },
-                                selected="net_deposits",
+                                selected="inquiries",
                                 inline=True,
                             ),
                             class_="pill-toggle",
@@ -212,10 +264,10 @@ page_overview = ui.nav_panel(
                 ui.output_ui("trending_chart"),
                 class_="chart-card",
             ),
-            # Right: Progress to goal
+            # Right: Funnel at a glance
             ui.tags.div(
-                ui.tags.span("Progress to goal", class_="card-heading"),
-                ui.output_ui("progress_to_goal"),
+                ui.tags.span("Funnel at a glance", class_="card-heading"),
+                ui.output_ui("funnel_at_glance"),
                 class_="chart-card",
             ),
             class_="main-content-row",
@@ -808,7 +860,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=5"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=6"),
         ),
         _sidebar_overlay(),
     ],
