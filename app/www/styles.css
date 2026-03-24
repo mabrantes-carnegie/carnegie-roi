@@ -1173,19 +1173,42 @@ body > div.container-fluid {
 }
 
 /* ════════════════════════════════════════════
-   COST EXPAND LINK
+   COST EXPAND — badge footer + panel
    ════════════════════════════════════════════ */
+
+.cost-badge-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 2px;
+    flex-wrap: wrap;
+}
 
 .cost-expand-link {
     font-family: 'Manrope', sans-serif;
     font-size: 11px;
     color: var(--carnegie-gray-text);
     text-decoration: none;
-    padding: 2px 0;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .cost-expand-link:hover {
     color: var(--carnegie-navy);
     text-decoration: underline;
+}
+
+/* The Shiny output wrapper is hidden by default; JS adds .cost-panel-open to reveal */
+#cost_detail_panel {
+    display: none;
+}
+
+#cost_detail_panel.cost-panel-open {
+    display: block;
+}
+
+#cost_detail_panel .secondary-row {
+    padding-top: 8px;
+    border-top: 1px solid var(--carnegie-gray-border);
+    flex-wrap: wrap;
 }

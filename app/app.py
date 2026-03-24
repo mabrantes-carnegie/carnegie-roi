@@ -171,7 +171,7 @@ page_overview = ui.nav_panel(
             class_="funnel-strip",
         ),
 
-        # Section 3: Secondary metrics row + expandable cost panel
+        # Section 3: Secondary metrics row
         ui.tags.div(
             _secondary_badge("Admit Rate", "admitted_rate"),
             _secondary_badge("Yield Rate", "yield_rate"),
@@ -183,46 +183,31 @@ page_overview = ui.nav_panel(
                 title="Students who completed enrollment. May differ from Net Deposits due to enrollment timing and process variations.",
                 class_="secondary-badge",
             ),
-            # Cost/Net Deposit badge + expand link
+            # Cost/Net Deposit badge with inline expand link
             ui.tags.div(
+                ui.tags.div("Cost per Net Deposit", class_="secondary-label"),
+                ui.tags.div(ui.output_text("kpi_cost_per_net_deposit"), class_="secondary-value"),
                 ui.tags.div(
-                    ui.tags.div("Cost per Net Deposit", class_="secondary-label"),
-                    ui.tags.div(ui.output_text("kpi_cost_per_net_deposit"), class_="secondary-value"),
                     ui.output_ui("yoy_cost_per_net_deposit"),
-                    class_="secondary-badge",
-                    style="margin-bottom:0;",
-                ),
-                ui.tags.a(
-                    "View all costs \u2197",
-                    href="#",
-                    class_="cost-expand-link",
-                    onclick=(
-                        "var p=document.getElementById('cost-expand-panel');"
-                        "p.style.display=p.style.display==='none'?'flex':'none';"
-                        "this.textContent=p.style.display==='none'?'View all costs \u2197':'Hide costs \u2197';"
-                        "return false;"
+                    ui.tags.a(
+                        "View all costs \u2197",
+                        href="#",
+                        class_="cost-expand-link",
+                        onclick=(
+                            "var p=document.getElementById('cost_detail_panel');"
+                            "p.classList.toggle('cost-panel-open');"
+                            "this.textContent=p.classList.contains('cost-panel-open')?'Hide costs \u2197':'View all costs \u2197';"
+                            "return false;"
+                        ),
                     ),
+                    class_="cost-badge-footer",
                 ),
-                style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;",
+                class_="secondary-badge",
             ),
             class_="secondary-row",
         ),
-        # Expandable cost detail panel (hidden by default)
-        ui.tags.div(
-            *[
-                ui.tags.div(
-                    ui.tags.div(label, class_="secondary-label"),
-                    ui.tags.div(ui.output_text(f"kpi_{key}"), class_="secondary-value"),
-                    ui.output_ui(f"yoy_{key}"),
-                    class_="secondary-badge",
-                )
-                for label, key in _COST_METRICS
-            ],
-            id="cost-expand-panel",
-            class_="secondary-row",
-            style="display:none; flex-wrap:wrap; margin-top:0; padding-top:8px; border-top:1px solid var(--carnegie-gray-border);",
-            title="Cost metrics reflect Carnegie campaign spend divided by total funnel volume.",
-        ),
+        # Expandable cost detail panel — single server-rendered output, toggled by CSS class
+        ui.output_ui("cost_detail_panel"),
 
         # Section 4: Main content (side by side)
         ui.tags.div(
@@ -859,7 +844,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=6"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=7"),
         ),
         _sidebar_overlay(),
     ],

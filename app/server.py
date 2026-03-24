@@ -273,39 +273,6 @@ def server_logic(input, output, session):
     def kpi_total_enrolled():
         return fmt_number(current_kpis().get("total_enrolled", 0))
 
-    def _cost_per(denominator_key):
-        """Return formatted cost per funnel stage metric."""
-        total_spend = filtered_q2()["total_cost"].sum()
-        denom = current_kpis().get(denominator_key, 0)
-        if denom > 0 and total_spend > 0:
-            return fmt_currency(total_spend / denom)
-        return "\u2014"
-
-    def _prior_cost_per(denominator_key):
-        prior_spend = prior_q2()["total_cost"].sum()
-        denom = prior_kpis().get(denominator_key, 0)
-        return (prior_spend / denom) if denom > 0 and prior_spend > 0 else None
-
-    @render.text
-    def kpi_cost_per_inquiry():
-        return _cost_per("total_inquiries")
-
-    @render.text
-    def kpi_cost_per_app_start():
-        return _cost_per("total_app_starts")
-
-    @render.text
-    def kpi_cost_per_app_submit():
-        return _cost_per("total_app_submits")
-
-    @render.text
-    def kpi_cost_per_admit():
-        return _cost_per("total_admits")
-
-    @render.text
-    def kpi_cost_per_deposit():
-        return _cost_per("total_deposits")
-
     @render.text
     def kpi_cost_per_net_deposit():
         total_spend = filtered_q2()["total_cost"].sum()
@@ -376,28 +343,53 @@ def server_logic(input, output, session):
         return ui.tags.span(text, class_=f"kpi-badge kpi-badge--{sentiment}")
 
     @render.ui
-    def yoy_cost_per_inquiry():
-        return _cost_yoy_badge("total_inquiries")
-
-    @render.ui
-    def yoy_cost_per_app_start():
-        return _cost_yoy_badge("total_app_starts")
-
-    @render.ui
-    def yoy_cost_per_app_submit():
-        return _cost_yoy_badge("total_app_submits")
-
-    @render.ui
-    def yoy_cost_per_admit():
-        return _cost_yoy_badge("total_admits")
-
-    @render.ui
-    def yoy_cost_per_deposit():
-        return _cost_yoy_badge("total_deposits")
-
-    @render.ui
     def yoy_cost_per_net_deposit():
         return _cost_yoy_badge("total_net_deposits")
+
+    @render.ui
+    def cost_detail_panel():
+        """Single render for all expanded cost metrics — avoids lazy-render spinner issue."""
+        _costs = [
+            ("Cost/Inquiry",    "total_inquiries"),
+            ("Cost/App Start",  "total_app_starts"),
+            ("Cost/App Submit", "total_app_submits"),
+            ("Cost/Admit",      "total_admits"),
+            ("Cost/Deposit",    "total_deposits"),
+        ]
+        total_spend = filtered_q2()["total_cost"].sum()
+        prior_spend = prior_q2()["total_cost"].sum()
+        kpis = current_kpis()
+        prior = prior_kpis()
+
+        badges = []
+        for label, denom_key in _costs:
+            denom = kpis.get(denom_key, 0)
+            curr_val = total_spend / denom if denom > 0 and total_spend > 0 else None
+            prior_denom = prior.get(denom_key, 0)
+            prior_val = prior_spend / prior_denom if prior_denom > 0 and prior_spend > 0 else None
+
+            value_str = fmt_currency(curr_val) if curr_val is not None else "\u2014"
+
+            if curr_val is not None and prior_val is not None and prior_val != 0:
+                pct = (curr_val - prior_val) / abs(prior_val) * 100
+                text, _ = fmt_yoy(pct)
+                sentiment = "positive" if pct < 0 else "negative" if pct > 0 else "neutral"
+                yoy_el = ui.tags.span(text, class_=f"kpi-badge kpi-badge--{sentiment}")
+            else:
+                yoy_el = ui.tags.span("N/A", class_="kpi-badge kpi-badge--na")
+
+            badges.append(ui.tags.div(
+                ui.tags.div(label, class_="secondary-label"),
+                ui.tags.div(value_str, class_="secondary-value"),
+                yoy_el,
+                class_="secondary-badge",
+            ))
+
+        return ui.tags.div(
+            *badges,
+            class_="secondary-row",
+            title="Cost metrics reflect Carnegie campaign spend divided by total funnel volume.",
+        )
 
     # --- Progress bars ---
 
