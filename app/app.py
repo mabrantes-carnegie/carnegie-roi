@@ -112,7 +112,6 @@ _COST_METRICS = [
     ("Cost/App Submit", "cost_per_app_submit"),
     ("Cost/Admit", "cost_per_admit"),
     ("Cost/Deposit", "cost_per_deposit"),
-    ("Cost/Net Deposit", "cost_per_net_deposit"),
 ]
 
 
