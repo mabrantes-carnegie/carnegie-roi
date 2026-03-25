@@ -219,6 +219,23 @@ page_overview = ui.nav_panel(
                     ui.tags.span("Trending performance", class_="card-heading"),
                     ui.tags.div(
                         ui.tags.div(
+                            # Hidden Shiny input — holds the value, never visible
+                            ui.tags.div(
+                                ui.input_radio_buttons(
+                                    "trending_metric", None,
+                                    choices={
+                                        "inquiries": "Inquiries",
+                                        "app_starts": "App Starts",
+                                        "app_submits": "App Submits",
+                                        "admits": "Admits",
+                                        "deposits": "Deposits",
+                                        "net_deposits": "Net Deposits",
+                                    },
+                                    selected="inquiries",
+                                    inline=True,
+                                ),
+                                style="display:none;",
+                            ),
                             ui.tags.div(
                                 ui.tags.button(
                                     ui.tags.span("Inquiries", id="trending-metric-label"),
