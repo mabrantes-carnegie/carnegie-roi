@@ -501,8 +501,8 @@ def server_logic(input, output, session):
                 x=prior["month_label"], y=prior[y_col],
                 mode="lines+markers",
                 name=prior_label,
-                line=dict(color="#FFDBD9", width=1.8, dash="dash"),
-                marker=dict(color="#FFDBD9", size=5),
+                line=dict(color="#C99D44", width=1.8, dash="dash"),
+                marker=dict(color="#C99D44", size=5),
                 hovertemplate=f"<b>%{{x}} {prior_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
             ))
 
