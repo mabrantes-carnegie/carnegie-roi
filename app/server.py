@@ -1061,12 +1061,7 @@ def server_logic(input, output, session):
             return ui.tags.div("No program data for the selected filters.", class_="empty-state")
 
         metric = input.program_metric()
-        metric_labels = {
-            "total_net_deposits": "Net Deposits",
-            "total_inquiries": "Inquiries",
-            "total_admits": "Admits",
-        }
-        metric_label = metric_labels.get(metric, metric)
+        metric_label = PRIMARY_LABELS.get(metric, metric)
 
         # Current year aggregation
         curr = (

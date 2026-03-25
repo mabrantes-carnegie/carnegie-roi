@@ -380,19 +380,6 @@ page_programs = ui.nav_panel(
                 choices=[],
                 multiple=True,
             ),
-            ui.tags.div(
-                ui.input_radio_buttons(
-                    "program_metric", None,
-                    choices={
-                        "total_net_deposits": "Net Deposits",
-                        "total_inquiries": "Inquiries",
-                        "total_admits": "Admits",
-                    },
-                    selected="total_net_deposits",
-                    inline=True,
-                ),
-                class_="pill-toggle",
-            ),
             class_="page-filter-bar",
         ),
         # Program trending vs goal
@@ -414,8 +401,20 @@ page_programs = ui.nav_panel(
             class_="chart-card",
         ),
         # Top programs bar chart
-        ui.tags.h2("Top programs", class_="section-heading"),
         ui.tags.div(
+            ui.tags.div(
+                ui.tags.span("Top programs", class_="card-heading"),
+                ui.tags.div(
+                    ui.input_radio_buttons(
+                        "program_metric", None,
+                        choices=PROGRAM_TREND_METRICS,
+                        selected="total_inquiries",
+                        inline=True,
+                    ),
+                    class_="pill-toggle",
+                ),
+                class_="card-header-row",
+            ),
             ui.output_ui("programs_bar_chart"),
             class_="chart-card",
         ),
