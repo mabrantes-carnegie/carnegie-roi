@@ -473,22 +473,54 @@ def server_logic(input, output, session):
             if agg.empty:
                 return ui.tags.div("No data available.", class_="empty-state")
             x_labels = [str(y) for y in agg["term_year"]]
+            values = agg[metric_col].tolist()
             colors = [
                 "#EA332D" if y == current_ty else "#C99D44" if y == prior_ty else CHART_COLORS[1]
                 for y in agg["term_year"]
             ]
+            # Value labels inside bars (near top)
+            bar_text = [f"{v:,.0f}" for v in values]
             fig.add_trace(go.Bar(
-                x=x_labels, y=agg[metric_col],
+                x=x_labels, y=values,
                 name=stage_label,
                 marker_color=colors,
+                text=bar_text,
+                textposition="inside",
+                insidetextanchor="end",
+                textfont=dict(family="Manrope, sans-serif", size=11, color="#ffffff"),
                 hovertemplate=f"<b>%{{x}}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
             ))
+            # YoY % annotations between bars
+            annotations = []
+            for i in range(1, len(values)):
+                prev = values[i - 1]
+                curr_v = values[i]
+                if prev and prev != 0:
+                    pct = (curr_v - prev) / prev * 100
+                    arrow = "▲" if pct >= 0 else "▼"
+                    color = "#132B23" if pct >= 0 else "#560422"
+                    annotations.append(dict(
+                        x=i - 0.5,
+                        y=max(curr_v, prev) * 1.06,
+                        xref="x", yref="y",
+                        text=f"{arrow} {abs(pct):.1f}%",
+                        showarrow=False,
+                        font=dict(family="Manrope, sans-serif", size=10.5, color=color),
+                        xanchor="center",
+                    ))
             layout = _base_chart_layout(360)
             layout["xaxis"] = dict(
                 tickfont=dict(family="Manrope, sans-serif", size=11, color="#9B9893"),
                 showgrid=False, title="",
             )
             layout["bargap"] = 0.4
+            layout["annotations"] = annotations
+            layout["yaxis"] = dict(
+                tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
+                gridcolor="#F0EEEA", gridwidth=0.8,
+                showline=False, nticks=5, title="",
+                range=[0, max(values) * 1.18],
+            )
         else:
             # Monthly mode — cumulative by academic month, current vs prior year
             def _monthly_series(term_year, cap_current_month=False):
