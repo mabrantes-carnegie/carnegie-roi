@@ -1041,49 +1041,58 @@ def server_logic(input, output, session):
             total_inquiries=("total_inquiries", "sum"),
             total_app_starts=("total_app_starts", "sum"),
             total_app_submits=("total_app_submits", "sum"),
-            total_admits=("total_admits", "sum"),
+            total_enrolled=("total_enrolled", "sum"),
             total_deposits=("total_deposits", "sum"),
             total_net_deposits=("total_net_deposits", "sum"),
         ).reset_index().sort_values("total_inquiries", ascending=False).head(20)
 
-        curr["Admit Rate"] = curr.apply(
-            lambda r: f"{r['total_admits'] / r['total_app_submits'] * 100:.1f}%"
-            if r["total_app_submits"] > 0 else "—", axis=1
-        )
-        curr["Yield"] = curr.apply(
-            lambda r: f"{r['total_net_deposits'] / r['total_admits'] * 100:.1f}%"
-            if r["total_admits"] > 0 else "—", axis=1
-        )
+        total_inq = curr["total_inquiries"].sum()
+        total_starts = curr["total_app_starts"].sum()
+        total_submits = curr["total_app_submits"].sum()
+        total_enrolled = curr["total_enrolled"].sum()
 
-        py_df = prior_programs()
-        if not py_df.empty:
-            py_agg = py_df.groupby("program_display")["total_net_deposits"].sum().reset_index()
-            py_agg.columns = ["program_display", "nd_py"]
-            curr = curr.merge(py_agg, on="program_display", how="left")
-            curr["YoY Δ"] = curr.apply(
-                lambda r: f"▲ {((r['total_net_deposits'] - r['nd_py']) / r['nd_py'] * 100):.0f}%"
-                if r.get("nd_py", 0) > 0 and r["total_net_deposits"] >= r["nd_py"]
-                else (
-                    f"▼ {abs((r['total_net_deposits'] - r['nd_py']) / r['nd_py'] * 100):.0f}%"
-                    if r.get("nd_py", 0) > 0
-                    else "N/A"
-                ),
-                axis=1,
-            )
-        else:
-            curr["YoY Δ"] = "N/A"
+        curr["% Inquiries"] = curr["total_inquiries"].apply(
+            lambda v: f"{v / total_inq * 100:.1f}%" if total_inq > 0 else "—"
+        )
+        curr["% App Starts"] = curr["total_app_starts"].apply(
+            lambda v: f"{v / total_starts * 100:.1f}%" if total_starts > 0 else "—"
+        )
+        curr["Start Rate"] = curr.apply(
+            lambda r: f"{r['total_app_starts'] / r['total_inquiries'] * 100:.1f}%"
+            if r["total_inquiries"] > 0 else "—", axis=1
+        )
+        curr["% App Submits"] = curr["total_app_submits"].apply(
+            lambda v: f"{v / total_submits * 100:.1f}%" if total_submits > 0 else "—"
+        )
+        curr["Submit Rate"] = curr.apply(
+            lambda r: f"{r['total_app_submits'] / r['total_app_starts'] * 100:.1f}%"
+            if r["total_app_starts"] > 0 else "—", axis=1
+        )
+        curr["% Enrolled"] = curr["total_enrolled"].apply(
+            lambda v: f"{v / total_enrolled * 100:.1f}%" if total_enrolled > 0 else "—"
+        )
+        curr["Inq→Enroll Rate"] = curr.apply(
+            lambda r: f"{r['total_enrolled'] / r['total_inquiries'] * 100:.1f}%"
+            if r["total_inquiries"] > 0 else "—", axis=1
+        )
 
         display = curr.rename(columns={
             "program_display": "Program",
             "total_inquiries": "Inquiries",
             "total_app_starts": "App Starts",
             "total_app_submits": "App Submits",
-            "total_admits": "Admits",
+            "total_enrolled": "Enrolled",
             "total_deposits": "Deposits",
             "total_net_deposits": "Net Deposits",
         })
-        cols = ["Program", "Inquiries", "App Starts", "App Submits",
-                "Admits", "Deposits", "Net Deposits", "Admit Rate", "Yield", "YoY Δ"]
+        cols = [
+            "Program",
+            "Inquiries", "% Inquiries",
+            "App Starts", "% App Starts", "Start Rate",
+            "App Submits", "% App Submits", "Submit Rate",
+            "Enrolled", "% Enrolled", "Inq→Enroll Rate",
+            "Deposits", "Net Deposits",
+        ]
         return render.DataGrid(display[cols], filters=False)
 
     # --- Geography Map + Top States (Q6 state data) ---
