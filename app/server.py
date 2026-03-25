@@ -464,75 +464,98 @@ def server_logic(input, output, session):
         current_ty = int(input.term_year())
         prior_ty = current_ty - 1
         stage_label = PRIMARY_LABELS.get(metric_col, metric_col)
+        fig = go.Figure()
 
-        def _monthly_series(term_year, cap_current_month=False):
-            sub = df[df["term_year"] == term_year]
-            if sub.empty:
-                return pd.DataFrame()
-            agg = sub.groupby(["acad_pos", "month_label"], as_index=False)[metric_col].sum()
-            agg = agg.sort_values("acad_pos")
-            if cap_current_month:
-                # Cap at the current academic month position (Jul=1 … Jun=12)
-                current_acad_pos = ACAD_ORDER.get(date.today().month, 12)
-                agg = agg[agg["acad_pos"] <= current_acad_pos]
-            return agg
+        if mode == "yearly":
+            # Aggregate total per term_year, show all available years as bars
+            agg = df.groupby("term_year", as_index=False)[metric_col].sum()
+            agg = agg.sort_values("term_year")
+            if agg.empty:
+                return ui.tags.div("No data available.", class_="empty-state")
+            x_labels = [str(y) for y in agg["term_year"]]
+            colors = [
+                "#EA332D" if y == current_ty else "#C99D44" if y == prior_ty else CHART_COLORS[1]
+                for y in agg["term_year"]
+            ]
+            fig.add_trace(go.Bar(
+                x=x_labels, y=agg[metric_col],
+                name=stage_label,
+                marker_color=colors,
+                hovertemplate=f"<b>%{{x}}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
+            ))
+            layout = _base_chart_layout(360)
+            layout["xaxis"] = dict(
+                tickfont=dict(family="Manrope, sans-serif", size=11, color="#9B9893"),
+                showgrid=False, title="",
+            )
+            layout["bargap"] = 0.4
+        else:
+            # Monthly mode — cumulative by academic month, current vs prior year
+            def _monthly_series(term_year, cap_current_month=False):
+                sub = df[df["term_year"] == term_year]
+                if sub.empty:
+                    return pd.DataFrame()
+                agg = sub.groupby(["acad_pos", "month_label"], as_index=False)[metric_col].sum()
+                agg = agg.sort_values("acad_pos")
+                if cap_current_month:
+                    current_acad_pos = ACAD_ORDER.get(date.today().month, 12)
+                    agg = agg[agg["acad_pos"] <= current_acad_pos]
+                return agg
 
-        curr = _monthly_series(current_ty, cap_current_month=True)
-        prior = _monthly_series(prior_ty)
+            curr = _monthly_series(current_ty, cap_current_month=True)
+            prior = _monthly_series(prior_ty)
 
-        if curr.empty and prior.empty:
-            return ui.tags.div("No data available.", class_="empty-state")
+            if curr.empty and prior.empty:
+                return ui.tags.div("No data available.", class_="empty-state")
 
-        y_col = metric_col
-        if mode == "cumulative":
+            # Always cumulative in monthly mode
             if not curr.empty:
                 curr["cumulative"] = curr[metric_col].cumsum()
             if not prior.empty:
                 prior["cumulative"] = prior[metric_col].cumsum()
             y_col = "cumulative"
 
-        fig = go.Figure()
+            prior_label = f"{prior_ty - 1}-{str(prior_ty)[-2:]}"
+            curr_label = f"{current_ty - 1}-{str(current_ty)[-2:]}"
 
-        prior_label = f"{prior_ty - 1}-{str(prior_ty)[-2:]}"
-        curr_label = f"{current_ty - 1}-{str(current_ty)[-2:]}"
+            if not prior.empty:
+                fig.add_trace(go.Scatter(
+                    x=prior["month_label"], y=prior[y_col],
+                    mode="lines+markers",
+                    name=prior_label,
+                    line=dict(color="#C99D44", width=1.8, dash="dash"),
+                    marker=dict(color="#C99D44", size=5),
+                    hovertemplate=f"<b>%{{x}} {prior_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
+                ))
 
-        if not prior.empty:
-            fig.add_trace(go.Scatter(
-                x=prior["month_label"], y=prior[y_col],
-                mode="lines+markers",
-                name=prior_label,
-                line=dict(color="#C99D44", width=1.8, dash="dash"),
-                marker=dict(color="#C99D44", size=5),
-                hovertemplate=f"<b>%{{x}} {prior_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
-            ))
+            if not curr.empty:
+                fig.add_trace(go.Scatter(
+                    x=curr["month_label"], y=curr[y_col],
+                    mode="lines+markers",
+                    name=curr_label,
+                    line=dict(color="#EA332D", width=2.5),
+                    marker=dict(color="#EA332D", size=7),
+                    hovertemplate=f"<b>%{{x}} {curr_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
+                ))
 
-        if not curr.empty:
-            fig.add_trace(go.Scatter(
-                x=curr["month_label"], y=curr[y_col],
-                mode="lines+markers",
-                name=curr_label,
-                line=dict(color="#EA332D", width=2.5),
-                marker=dict(color="#EA332D", size=7),
-                hovertemplate=f"<b>%{{x}} {curr_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
-            ))
+                if len(curr) >= 3:
+                    curr["trend"] = curr[y_col].rolling(window=3).mean()
+                    trend_df = curr.dropna(subset=["trend"])
+                    if not trend_df.empty:
+                        fig.add_trace(go.Scatter(
+                            x=trend_df["month_label"], y=trend_df["trend"],
+                            mode="lines", name="3-mo trend",
+                            line=dict(color="rgba(2,19,38,0.4)", width=1.5, dash="dot"),
+                            hovertemplate=f"<b>%{{x}} {curr_label}</b><br>3-mo avg: %{{y:,.0f}}<extra></extra>",
+                        ))
 
-            if len(curr) >= 3:
-                curr["trend"] = curr[y_col].rolling(window=3).mean()
-                trend_df = curr.dropna(subset=["trend"])
-                if not trend_df.empty:
-                    fig.add_trace(go.Scatter(
-                        x=trend_df["month_label"], y=trend_df["trend"],
-                        mode="lines", name="3-mo trend",
-                        line=dict(color="rgba(2,19,38,0.4)", width=1.5, dash="dot"),
-                        hovertemplate=f"<b>%{{x}} {curr_label}</b><br>3-mo avg: %{{y:,.0f}}<extra></extra>",
-                    ))
+            layout = _base_chart_layout(360)
+            layout["xaxis"] = dict(
+                categoryorder="array", categoryarray=MONTH_ORDER,
+                tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
+                showgrid=False, title="",
+            )
 
-        layout = _base_chart_layout(360)
-        layout["xaxis"] = dict(
-            categoryorder="array", categoryarray=MONTH_ORDER,
-            tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
-            showgrid=False, title="",
-        )
         fig.update_layout(**layout)
         return _plotly_html(fig)
 

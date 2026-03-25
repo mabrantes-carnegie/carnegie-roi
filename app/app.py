@@ -286,10 +286,10 @@ page_overview = ui.nav_panel(
                             ui.input_radio_buttons(
                                 "trending_mode", None,
                                 choices={
-                                    "cumulative": "Yearly",
                                     "monthly": "Monthly",
+                                    "yearly": "Yearly",
                                 },
-                                selected="cumulative",
+                                selected="monthly",
                                 inline=True,
                             ),
                             class_="pill-toggle pill-toggle--secondary",
