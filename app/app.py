@@ -219,19 +219,47 @@ page_overview = ui.nav_panel(
                     ui.tags.span("Trending performance", class_="card-heading"),
                     ui.tags.div(
                         ui.tags.div(
-                            ui.input_select(
-                                "trending_metric", None,
-                                choices={
-                                    "inquiries": "Inquiries",
-                                    "app_starts": "App Starts",
-                                    "app_submits": "App Submits",
-                                    "admits": "Admits",
-                                    "deposits": "Deposits",
-                                    "net_deposits": "Net Deposits",
-                                },
-                                selected="inquiries",
+                            ui.tags.div(
+                                ui.tags.button(
+                                    ui.tags.span("Inquiries", id="trending-metric-label"),
+                                    ui.tags.span("▾", class_="pill-dropdown-arrow"),
+                                    class_="pill-dropdown-btn",
+                                    onclick=(
+                                        "var m=document.getElementById('trending-metric-menu');"
+                                        "m.style.display=m.style.display==='block'?'none':'block';"
+                                        "event.stopPropagation();"
+                                    ),
+                                ),
+                                ui.tags.div(
+                                    *[
+                                        ui.tags.div(
+                                            label,
+                                            class_="pill-dropdown-option",
+                                            **{
+                                                "data-value": value,
+                                                "onclick": (
+                                                    f"document.getElementById('trending-metric-label').textContent='{label}';"
+                                                    "document.getElementById('trending-metric-menu').style.display='none';"
+                                                    f"Shiny.setInputValue('trending_metric','{value}',{{priority:'event'}});"
+                                                    "document.querySelectorAll('#trending-metric-menu .pill-dropdown-option').forEach(function(el){{el.classList.remove('active')}});"
+                                                    "this.classList.add('active');"
+                                                ),
+                                            },
+                                        )
+                                        for value, label in [
+                                            ("inquiries", "Inquiries"),
+                                            ("app_starts", "App Starts"),
+                                            ("app_submits", "App Submits"),
+                                            ("admits", "Admits"),
+                                            ("deposits", "Deposits"),
+                                            ("net_deposits", "Net Deposits"),
+                                        ]
+                                    ],
+                                    id="trending-metric-menu",
+                                    class_="pill-dropdown-menu",
+                                ),
+                                class_="pill-dropdown",
                             ),
-                            class_="pill-select",
                         ),
                         ui.tags.div(
                             ui.input_radio_buttons(
@@ -869,8 +897,13 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=12"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=13"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
+            ui.tags.script(
+                "document.addEventListener('click',function(){"
+                "document.querySelectorAll('.pill-dropdown-menu').forEach(function(m){"
+                "m.style.display='none';});});"
+            ),
         ),
         _sidebar_overlay(),
     ],
