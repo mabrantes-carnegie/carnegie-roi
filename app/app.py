@@ -286,7 +286,7 @@ page_overview = ui.nav_panel(
                             ui.input_radio_buttons(
                                 "trending_mode", None,
                                 choices={
-                                    "cumulative": "Cumulative",
+                                    "cumulative": "Yearly",
                                     "monthly": "Monthly",
                                 },
                                 selected="cumulative",
