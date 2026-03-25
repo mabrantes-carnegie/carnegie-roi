@@ -1,6 +1,13 @@
 """Carnegie ROI Dashboard — UI layout and app entry point."""
 
+import sys
 from pathlib import Path
+
+# Ensure the app directory is on sys.path so local modules resolve
+# both locally and on Posit Connect (which runs from the repo root).
+sys.path.insert(0, str(Path(__file__).parent))
+
+
 from shiny import App, ui
 
 from datetime import date
