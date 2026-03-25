@@ -501,8 +501,8 @@ def server_logic(input, output, session):
                 x=prior["month_label"], y=prior[y_col],
                 mode="lines+markers",
                 name=prior_label,
-                line=dict(color=CHART_COLORS[1], width=1.8, dash="dash"),
-                marker=dict(color=CHART_COLORS[1], size=5),
+                line=dict(color="#FFDBD9", width=1.8, dash="dash"),
+                marker=dict(color="#FFDBD9", size=5),
                 hovertemplate=f"<b>%{{x}} {prior_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
             ))
 
@@ -511,8 +511,8 @@ def server_logic(input, output, session):
                 x=curr["month_label"], y=curr[y_col],
                 mode="lines+markers",
                 name=curr_label,
-                line=dict(color=CHART_COLORS[0], width=2.5),
-                marker=dict(color=CHART_COLORS[0], size=7),
+                line=dict(color="#EA332D", width=2.5),
+                marker=dict(color="#EA332D", size=7),
                 hovertemplate=f"<b>%{{x}} {curr_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
             ))
 
