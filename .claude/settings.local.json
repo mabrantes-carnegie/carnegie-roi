@@ -41,7 +41,27 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git config:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(/c/Users/mabrantes/Documents/Projects/carnegie-roi-1/.venv/Scripts/python.exe -c \"from app import app; print\\(''App loads OK''\\)\")",
+      "Bash(/c/Users/mabrantes/Documents/Projects/carnegie-roi-1/.venv/Scripts/python.exe -c \"from app import app; print\\(''OK''\\)\")",
+      "Bash(mkdir -p data/archive)",
+      "Bash(mv data/q1_funnel_kpis.csv data/q4_monthly_trending.csv data/q5_monthly_source_trending.csv data/archive/)",
+      "Bash(git rm:*)",
+      "Bash(python -c \"import app\")",
+      "Bash(python3 -c \"import app\")",
+      "Bash(py -c \"import app\")",
+      "Read(//usr/**)",
+      "Read(//usr/local/**)",
+      "Bash(/c/Users/mabrantes/Documents/Projects/carnegie-roi-1/.venv/Scripts/python -c \"import app\")",
+      "Bash(/c/Users/mabrantes/Documents/Projects/carnegie-roi-1/.venv/Scripts/python -c \":*)",
+      "Bash(ls -la /c/Users/mabrantes/Documents/Projects/carnegie-roi-1/doc*)",
+      "Bash(/c/Users/mabrantes/Documents/Projects/carnegie-roi-1/.venv/Scripts/python -c \"import digital_data; print\\(''Q8:'', digital_data.Q8.shape\\); print\\(''Q9:'', digital_data.Q9.shape\\); print\\(''Q10:'', digital_data.Q10.shape\\); print\\(''Q11c:'', digital_data.Q11_CREATIVE.shape\\); print\\(''Q11k:'', digital_data.Q11_KEYWORDS.shape\\); print\\(''Q12:'', digital_data.Q12.shape\\); print\\(''Date range:'', digital_data.get_digital_date_range\\(\\)\\)\")",
+      "Bash(/c/Users/mabrantes/Documents/Projects/carnegie-roi-1/.venv/Scripts/python -c \"import app; print\\(''OK''\\)\")",
+      "Bash(C:/Users/mabrantes/AppData/Local/Programs/Python/Python312/python.exe -c \"import app\")",
+      "Bash(.venv/Scripts/python.exe -c \"import sys; sys.path.insert\\(0,''app''\\); import app\")",
+      "Bash(.venv/Scripts/python.exe -m py_compile app/server.py)",
+      "Bash(.venv/Scripts/python.exe -m py_compile app/digital_server.py)",
+      "Bash(.venv/Scripts/python.exe -c \"import plotly; print\\(''Plotly version:'', plotly.__version__\\)\")"
     ]
   }
 }

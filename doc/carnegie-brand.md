@@ -10,31 +10,31 @@ COLORS — USE HEX IN ALL DIGITAL / DASHBOARD WORK
 
 PRIMARY (these three define Carnegie — always lead with them):
 
-  Carnegie Red      #FA3320    Primary accent, CTAs, active states
-  Carnegie Blue     #021324    Primary text, headings, dark backgrounds
+  Carnegie Red      #EA332D    Primary accent, CTAs, active states
+  Carnegie Blue     #021326    Primary text, headings, dark backgrounds
   Off White         #F8F4F0    Page backgrounds, breathing room
 
 SECONDARY (use for charts, infographics, supporting elements only):
 
-  Carnegie Gold     #C9D444    Warmth, polish — limited use
+  Carnegie Gold     #C99D44    Warmth, polish — limited use
 
-  Light Red         #FFD7D3
-  Dark Red          #5E1318
+  Light Red         #FFDBD9
+  Dark Red          #560422
 
-  Light Blue        #A8BDD6
-  Dark Blue         #001F30
+  Light Blue        #A4B9D3
+  Dark Blue         #021326
 
-  Light Orange      #E8D9B8
-  Dark Orange       #56530F
+  Light Orange      #FBCFB1
+  Dark Orange       #370C05
 
-  Light Purple      #E8D8F6
-  Dark Purple       #3D2E47
+  Light Purple      #E9DBF6
+  Dark Purple       #41334E
 
-  Light Green       #B3C78D
-  Dark Green        #1A4D2E
+  Light Green       #B3C7BD
+  Dark Green        #132B23
 
-  Light Yellow      #FFF88A
-  Dark Yellow       #54F00D   (use with extreme care)
+  Light Yellow      #FFF8B4
+  Dark Yellow       #543F00   (use with extreme care)
 
 COLOR USAGE RULES:
   - Secondary colors are for charts and infographics only.
