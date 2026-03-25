@@ -5,6 +5,60 @@ from shiny import App, ui
 
 from datetime import date
 
+
+def _pill_dropdown(input_id: str, choices: dict, selected: str):
+    """Reusable iOS-style pill dropdown that sets a hidden Shiny input."""
+    menu_id = f"{input_id}-menu"
+    label_id = f"{input_id}-label"
+    default_label = choices[selected]
+    return ui.tags.div(
+        # Hidden Shiny input — provides default value at session start
+        ui.tags.div(
+            ui.input_radio_buttons(
+                input_id, None,
+                choices=choices,
+                selected=selected,
+                inline=True,
+            ),
+            style="display:none;",
+        ),
+        # Visible pill button + menu
+        ui.tags.div(
+            ui.tags.button(
+                ui.tags.span(default_label, id=label_id),
+                ui.tags.span("▾", class_="pill-dropdown-arrow"),
+                class_="pill-dropdown-btn",
+                onclick=(
+                    f"var m=document.getElementById('{menu_id}');"
+                    "m.style.display=m.style.display==='block'?'none':'block';"
+                    "event.stopPropagation();"
+                ),
+            ),
+            ui.tags.div(
+                *[
+                    ui.tags.div(
+                        label,
+                        class_="pill-dropdown-option" + (" active" if value == selected else ""),
+                        **{
+                            "data-value": value,
+                            "onclick": (
+                                f"document.getElementById('{label_id}').textContent='{label}';"
+                                f"document.getElementById('{menu_id}').style.display='none';"
+                                f"Shiny.setInputValue('{input_id}','{value}',{{priority:'event'}});"
+                                f"document.querySelectorAll('#{menu_id} .pill-dropdown-option').forEach(function(el){{el.classList.remove('active')}});"
+                                "this.classList.add('active');"
+                            ),
+                        },
+                    )
+                    for value, label in choices.items()
+                ],
+                id=menu_id,
+                class_="pill-dropdown-menu",
+            ),
+            class_="pill-dropdown",
+        ),
+    )
+
 from data_loader import (
     get_institutions, get_term_years, get_term_semesters, get_student_types,
 )
@@ -218,65 +272,17 @@ page_overview = ui.nav_panel(
                 ui.tags.div(
                     ui.tags.span("Trending performance", class_="card-heading"),
                     ui.tags.div(
-                        ui.tags.div(
-                            # Hidden Shiny input — holds the value, never visible
-                            ui.tags.div(
-                                ui.input_radio_buttons(
-                                    "trending_metric", None,
-                                    choices={
-                                        "inquiries": "Inquiries",
-                                        "app_starts": "App Starts",
-                                        "app_submits": "App Submits",
-                                        "admits": "Admits",
-                                        "deposits": "Deposits",
-                                        "net_deposits": "Net Deposits",
-                                    },
-                                    selected="inquiries",
-                                    inline=True,
-                                ),
-                                style="display:none;",
-                            ),
-                            ui.tags.div(
-                                ui.tags.button(
-                                    ui.tags.span("Inquiries", id="trending-metric-label"),
-                                    ui.tags.span("▾", class_="pill-dropdown-arrow"),
-                                    class_="pill-dropdown-btn",
-                                    onclick=(
-                                        "var m=document.getElementById('trending-metric-menu');"
-                                        "m.style.display=m.style.display==='block'?'none':'block';"
-                                        "event.stopPropagation();"
-                                    ),
-                                ),
-                                ui.tags.div(
-                                    *[
-                                        ui.tags.div(
-                                            label,
-                                            class_="pill-dropdown-option",
-                                            **{
-                                                "data-value": value,
-                                                "onclick": (
-                                                    f"document.getElementById('trending-metric-label').textContent='{label}';"
-                                                    "document.getElementById('trending-metric-menu').style.display='none';"
-                                                    f"Shiny.setInputValue('trending_metric','{value}',{{priority:'event'}});"
-                                                    "document.querySelectorAll('#trending-metric-menu .pill-dropdown-option').forEach(function(el){{el.classList.remove('active')}});"
-                                                    "this.classList.add('active');"
-                                                ),
-                                            },
-                                        )
-                                        for value, label in [
-                                            ("inquiries", "Inquiries"),
-                                            ("app_starts", "App Starts"),
-                                            ("app_submits", "App Submits"),
-                                            ("admits", "Admits"),
-                                            ("deposits", "Deposits"),
-                                            ("net_deposits", "Net Deposits"),
-                                        ]
-                                    ],
-                                    id="trending-metric-menu",
-                                    class_="pill-dropdown-menu",
-                                ),
-                                class_="pill-dropdown",
-                            ),
+                        _pill_dropdown(
+                            "trending_metric",
+                            {
+                                "inquiries": "Inquiries",
+                                "app_starts": "App Starts",
+                                "app_submits": "App Submits",
+                                "admits": "Admits",
+                                "deposits": "Deposits",
+                                "net_deposits": "Net Deposits",
+                            },
+                            "inquiries",
                         ),
                         ui.tags.div(
                             ui.input_radio_buttons(
@@ -375,18 +381,14 @@ page_funnel = ui.nav_panel(
             ui.tags.div(
                 ui.tags.div(
                     ui.tags.span("Source trend", class_="card-heading"),
-                    ui.tags.div(
-                        ui.input_radio_buttons(
-                            "source_trend_metric", None,
-                            choices={
-                                "total_inquiries": "Inquiries",
-                                "total_net_deposits": "Net Deposits",
-                                "total_admits": "Admits",
-                            },
-                            selected="total_inquiries",
-                            inline=True,
-                        ),
-                        class_="pill-toggle",
+                    _pill_dropdown(
+                        "source_trend_metric",
+                        {
+                            "total_inquiries": "Inquiries",
+                            "total_net_deposits": "Net Deposits",
+                            "total_admits": "Admits",
+                        },
+                        "total_inquiries",
                     ),
                     class_="card-header-row",
                 ),
@@ -434,15 +436,7 @@ page_programs = ui.nav_panel(
         ui.tags.div(
             ui.tags.div(
                 ui.tags.span("Program trending vs. goal", class_="card-heading"),
-                ui.tags.div(
-                    ui.input_radio_buttons(
-                        "program_trend_metric", None,
-                        choices=PROGRAM_TREND_METRICS,
-                        selected="total_inquiries",
-                        inline=True,
-                    ),
-                    class_="pill-toggle",
-                ),
+                _pill_dropdown("program_trend_metric", PROGRAM_TREND_METRICS, "total_inquiries"),
                 class_="card-header-row",
             ),
             ui.output_ui("program_trend_chart"),
@@ -452,15 +446,7 @@ page_programs = ui.nav_panel(
         ui.tags.div(
             ui.tags.div(
                 ui.tags.span("Top programs", class_="card-heading"),
-                ui.tags.div(
-                    ui.input_radio_buttons(
-                        "program_metric", None,
-                        choices=PROGRAM_TREND_METRICS,
-                        selected="total_inquiries",
-                        inline=True,
-                    ),
-                    class_="pill-toggle",
-                ),
+                _pill_dropdown("program_metric", PROGRAM_TREND_METRICS, "total_inquiries"),
                 class_="card-header-row",
             ),
             ui.output_ui("programs_bar_chart"),
@@ -485,19 +471,15 @@ page_geography = ui.nav_panel(
         # Map section heading + metric toggle
         ui.tags.div(
             ui.output_ui("geo_map_title"),
-            ui.tags.div(
-                ui.input_radio_buttons(
-                    "geo_map_metric", None,
-                    choices={
-                        "total_inquiries": "Inquiries",
-                        "total_app_submits": "App Submits",
-                        "total_admits": "Admits",
-                        "total_net_deposits": "Net Deposits",
-                    },
-                    selected="total_inquiries",
-                    inline=True,
-                ),
-                class_="pill-toggle",
+            _pill_dropdown(
+                "geo_map_metric",
+                {
+                    "total_inquiries": "Inquiries",
+                    "total_app_submits": "App Submits",
+                    "total_admits": "Admits",
+                    "total_net_deposits": "Net Deposits",
+                },
+                "total_inquiries",
             ),
             class_="card-header-row",
             style="margin-bottom:12px;",
@@ -914,7 +896,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=14"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=15"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(
                 "document.addEventListener('click',function(){"
