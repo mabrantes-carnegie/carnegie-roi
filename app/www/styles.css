@@ -17,8 +17,8 @@
     --carnegie-green-light: #ecfdf5;
     --carnegie-amber-light: #fffbeb;
     /* Semantic delta colors (positive/negative comparatives) */
-    --delta-positive: #B3C7BD;
-    --delta-positive-light: #f0f5f2;
+    --delta-positive: #132B23;
+    --delta-positive-light: #ddeae5;
     --delta-negative: #560422;
     --delta-negative-light: #f9edf1;
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
