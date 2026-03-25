@@ -453,17 +453,15 @@ def server_logic(input, output, session):
 
         def _monthly_series(term_year, cap_current_month=False):
             sub = df[df["term_year"] == term_year]
-            # Restrict to the academic recruitment cycle: Jul (term_year-1) → Jun (term_year)
-            acad_start = pd.Timestamp(f"{term_year - 1}-07-01")
-            acad_end = pd.Timestamp(f"{term_year}-06-30")
-            sub = sub[(sub["event_date"] >= acad_start) & (sub["event_date"] <= acad_end)]
-            if cap_current_month and not sub.empty:
-                cutoff = pd.Timestamp(date.today().replace(day=1))
-                sub = sub[sub["event_date"] <= cutoff]
             if sub.empty:
                 return pd.DataFrame()
             agg = sub.groupby(["acad_pos", "month_label"], as_index=False)[metric_col].sum()
-            return agg.sort_values("acad_pos")
+            agg = agg.sort_values("acad_pos")
+            if cap_current_month:
+                # Cap at the current academic month position (Jul=1 … Jun=12)
+                current_acad_pos = ACAD_ORDER.get(date.today().month, 12)
+                agg = agg[agg["acad_pos"] <= current_acad_pos]
+            return agg
 
         curr = _monthly_series(current_ty, cap_current_month=True)
         prior = _monthly_series(prior_ty)
