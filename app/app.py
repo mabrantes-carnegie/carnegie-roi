@@ -846,7 +846,7 @@ app_ui = ui.page_navbar(
     header=[
         ui.head_content(
             ui.tags.link(rel="stylesheet", href="styles.css?v=8"),
-            ui.tags.script(src="https://cdn.plot.ly/plotly-2.27.0.min.js"),
+            ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
         ),
         _sidebar_overlay(),
     ],
