@@ -66,7 +66,7 @@ def _safe_div(num, denom):
 def _fmt_delta(curr, prev, invert=False):
     """Build a YoY/MoM delta badge. invert=True means down is good (cost)."""
     if prev is None or prev == 0 or curr is None:
-        return ui.tags.span("N/A", class_="yoy-badge neutral")
+        return ui.tags.span("N/A", class_="kpi-badge kpi-badge--na")
     pct = (curr - prev) / abs(prev) * 100
     rounded = round(pct, 1)
     if rounded > 0:
@@ -77,7 +77,7 @@ def _fmt_delta(curr, prev, invert=False):
         arrow, sentiment = "", "neutral"
     return ui.tags.span(
         f"{arrow} {abs(rounded):.1f}% vs. prior",
-        class_=f"yoy-badge {sentiment}",
+        class_=f"kpi-badge kpi-badge--{sentiment}",
     )
 
 
