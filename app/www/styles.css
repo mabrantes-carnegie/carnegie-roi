@@ -16,6 +16,11 @@
     --carnegie-red-light: #fef2f2;
     --carnegie-green-light: #ecfdf5;
     --carnegie-amber-light: #fffbeb;
+    /* Semantic delta colors (positive/negative comparatives) */
+    --delta-positive: #B3C7BD;
+    --delta-positive-light: #f0f5f2;
+    --delta-negative: #560422;
+    --delta-negative-light: #f9edf1;
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
     --radius-card: 12px;
     --radius-badge: 9999px;
@@ -495,13 +500,13 @@ body > div.container-fluid {
 }
 
 .kpi-badge--positive {
-    background: var(--carnegie-green-light);
-    color: var(--carnegie-green);
+    background: var(--delta-positive-light);
+    color: var(--delta-positive);
 }
 
 .kpi-badge--negative {
-    background: var(--carnegie-red-light);
-    color: var(--carnegie-red);
+    background: var(--delta-negative-light);
+    color: var(--delta-negative);
 }
 
 .kpi-badge--neutral {
@@ -1116,8 +1121,8 @@ body > div.container-fluid {
 }
 
 .fg-rate--good {
-    color: var(--carnegie-green);
-    background: var(--carnegie-green-light);
+    color: var(--delta-positive);
+    background: var(--delta-positive-light);
     padding: 1px 6px;
     border-radius: 9999px;
 }
@@ -1130,8 +1135,8 @@ body > div.container-fluid {
 }
 
 .fg-rate--bad {
-    color: var(--carnegie-red);
-    background: var(--carnegie-red-light);
+    color: var(--delta-negative);
+    background: var(--delta-negative-light);
     padding: 1px 6px;
     border-radius: 9999px;
 }
@@ -1148,9 +1153,9 @@ body > div.container-fluid {
     color: var(--carnegie-gray-text);
 }
 
-.fg-melt--good { color: var(--carnegie-green); }
+.fg-melt--good { color: var(--delta-positive); }
 .fg-melt--warn { color: var(--carnegie-amber); }
-.fg-melt--bad  { color: var(--carnegie-red); }
+.fg-melt--bad  { color: var(--delta-negative); }
 
 /* ════════════════════════════════════════════
    KPI CARD EXTRAS (goal text, melt note)
