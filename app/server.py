@@ -408,10 +408,10 @@ def server_logic(input, output, session):
 
     def _goal_color(pct: float) -> str:
         if pct >= 95:
-            return "#0D7A4A"
+            return "#B3C7BD"
         elif pct >= 80:
             return "#C48A1A"
-        return "#C93030"
+        return "#560422"
 
     def _progress_bar(key: str):
         goal = GOALS.get(key)
