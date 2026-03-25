@@ -454,9 +454,9 @@ def server_logic(input, output, session):
 
     @render.ui
     def trending_chart():
-        req(input.trending_metric(), input.trending_mode())
-        metric_col = f"total_{input.trending_metric()}"  # e.g. "total_net_deposits"
-        mode = input.trending_mode()
+        metric_val = input.trending_metric() or "inquiries"
+        mode = input.trending_mode() or "cumulative"
+        metric_col = f"total_{metric_val}"
         df = trending_main()
         if df.empty:
             return ui.tags.div("No data available for the selected filters.", class_="empty-state")

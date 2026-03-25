@@ -903,8 +903,6 @@ app_ui = ui.page_navbar(
                 "document.addEventListener('click',function(){"
                 "document.querySelectorAll('.pill-dropdown-menu').forEach(function(m){"
                 "m.style.display='none';});});"
-                "$(document).on('shiny:connected',function(){"
-                "Shiny.setInputValue('trending_metric','inquiries',{priority:'event'});});"
             ),
         ),
         _sidebar_overlay(),
