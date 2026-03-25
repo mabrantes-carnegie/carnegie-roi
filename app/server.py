@@ -487,11 +487,15 @@ def server_logic(input, output, session):
                 text=bar_text,
                 textposition="inside",
                 insidetextanchor="end",
-                textfont=dict(family="Manrope, sans-serif", size=11, color="#ffffff"),
+                textfont=dict(family="Manrope, sans-serif", size=13, color="#ffffff"),
                 hovertemplate=f"<b>%{{x}}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
             ))
-            # YoY % annotations between bars
+            # YoY % annotations + connector shapes between each pair of bars
             annotations = []
+            shapes = []
+            y_max = max(values)
+            label_y = y_max * 1.10  # annotation label height
+            line_y = y_max * 1.04   # horizontal connector height
             for i in range(1, len(values)):
                 prev = values[i - 1]
                 curr_v = values[i]
@@ -499,14 +503,34 @@ def server_logic(input, output, session):
                     pct = (curr_v - prev) / prev * 100
                     arrow = "▲" if pct >= 0 else "▼"
                     color = "#132B23" if pct >= 0 else "#560422"
+                    # Label centered between the two bars
                     annotations.append(dict(
-                        x=i - 0.5,
-                        y=max(curr_v, prev) * 1.06,
+                        x=i - 0.5, y=label_y,
                         xref="x", yref="y",
                         text=f"{arrow} {abs(pct):.1f}%",
                         showarrow=False,
-                        font=dict(family="Manrope, sans-serif", size=10.5, color=color),
-                        xanchor="center",
+                        font=dict(family="Manrope, sans-serif", size=13, color=color),
+                        xanchor="center", yanchor="bottom",
+                    ))
+                    line_color = "#9B9893"
+                    lw = 1
+                    # Left vertical leg: top of left bar → connector height
+                    shapes.append(dict(
+                        type="line", xref="x", yref="y",
+                        x0=i - 1, y0=prev, x1=i - 1, y1=line_y,
+                        line=dict(color=line_color, width=lw, dash="dot"),
+                    ))
+                    # Right vertical leg: top of right bar → connector height
+                    shapes.append(dict(
+                        type="line", xref="x", yref="y",
+                        x0=i, y0=curr_v, x1=i, y1=line_y,
+                        line=dict(color=line_color, width=lw, dash="dot"),
+                    ))
+                    # Horizontal connector between the two legs
+                    shapes.append(dict(
+                        type="line", xref="x", yref="y",
+                        x0=i - 1, y0=line_y, x1=i, y1=line_y,
+                        line=dict(color=line_color, width=lw, dash="dot"),
                     ))
             layout = _base_chart_layout(360)
             layout["xaxis"] = dict(
@@ -515,11 +539,12 @@ def server_logic(input, output, session):
             )
             layout["bargap"] = 0.4
             layout["annotations"] = annotations
+            layout["shapes"] = shapes
             layout["yaxis"] = dict(
                 tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
                 gridcolor="#F0EEEA", gridwidth=0.8,
                 showline=False, nticks=5, title="",
-                range=[0, max(values) * 1.18],
+                range=[0, y_max * 1.22],
             )
         else:
             # Monthly mode — cumulative by academic month, current vs prior year
