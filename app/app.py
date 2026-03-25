@@ -360,103 +360,98 @@ page_funnel = ui.nav_panel(
 )
 
 
-# --- Page 3: Geography (tabs: Programs + Geographic Markets) ---
+# --- Page 3: Programs ---
 
-page_geography = ui.nav_panel(
-    "Geography",
+page_programs = ui.nav_panel(
+    "Programs",
     ui.tags.div(
-        ui.navset_pill(
-            # Tab 1: Programs
-            ui.nav_panel(
-                "Programs",
-                ui.tags.div(
-                    # Program filter bar
-                    ui.tags.div(
-                        ui.input_selectize(
-                            "program_name_filter", "Program",
-                            choices=[],
-                            multiple=True,
-                        ),
-                        ui.tags.div(
-                            ui.input_radio_buttons(
-                                "program_metric", None,
-                                choices={
-                                    "total_net_deposits": "Net Deposits",
-                                    "total_inquiries": "Inquiries",
-                                    "total_admits": "Admits",
-                                },
-                                selected="total_net_deposits",
-                                inline=True,
-                            ),
-                            class_="pill-toggle",
-                        ),
-                        class_="page-filter-bar",
-                    ),
-                    # Top programs bar chart
-                    ui.tags.h2("Top programs", class_="section-heading"),
-                    ui.tags.div(
-                        ui.output_ui("programs_bar_chart"),
-                        class_="chart-card",
-                    ),
-                    # Program detail table
-                    ui.tags.h2("Program detail", class_="section-heading"),
-                    ui.tags.div(
-                        ui.output_data_frame("program_detail_table"),
-                        class_="carnegie-table-card",
-                    ),
-                ),
+        # Program filter bar
+        ui.tags.div(
+            ui.input_selectize(
+                "program_name_filter", "Program",
+                choices=[],
+                multiple=True,
             ),
-            # Tab 2: Geographic markets
-            ui.nav_panel(
-                "Geographic markets",
-                ui.tags.div(
-                    # Map section heading + metric toggle
-                    ui.tags.div(
-                        ui.output_ui("geo_map_title"),
-                        ui.tags.div(
-                            ui.input_radio_buttons(
-                                "geo_map_metric", None,
-                                choices={
-                                    "total_inquiries": "Inquiries",
-                                    "total_app_submits": "App Submits",
-                                    "total_admits": "Admits",
-                                    "total_net_deposits": "Net Deposits",
-                                },
-                                selected="total_inquiries",
-                                inline=True,
-                            ),
-                            class_="pill-toggle",
-                        ),
-                        class_="card-header-row",
-                        style="margin-bottom:12px;",
-                    ),
-                    ui.tags.div(
-                        ui.output_ui("geo_map_section"),
-                        class_="chart-card",
-                    ),
-                    ui.tags.h2("State / City detail", class_="section-heading"),
-                    ui.tags.div(
-                        ui.input_switch(
-                            "include_intl_unknown",
-                            "Include international & unknown",
-                            value=False,
-                        ),
-                        style="margin-bottom:12px;",
-                    ),
-                    ui.tags.div(
-                        ui.output_data_frame("geo_detail_table"),
-                        class_="carnegie-table-card",
-                    ),
+            ui.tags.div(
+                ui.input_radio_buttons(
+                    "program_metric", None,
+                    choices={
+                        "total_net_deposits": "Net Deposits",
+                        "total_inquiries": "Inquiries",
+                        "total_admits": "Admits",
+                    },
+                    selected="total_net_deposits",
+                    inline=True,
                 ),
+                class_="pill-toggle",
             ),
-            id="geo_tabs",
+            class_="page-filter-bar",
+        ),
+        # Top programs bar chart
+        ui.tags.h2("Top programs", class_="section-heading"),
+        ui.tags.div(
+            ui.output_ui("programs_bar_chart"),
+            class_="chart-card",
+        ),
+        # Program detail table
+        ui.tags.h2("Program detail", class_="section-heading"),
+        ui.tags.div(
+            ui.output_data_frame("program_detail_table"),
+            class_="carnegie-table-card",
         ),
         style=_CW,
     ),
 )
 
 
-# --- Page 4: Digital Performance (5 sub-tabs) ---
+# --- Page 4: Geography ---
+
+page_geography = ui.nav_panel(
+    "Geography",
+    ui.tags.div(
+        # Map section heading + metric toggle
+        ui.tags.div(
+            ui.output_ui("geo_map_title"),
+            ui.tags.div(
+                ui.input_radio_buttons(
+                    "geo_map_metric", None,
+                    choices={
+                        "total_inquiries": "Inquiries",
+                        "total_app_submits": "App Submits",
+                        "total_admits": "Admits",
+                        "total_net_deposits": "Net Deposits",
+                    },
+                    selected="total_inquiries",
+                    inline=True,
+                ),
+                class_="pill-toggle",
+            ),
+            class_="card-header-row",
+            style="margin-bottom:12px;",
+        ),
+        ui.tags.div(
+            ui.output_ui("geo_map_section"),
+            class_="chart-card",
+        ),
+        ui.tags.h2("State / City detail", class_="section-heading"),
+        ui.tags.div(
+            ui.input_switch(
+                "include_intl_unknown",
+                "Include international & unknown",
+                value=False,
+            ),
+            style="margin-bottom:12px;",
+        ),
+        ui.tags.div(
+            ui.output_data_frame("geo_detail_table"),
+            class_="carnegie-table-card",
+        ),
+        style=_CW,
+    ),
+)
+
+
+# --- Page 5: Digital Performance (5 sub-tabs) ---
 
 _dig_min, _dig_max = get_digital_date_range()
 
@@ -839,6 +834,7 @@ app_ui = ui.page_navbar(
     ui.nav_spacer(),
     page_overview,
     page_funnel,
+    page_programs,
     page_geography,
     page_digital,
     title=navbar_title,
