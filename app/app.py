@@ -219,17 +219,19 @@ page_overview = ui.nav_panel(
                     ui.tags.span("Trending performance", class_="card-heading"),
                     ui.tags.div(
                         ui.tags.div(
-                            ui.input_radio_buttons(
+                            ui.input_select(
                                 "trending_metric", None,
                                 choices={
                                     "inquiries": "Inquiries",
-                                    "net_deposits": "Net Deposits",
+                                    "app_starts": "App Starts",
+                                    "app_submits": "App Submits",
                                     "admits": "Admits",
+                                    "deposits": "Deposits",
+                                    "net_deposits": "Net Deposits",
                                 },
                                 selected="inquiries",
-                                inline=True,
                             ),
-                            class_="pill-toggle",
+                            class_="pill-select",
                         ),
                         ui.tags.div(
                             ui.input_radio_buttons(
@@ -867,7 +869,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=11"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=12"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
         ),
         _sidebar_overlay(),
