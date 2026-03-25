@@ -46,9 +46,9 @@ PRIMARY_LABELS = {
 
 
 def _plotly_html(fig, no_toolbar=True):
-    """Convert plotly figure to HTML widget."""
+    """Convert plotly figure to HTML widget. Plotly JS is loaded once in the page <head>."""
     config = {"displayModeBar": False} if no_toolbar else {}
-    return ui.HTML(fig.to_html(full_html=False, include_plotlyjs="cdn", config=config))
+    return ui.HTML(fig.to_html(full_html=False, include_plotlyjs=False, config=config))
 
 
 def _base_chart_layout(height=360):
@@ -453,6 +453,10 @@ def server_logic(input, output, session):
 
         def _monthly_series(term_year, cap_current_month=False):
             sub = df[df["term_year"] == term_year]
+            # Restrict to the academic recruitment cycle: Jul (term_year-1) → Jun (term_year)
+            acad_start = pd.Timestamp(f"{term_year - 1}-07-01")
+            acad_end = pd.Timestamp(f"{term_year}-06-30")
+            sub = sub[(sub["event_date"] >= acad_start) & (sub["event_date"] <= acad_end)]
             if cap_current_month and not sub.empty:
                 cutoff = pd.Timestamp(date.today().replace(day=1))
                 sub = sub[sub["event_date"] <= cutoff]
