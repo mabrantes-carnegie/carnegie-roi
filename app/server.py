@@ -643,43 +643,26 @@ def server_logic(input, output, session):
     def goal_text_total_net_deposits():
         return _goal_text_ui("total_net_deposits")
 
-    # --- Melt note (only shown on Deposits card) ---
-
-    def _empty_melt():
-        return ui.tags.div()
+    # --- Melt Rate secondary badge ---
 
     @render.ui
-    def melt_note_total_inquiries():
-        return _empty_melt()
-
-    @render.ui
-    def melt_note_total_app_starts():
-        return _empty_melt()
-
-    @render.ui
-    def melt_note_total_app_submits():
-        return _empty_melt()
-
-    @render.ui
-    def melt_note_total_admits():
-        return _empty_melt()
-
-    @render.ui
-    def melt_note_total_deposits():
+    def melt_rate_secondary():
         deposits = current_kpis().get("total_deposits", 0)
         net_deposits = current_kpis().get("total_net_deposits", 0)
         if deposits > 0:
             melt = (1 - net_deposits / deposits) * 100
-            return ui.tags.span(
-                f"{melt:.1f}% melt rate",
-                class_="melt-note",
-                title=f"{melt:.1f}% of deposited students withdrew (melt rate).",
+            melt_cls = "fg-melt--good" if melt < 3 else "fg-melt--warn" if melt <= 5 else "fg-melt--bad"
+            return ui.tags.div(
+                ui.tags.div("Melt Rate", class_="secondary-label"),
+                ui.tags.div(f"{melt:.1f}%", class_=f"secondary-value {melt_cls}"),
+                title="Percentage of deposited students who withdrew before enrollment.",
+                class_="secondary-badge",
             )
-        return _empty_melt()
-
-    @render.ui
-    def melt_note_total_net_deposits():
-        return _empty_melt()
+        return ui.tags.div(
+            ui.tags.div("Melt Rate", class_="secondary-label"),
+            ui.tags.div("—", class_="secondary-value"),
+            class_="secondary-badge",
+        )
 
     # ══════════════════════════════════════════════════════════
     # PAGE 2: FUNNEL DEEP DIVE

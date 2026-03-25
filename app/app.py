@@ -116,13 +116,12 @@ _COST_METRICS = [
 
 
 def _funnel_kpi_card(label: str, key: str):
-    """Compact funnel KPI card with value, YoY delta, goal text, melt note, and progress bar."""
+    """Compact funnel KPI card with value, YoY delta, goal text, and progress bar."""
     return ui.tags.div(
         ui.tags.div(label, class_="funnel-label"),
         ui.tags.div(ui.output_text(f"kpi_{key}"), class_="funnel-value"),
         ui.output_ui(f"yoy_{key}"),
         ui.output_ui(f"goal_text_{key}"),
-        ui.output_ui(f"melt_note_{key}"),
         ui.output_ui(f"progress_{key}"),
         class_="funnel-card",
     )
@@ -183,6 +182,8 @@ page_overview = ui.nav_panel(
                 title="Students who completed enrollment. May differ from Net Deposits due to enrollment timing and process variations.",
                 class_="secondary-badge",
             ),
+            # Melt Rate badge
+            ui.output_ui("melt_rate_secondary"),
             # Cost/Net Deposit badge with inline expand link
             ui.tags.div(
                 ui.tags.div("Cost per Net Deposit", class_="secondary-label"),
@@ -866,7 +867,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=10"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=11"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
         ),
         _sidebar_overlay(),
