@@ -8,8 +8,6 @@ from datetime import date
 
 def _pill_dropdown(input_id: str, choices: dict, selected: str):
     """Reusable iOS-style pill dropdown that sets a hidden Shiny input."""
-    menu_id = f"{input_id}-menu"
-    label_id = f"{input_id}-label"
     default_label = choices[selected]
     return ui.tags.div(
         # Hidden Shiny input — provides default value at session start
@@ -25,11 +23,11 @@ def _pill_dropdown(input_id: str, choices: dict, selected: str):
         # Visible pill button + menu
         ui.tags.div(
             ui.tags.button(
-                ui.tags.span(default_label, id=label_id),
+                ui.tags.span(default_label),
                 ui.tags.span("▾", class_="pill-dropdown-arrow"),
                 class_="pill-dropdown-btn",
                 onclick=(
-                    f"var m=document.getElementById('{menu_id}');"
+                    "var m=this.nextElementSibling;"
                     "m.style.display=m.style.display==='block'?'none':'block';"
                     "event.stopPropagation();"
                 ),
@@ -42,17 +40,17 @@ def _pill_dropdown(input_id: str, choices: dict, selected: str):
                         **{
                             "data-value": value,
                             "onclick": (
-                                f"document.getElementById('{label_id}').textContent='{label}';"
-                                f"document.getElementById('{menu_id}').style.display='none';"
+                                "var pd=this.closest('.pill-dropdown');"
+                                "pd.querySelector('.pill-dropdown-btn span:first-child').textContent=this.textContent;"
+                                "pd.querySelector('.pill-dropdown-menu').style.display='none';"
                                 f"Shiny.setInputValue('{input_id}','{value}',{{priority:'event'}});"
-                                f"document.querySelectorAll('#{menu_id} .pill-dropdown-option').forEach(function(el){{el.classList.remove('active')}});"
+                                "pd.querySelectorAll('.pill-dropdown-option').forEach(function(el){el.classList.remove('active')});"
                                 "this.classList.add('active');"
                             ),
                         },
                     )
                     for value, label in choices.items()
                 ],
-                id=menu_id,
                 class_="pill-dropdown-menu",
             ),
             class_="pill-dropdown",
@@ -896,7 +894,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=15"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=16"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(
                 "document.addEventListener('click',function(){"
