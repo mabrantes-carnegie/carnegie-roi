@@ -8,19 +8,24 @@ from digital_data import Q8, Q9, Q10, Q11_CREATIVE, Q11_KEYWORDS, Q12
 from formatters import fmt_number, fmt_currency
 
 # ── Carnegie brand colors ────────────────────────────────────
-CARNEGIE_RED = "#FA3320"
-CARNEGIE_NAVY = "#021324"
+CARNEGIE_NAVY = "#021326"
 CARNEGIE_GRAY_TEXT = "#6b7280"
 CARNEGIE_GRAY_BORDER = "#e5e1dc"
 CARNEGIE_BG = "#f8f4f0"
 CARNEGIE_WHITE = "#ffffff"
-CARNEGIE_GREEN = "#2d8a4e"
 
-# Palette for multi-line charts
-STRATEGY_COLORS = [
-    "#EA332D", "#021326", "#C99D44", "#4A90D9", "#E8B9A4",
-    "#6B4C9A", "#2D8A4E", "#D4A574", "#7FB3D3", "#C97B84",
+# Chart data palette — red is NEVER used for data series
+CHART_COLORS = [
+    "#021326",  # Carnegie Blue dark — primary
+    "#A4B9D3",  # Carnegie Blue light — secondary
+    "#C99D44",  # Carnegie Gold
+    "#6B8F71",  # Muted green
+    "#8B7355",  # Warm brown
+    "#5B7C99",  # Steel blue
+    "#9B8EC0",  # Muted purple
+    "#D4A574",  # Sand/tan
 ]
+STRATEGY_COLORS = CHART_COLORS
 
 
 def _plotly_html(fig, no_toolbar=True):
@@ -381,7 +386,7 @@ def digital_server(input, output, session):
         fig.add_trace(go.Scatter(
             x=curr_monthly["label"], y=curr_monthly["total_interactions"],
             mode="lines+markers", name="Current",
-            line=dict(color=CARNEGIE_RED, width=2),
+            line=dict(color=CHART_COLORS[0], width=2),
             marker=dict(size=5),
             hovertemplate="%{x}<br>Interactions: %{y:,.1f}<extra></extra>",
         ))
@@ -419,7 +424,7 @@ def digital_server(input, output, session):
 
         fig = go.Figure(go.Bar(
             x=strat["impressions"], y=strat["product_name"],
-            orientation="h", marker_color=CARNEGIE_RED,
+            orientation="h", marker_color=CHART_COLORS[0],
             text=[f"{p:.1f}%" for p in strat["pct"]],
             textposition="outside",
             textfont=dict(family="Manrope, sans-serif", size=10, color=CARNEGIE_NAVY),

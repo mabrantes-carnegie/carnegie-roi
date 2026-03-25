@@ -17,8 +17,19 @@ from digital_server import digital_server
 
 # ── Carnegie brand colors for Plotly ─────────────────────────
 
-CARNEGIE_RED = "#FA3320"
-CARNEGIE_NAVY = "#021324"
+CARNEGIE_NAVY = "#021326"
+
+# Chart data palette — red is NEVER used for data series
+CHART_COLORS = [
+    "#021326",  # Carnegie Blue dark — primary
+    "#A4B9D3",  # Carnegie Blue light — secondary
+    "#C99D44",  # Carnegie Gold
+    "#6B8F71",  # Muted green
+    "#8B7355",  # Warm brown
+    "#5B7C99",  # Steel blue
+    "#9B8EC0",  # Muted purple
+    "#D4A574",  # Sand/tan
+]
 CARNEGIE_GRAY_TEXT = "#6b7280"
 CARNEGIE_GRAY_BORDER = "#e5e1dc"
 CARNEGIE_BG = "#f8f4f0"
@@ -490,8 +501,8 @@ def server_logic(input, output, session):
                 x=prior["month_label"], y=prior[y_col],
                 mode="lines+markers",
                 name=prior_label,
-                line=dict(color="#B5B2AA", width=1.8, dash="dash"),
-                marker=dict(color="#B5B2AA", size=5),
+                line=dict(color=CHART_COLORS[1], width=1.8, dash="dash"),
+                marker=dict(color=CHART_COLORS[1], size=5),
                 hovertemplate=f"<b>%{{x}} {prior_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
             ))
 
@@ -500,8 +511,8 @@ def server_logic(input, output, session):
                 x=curr["month_label"], y=curr[y_col],
                 mode="lines+markers",
                 name=curr_label,
-                line=dict(color="#EA332D", width=2.5),
-                marker=dict(color="#EA332D", size=7),
+                line=dict(color=CHART_COLORS[0], width=2.5),
+                marker=dict(color=CHART_COLORS[0], size=7),
                 hovertemplate=f"<b>%{{x}} {curr_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
             ))
 
@@ -512,7 +523,7 @@ def server_logic(input, output, session):
                     fig.add_trace(go.Scatter(
                         x=trend_df["month_label"], y=trend_df["trend"],
                         mode="lines", name="3-mo trend",
-                        line=dict(color="#E8A099", width=1.5, dash="dash"),
+                        line=dict(color="rgba(2,19,38,0.4)", width=1.5, dash="dash"),
                         hovertemplate=f"<b>%{{x}} {curr_label}</b><br>3-mo avg: %{{y:,.0f}}<extra></extra>",
                     ))
 
@@ -691,14 +702,14 @@ def server_logic(input, output, session):
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=labels, y=curr_vals, name="Current Year",
-            marker_color=CARNEGIE_RED,
+            marker_color=CHART_COLORS[0],
             text=[f"{v:,}" for v in curr_vals], textposition="outside",
             textfont=dict(family="Manrope, sans-serif", size=11),
             hovertemplate="<b>%{x}</b><br>Current: %{y:,}<extra></extra>",
         ))
         fig.add_trace(go.Bar(
             x=labels, y=prior_vals, name="Prior Year",
-            marker_color="#A8BDD6",
+            marker_color=CHART_COLORS[1],
             text=[f"{v:,}" for v in prior_vals], textposition="outside",
             textfont=dict(family="Manrope, sans-serif", size=11),
             hovertemplate="<b>%{x}</b><br>Prior: %{y:,}<extra></extra>",
@@ -784,7 +795,7 @@ def server_logic(input, output, session):
         if not top_sources:
             return ui.tags.div("No source data available.", class_="empty-state")
 
-        source_colors = ["#EA332D", "#4A7FB5", "#8B6EBD", "#D4A843", "#6B9E8A"]
+        source_colors = CHART_COLORS[:5]
 
         fig = go.Figure()
         for i, src in enumerate(top_sources):
@@ -864,10 +875,10 @@ def server_logic(input, output, session):
         ))
         fig.add_trace(go.Bar(
             x=x_labels, y=bd["yield_rate"], name="Yield Rate",
-            marker=dict(color="#EA332D", line=dict(width=0)),
+            marker=dict(color=CHART_COLORS[1], line=dict(width=0)),
             text=[f"{v:.0f}%" for v in bd["yield_rate"]],
             textposition="outside",
-            textfont=dict(family="Manrope", size=10, color="#EA332D"),
+            textfont=dict(family="Manrope", size=10, color=CHART_COLORS[1]),
             cliponaxis=False,
             hovertemplate="<b>%{x}</b><br>Yield Rate: %{y:.1f}%<extra></extra>",
         ))
@@ -989,7 +1000,7 @@ def server_logic(input, output, session):
         # Sort ascending for horizontal bar (plotly renders bottom-to-top)
         curr = curr.sort_values(metric, ascending=True)
         bar_colors = [
-            CARNEGIE_RED if (pd.isna(y) or y >= 0) else "#E8B9A4"
+            CHART_COLORS[0] if (pd.isna(y) or y >= 0) else CHART_COLORS[1]
             for y in curr["yoy"]
         ]
 
@@ -1146,8 +1157,8 @@ def server_logic(input, output, session):
             locationmode="USA-states",
             z=map_df[metric],
             colorscale=[
-                [0, "#fce4ec"], [0.3, "#ef9a9a"],
-                [0.6, "#e57373"], [1, CARNEGIE_RED],
+                [0, "#FFFFFF"], [0.3, "#C8D6E5"],
+                [0.6, "#6B8FB5"], [1, "#021326"],
             ],
             hovertemplate=f"<b>%{{location}}</b><br>{metric_short}: %{{z:,}}<extra></extra>",
             colorbar=dict(
