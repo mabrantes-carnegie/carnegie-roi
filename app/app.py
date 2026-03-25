@@ -466,23 +466,21 @@ page_programs = ui.nav_panel(
 page_geography = ui.nav_panel(
     "Geography",
     ui.tags.div(
-        # Map section heading + metric toggle
         ui.tags.div(
-            ui.output_ui("geo_map_title"),
-            _pill_dropdown(
-                "geo_map_metric",
-                {
-                    "total_inquiries": "Inquiries",
-                    "total_app_submits": "App Submits",
-                    "total_admits": "Admits",
-                    "total_net_deposits": "Net Deposits",
-                },
-                "total_inquiries",
+            ui.tags.div(
+                ui.output_ui("geo_map_title"),
+                _pill_dropdown(
+                    "geo_map_metric",
+                    {
+                        "total_inquiries": "Inquiries",
+                        "total_app_submits": "App Submits",
+                        "total_admits": "Admits",
+                        "total_net_deposits": "Net Deposits",
+                    },
+                    "total_inquiries",
+                ),
+                class_="card-header-row",
             ),
-            class_="card-header-row",
-            style="margin-bottom:12px;",
-        ),
-        ui.tags.div(
             ui.output_ui("geo_map_section"),
             class_="chart-card",
         ),
