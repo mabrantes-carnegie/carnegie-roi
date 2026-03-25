@@ -367,33 +367,30 @@ page_funnel = ui.nav_panel(
             class_="chart-card",
         ),
 
-        # Section 2: Source performance (two columns)
+        # Section 2: Source performance table (full width)
         ui.tags.h2("Source performance", class_="section-heading"),
         ui.tags.div(
-            # Left: table
+            ui.output_data_frame("source_table"),
+            class_="carnegie-table-card",
+        ),
+
+        # Section 3: Source trend chart
+        ui.tags.div(
             ui.tags.div(
-                ui.output_data_frame("source_table"),
-                class_="source-table-wrap",
-            ),
-            # Right: source trend chart
-            ui.tags.div(
-                ui.tags.div(
-                    ui.tags.span("Source trend", class_="card-heading"),
-                    _pill_dropdown(
-                        "source_trend_metric",
-                        {
-                            "total_inquiries": "Inquiries",
-                            "total_net_deposits": "Net Deposits",
-                            "total_admits": "Admits",
-                        },
-                        "total_inquiries",
-                    ),
-                    class_="card-header-row",
+                ui.tags.span("Source trend", class_="card-heading"),
+                _pill_dropdown(
+                    "source_trend_metric",
+                    {
+                        "total_inquiries": "Inquiries",
+                        "total_net_deposits": "Net Deposits",
+                        "total_admits": "Admits",
+                    },
+                    "total_inquiries",
                 ),
-                ui.output_ui("source_trend_chart"),
-                class_="chart-card",
+                class_="card-header-row",
             ),
-            class_="source-row",
+            ui.output_ui("source_trend_chart"),
+            class_="chart-card",
         ),
 
         # Section 3: Conversion rates by source

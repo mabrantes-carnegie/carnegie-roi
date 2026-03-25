@@ -798,42 +798,64 @@ def server_logic(input, output, session):
 
     @render.data_frame
     def source_table():
-        """Source performance table using Q6 origin_source_first (Slate lead source)."""
+        """Source performance table — same columns as program detail, grouped by lead source."""
         df_curr = filtered_deep_dive()
-        df_prior = prior_deep_dive()
         if df_curr.empty:
             return render.DataGrid(pd.DataFrame({"No data available": []}))
 
-        funnel_cols = ["total_inquiries", "total_app_submits", "total_admits",
-                       "total_deposits", "total_net_deposits"]
-        curr_agg = df_curr.groupby("origin_source_first", as_index=False)[funnel_cols].sum()
-        prior_agg = df_prior.groupby("origin_source_first", as_index=False)[funnel_cols].sum()
+        agg_cols = ["total_inquiries", "total_app_starts", "total_app_submits",
+                    "total_enrolled", "total_deposits", "total_net_deposits"]
+        curr = df_curr.groupby("origin_source_first", as_index=False)[agg_cols].sum()
+        curr = curr.sort_values("total_inquiries", ascending=False)
 
-        display = pd.DataFrame()
-        display["Lead Source"] = curr_agg["origin_source_first"]
-        display["Inquiries"] = curr_agg["total_inquiries"].apply(lambda x: f"{int(x):,}")
-        display["App Submits"] = curr_agg["total_app_submits"].apply(lambda x: f"{int(x):,}")
-        display["Admits"] = curr_agg["total_admits"].apply(lambda x: f"{int(x):,}")
-        display["Net Deposits"] = curr_agg["total_net_deposits"].apply(lambda x: f"{int(x):,}")
+        total_inq    = curr["total_inquiries"].sum()
+        total_starts = curr["total_app_starts"].sum()
+        total_submits = curr["total_app_submits"].sum()
+        total_enrolled = curr["total_enrolled"].sum()
 
-        yoy_col = []
-        for _, row in curr_agg.iterrows():
-            src = row["origin_source_first"]
-            curr_nd = row["total_net_deposits"]
-            prior_row = prior_agg[prior_agg["origin_source_first"] == src]
-            if prior_row.empty or prior_row.iloc[0]["total_net_deposits"] == 0:
-                yoy_col.append("\u2014")
-            else:
-                prev_nd = prior_row.iloc[0]["total_net_deposits"]
-                pct = ((curr_nd - prev_nd) / abs(prev_nd)) * 100
-                yoy_col.append(f"{pct:+.1f}%")
-        display["YoY \u0394"] = yoy_col
-
-        return render.DataGrid(
-            display.sort_values("Net Deposits", ascending=False,
-                                key=lambda x: x.str.replace(",", "").astype(int)),
-            filters=False,
+        curr["% Inquiries"] = curr["total_inquiries"].apply(
+            lambda v: f"{v / total_inq * 100:.1f}%" if total_inq > 0 else "—"
         )
+        curr["% App Starts"] = curr["total_app_starts"].apply(
+            lambda v: f"{v / total_starts * 100:.1f}%" if total_starts > 0 else "—"
+        )
+        curr["Start Rate"] = curr.apply(
+            lambda r: f"{r['total_app_starts'] / r['total_inquiries'] * 100:.1f}%"
+            if r["total_inquiries"] > 0 else "—", axis=1
+        )
+        curr["% App Submits"] = curr["total_app_submits"].apply(
+            lambda v: f"{v / total_submits * 100:.1f}%" if total_submits > 0 else "—"
+        )
+        curr["Submit Rate"] = curr.apply(
+            lambda r: f"{r['total_app_submits'] / r['total_app_starts'] * 100:.1f}%"
+            if r["total_app_starts"] > 0 else "—", axis=1
+        )
+        curr["% Enrolled"] = curr["total_enrolled"].apply(
+            lambda v: f"{v / total_enrolled * 100:.1f}%" if total_enrolled > 0 else "—"
+        )
+        curr["Inq→Enroll Rate"] = curr.apply(
+            lambda r: f"{r['total_enrolled'] / r['total_inquiries'] * 100:.1f}%"
+            if r["total_inquiries"] > 0 else "—", axis=1
+        )
+
+        display = curr.rename(columns={
+            "origin_source_first": "Lead Source",
+            "total_inquiries":     "Inquiries",
+            "total_app_starts":    "App Starts",
+            "total_app_submits":   "App Submits",
+            "total_enrolled":      "Enrolled",
+            "total_deposits":      "Deposits",
+            "total_net_deposits":  "Net Deposits",
+        })
+        cols = [
+            "Lead Source",
+            "Inquiries", "% Inquiries",
+            "App Starts", "% App Starts", "Start Rate",
+            "App Submits", "% App Submits", "Submit Rate",
+            "Enrolled", "% Enrolled", "Inq→Enroll Rate",
+            "Deposits", "Net Deposits",
+        ]
+        return render.DataGrid(display[cols], filters=False)
 
     # --- Origin Source Trend Chart (Q6 — first-touch, monthly) ---
 
