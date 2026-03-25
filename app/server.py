@@ -523,7 +523,7 @@ def server_logic(input, output, session):
                     fig.add_trace(go.Scatter(
                         x=trend_df["month_label"], y=trend_df["trend"],
                         mode="lines", name="3-mo trend",
-                        line=dict(color="rgba(2,19,38,0.4)", width=1.5, dash="dash"),
+                        line=dict(color="rgba(2,19,38,0.4)", width=1.5, dash="dot"),
                         hovertemplate=f"<b>%{{x}} {curr_label}</b><br>3-mo avg: %{{y:,.0f}}<extra></extra>",
                     ))
 
