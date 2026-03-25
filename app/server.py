@@ -963,6 +963,98 @@ def server_logic(input, output, session):
         ui.update_selectize("program_name_filter", choices=opts, selected=[])
 
     @render.ui
+    def program_trend_chart():
+        req(input.program_trend_metric())
+        metric_col = input.program_trend_metric()
+        df = _apply_global_filters(Q6.copy())
+        df = df[df["program_name"].notna() & (df["program_name"].str.strip() != "")].copy()
+        df["program_display"] = df["program_name"].apply(_clean_program_name)
+
+        # Apply program name filter if set
+        sel = input.program_name_filter()
+        if sel and len(sel) > 0:
+            df = df[df["program_display"].isin(sel)]
+
+        if df.empty:
+            return ui.tags.div("No program data for the selected filters.", class_="empty-state")
+
+        current_ty = int(input.term_year())
+        metric_label = PRIMARY_LABELS.get(metric_col, metric_col)
+
+        # Goal for this metric (institution-level flat target)
+        goal_value = GOALS.get(metric_col)
+
+        # Build monthly cumulative series for current year — grouped across all programs
+        curr_df = df[df["term_year"] == current_ty].copy()
+        if curr_df.empty:
+            return ui.tags.div("No data for the selected term year.", class_="empty-state")
+
+        curr_agg = (
+            curr_df.groupby(["acad_pos", "month_label"], as_index=False)[metric_col].sum()
+            .sort_values("acad_pos")
+        )
+        # Cap at current academic month
+        current_acad_pos = ACAD_ORDER.get(date.today().month, 12)
+        curr_agg = curr_agg[curr_agg["acad_pos"] <= current_acad_pos]
+        curr_agg["cumulative"] = curr_agg[metric_col].cumsum()
+
+        # Prior year for comparison
+        prior_df = df[df["term_year"] == current_ty - 1].copy()
+        prior_agg = None
+        if not prior_df.empty:
+            prior_agg = (
+                prior_df.groupby(["acad_pos", "month_label"], as_index=False)[metric_col].sum()
+                .sort_values("acad_pos")
+            )
+            prior_agg["cumulative"] = prior_agg[metric_col].cumsum()
+
+        curr_label = f"{current_ty - 1}-{str(current_ty)[-2:]}"
+        prior_label = f"{current_ty - 2}-{str(current_ty - 1)[-2:]}"
+
+        fig = go.Figure()
+
+        # Prior year line
+        if prior_agg is not None and not prior_agg.empty:
+            fig.add_trace(go.Scatter(
+                x=prior_agg["month_label"], y=prior_agg["cumulative"],
+                mode="lines+markers",
+                name=prior_label,
+                line=dict(color=CHART_COLORS[1], width=1.8, dash="dash"),
+                marker=dict(color=CHART_COLORS[1], size=5),
+                hovertemplate=f"<b>%{{x}} {prior_label}</b><br>{metric_label}: %{{y:,.0f}}<extra></extra>",
+            ))
+
+        # Current year line
+        fig.add_trace(go.Scatter(
+            x=curr_agg["month_label"], y=curr_agg["cumulative"],
+            mode="lines+markers",
+            name=curr_label,
+            line=dict(color=CHART_COLORS[0], width=2.5),
+            marker=dict(color=CHART_COLORS[0], size=7),
+            hovertemplate=f"<b>%{{x}} {curr_label}</b><br>{metric_label}: %{{y:,.0f}}<extra></extra>",
+        ))
+
+        # Goal line — horizontal at goal_value across all 12 academic months
+        if goal_value:
+            fig.add_trace(go.Scatter(
+                x=MONTH_ORDER,
+                y=[goal_value] * len(MONTH_ORDER),
+                mode="lines",
+                name=f"{metric_label} Goal",
+                line=dict(color=CARNEGIE_AMBER, width=2, dash="dot"),
+                hovertemplate=f"Goal: {goal_value:,}<extra></extra>",
+            ))
+
+        layout = _base_chart_layout(360)
+        layout["xaxis"] = dict(
+            categoryorder="array", categoryarray=MONTH_ORDER,
+            tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
+            showgrid=False, title="",
+        )
+        fig.update_layout(**layout)
+        return _plotly_html(fig)
+
+    @render.ui
     def programs_bar_chart():
         df = filtered_programs()
         if df.empty:

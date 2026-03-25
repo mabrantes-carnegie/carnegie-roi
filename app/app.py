@@ -362,6 +362,14 @@ page_funnel = ui.nav_panel(
 
 # --- Page 3: Programs ---
 
+PROGRAM_TREND_METRICS = {
+    "total_inquiries": "Inquiries",
+    "total_app_starts": "App Starts",
+    "total_app_submits": "App Submits",
+    "total_deposits": "Deposits",
+    "total_net_deposits": "Net Deposits",
+}
+
 page_programs = ui.nav_panel(
     "Programs",
     ui.tags.div(
@@ -386,6 +394,24 @@ page_programs = ui.nav_panel(
                 class_="pill-toggle",
             ),
             class_="page-filter-bar",
+        ),
+        # Program trending vs goal
+        ui.tags.div(
+            ui.tags.div(
+                ui.tags.span("Program trending vs. goal", class_="card-heading"),
+                ui.tags.div(
+                    ui.input_radio_buttons(
+                        "program_trend_metric", None,
+                        choices=PROGRAM_TREND_METRICS,
+                        selected="total_inquiries",
+                        inline=True,
+                    ),
+                    class_="pill-toggle",
+                ),
+                class_="card-header-row",
+            ),
+            ui.output_ui("program_trend_chart"),
+            class_="chart-card",
         ),
         # Top programs bar chart
         ui.tags.h2("Top programs", class_="section-heading"),
