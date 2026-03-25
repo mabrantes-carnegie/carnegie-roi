@@ -387,7 +387,9 @@ def server_logic(input, output, session):
 
         return ui.tags.div(
             *badges,
+            id="cost-expand-inner",
             class_="secondary-row",
+            style="display:none;",
             title="Cost metrics reflect Carnegie campaign spend divided by total funnel volume.",
         )
 
@@ -441,6 +443,7 @@ def server_logic(input, output, session):
 
     @render.ui
     def trending_chart():
+        req(input.trending_metric(), input.trending_mode())
         metric_col = f"total_{input.trending_metric()}"  # e.g. "total_net_deposits"
         mode = input.trending_mode()
         df = trending_main()
@@ -479,24 +482,27 @@ def server_logic(input, output, session):
 
         fig = go.Figure()
 
+        prior_label = f"{prior_ty - 1}-{str(prior_ty)[-2:]}"
+        curr_label = f"{current_ty - 1}-{str(current_ty)[-2:]}"
+
         if not prior.empty:
             fig.add_trace(go.Scatter(
                 x=prior["month_label"], y=prior[y_col],
                 mode="lines+markers",
-                name=f"{prior_ty - 1}-{str(prior_ty)[-2:]}",
+                name=prior_label,
                 line=dict(color="#B5B2AA", width=1.8, dash="dash"),
                 marker=dict(color="#B5B2AA", size=5),
-                hovertemplate=f"<b>%{{x}}</b><br>{stage_label}: %{{y:,}}<extra></extra>",
+                hovertemplate=f"<b>%{{x}} {prior_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
             ))
 
         if not curr.empty:
             fig.add_trace(go.Scatter(
                 x=curr["month_label"], y=curr[y_col],
                 mode="lines+markers",
-                name=f"{current_ty - 1}-{str(current_ty)[-2:]}",
+                name=curr_label,
                 line=dict(color="#EA332D", width=2.5),
                 marker=dict(color="#EA332D", size=7),
-                hovertemplate=f"<b>%{{x}}</b><br>{stage_label}: %{{y:,}}<extra></extra>",
+                hovertemplate=f"<b>%{{x}} {curr_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
             ))
 
             if len(curr) >= 3:
@@ -507,7 +513,7 @@ def server_logic(input, output, session):
                         x=trend_df["month_label"], y=trend_df["trend"],
                         mode="lines", name="3-mo trend",
                         line=dict(color="#E8A099", width=1.5, dash="dash"),
-                        hovertemplate="<b>%{x}</b><br>3-mo avg: %{y:,.0f}<extra></extra>",
+                        hovertemplate=f"<b>%{{x}} {curr_label}</b><br>3-mo avg: %{{y:,.0f}}<extra></extra>",
                     ))
 
         layout = _base_chart_layout(360)
@@ -759,6 +765,7 @@ def server_logic(input, output, session):
 
     @render.ui
     def source_trend_chart():
+        req(input.source_trend_metric())
         metric_col = input.source_trend_metric()  # e.g. "total_inquiries"
         df = filtered_deep_dive()
 

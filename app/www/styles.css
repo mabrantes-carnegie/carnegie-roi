@@ -1198,16 +1198,8 @@ body > div.container-fluid {
     text-decoration: underline;
 }
 
-/* The Shiny output wrapper is hidden by default; JS adds .cost-panel-open to reveal */
-#cost_detail_panel {
-    display: none;
-}
-
-#cost_detail_panel.cost-panel-open {
-    display: block;
-}
-
-#cost_detail_panel .secondary-row {
+/* Inner div inside cost_detail_panel — JS toggles inline display */
+#cost-expand-inner {
     padding-top: 8px;
     border-top: 1px solid var(--carnegie-gray-border);
     flex-wrap: wrap;

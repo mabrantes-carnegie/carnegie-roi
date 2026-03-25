@@ -25,7 +25,7 @@ STRATEGY_COLORS = [
 
 def _plotly_html(fig, no_toolbar=True):
     config = {"displayModeBar": False} if no_toolbar else {}
-    return ui.HTML(fig.to_html(full_html=False, include_plotlyjs="cdn", config=config))
+    return ui.HTML(fig.to_html(full_html=False, include_plotlyjs=False, config=config))
 
 
 def _base_layout(height=360):

@@ -194,9 +194,10 @@ page_overview = ui.nav_panel(
                         href="#",
                         class_="cost-expand-link",
                         onclick=(
-                            "var p=document.getElementById('cost_detail_panel');"
-                            "p.classList.toggle('cost-panel-open');"
-                            "this.textContent=p.classList.contains('cost-panel-open')?'Hide costs \u2197':'View all costs \u2197';"
+                            "var p=document.getElementById('cost-expand-inner');"
+                            "if(!p)return false;"
+                            "p.style.display=p.style.display==='none'?'flex':'none';"
+                            "this.textContent=p.style.display==='none'?'View all costs \u2197':'Hide costs \u2197';"
                             "return false;"
                         ),
                     ),
@@ -844,7 +845,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=7"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=8"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-2.27.0.min.js"),
         ),
         _sidebar_overlay(),
