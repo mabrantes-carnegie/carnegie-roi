@@ -1753,9 +1753,10 @@ def digital_server(input, output, session):
         wide["Grand Total"] = wide.select_dtypes(include="number").sum(axis=1)
         wide = wide.sort_values("Grand Total", ascending=False)
         wide = wide.rename(columns={"product_name": "Strategy", "campaign_name": "Campaign Name"})
-        for c in wide.columns[2:]:
+        heatmap_cols = [c for c in wide.columns if c not in ["Strategy", "Campaign Name"]]
+        for c in heatmap_cols:
             wide[c] = wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
-        return _plain_table(wide)
+        return _heatmap_table(wide, heatmap_cols)
 
     # --- Interactions by month pivot ---
 
@@ -1777,9 +1778,10 @@ def digital_server(input, output, session):
         wide["Grand Total"] = wide[num_cols].sum(axis=1)
         wide = wide.sort_values("Grand Total", ascending=False)
         wide = wide.rename(columns={"interaction_category": "Category", "conversion_name": "Conversion Name"})
-        for c in num_cols + ["Grand Total"]:
+        heatmap_cols = num_cols + ["Grand Total"]
+        for c in heatmap_cols:
             wide[c] = wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
-        return _plain_table(wide)
+        return _heatmap_table(wide, heatmap_cols)
 
     # --- Interactions detail table ---
 
@@ -1799,9 +1801,10 @@ def digital_server(input, output, session):
             "product_name": "Strategy", "campaign_name": "Campaign Name",
             "total": "Total Conv.", "direct": "Direct Conv.", "vt": "View-through Conv.",
         })
-        for c in ["Total Conv.", "Direct Conv.", "View-through Conv."]:
+        heatmap_cols = ["Total Conv.", "Direct Conv.", "View-through Conv."]
+        for c in heatmap_cols:
             agg[c] = agg[c].apply(lambda v: f"{round(v):,}")
-        return _plain_table(agg)
+        return _heatmap_table(agg, heatmap_cols)
 
     # ══════════════════════════════════════════════════════════
     # TAB 3: GEOGRAPHY
