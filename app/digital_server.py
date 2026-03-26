@@ -60,11 +60,16 @@ def _build_total_row(df: "pd.DataFrame", td_first: str, td_base: str) -> str:
             nums = [_parse_num_for_total(v) for v in df[col]]
             nums = [n for n in nums if n is not None]
             if nums:
-                total = sum(nums)
-                # Detect if column looks like a percentage (most values contain %)
+                import math
+                valid = [n for n in nums if not math.isnan(n)]
+                if not valid:
+                    cells.append(f'<td style="{style}">—</td>')
+                    continue
+                total = sum(valid)
+                # Percentage columns show '—' in total (summing rates is meaningless)
                 pct_count = sum(1 for v in df[col] if isinstance(v, str) and "%" in v)
                 if pct_count > len(df) * 0.5:
-                    cells.append(f'<td style="{style}">{total:.2f}%</td>')
+                    cells.append(f'<td style="{style}">—</td>')
                 else:
                     cells.append(f'<td style="{style}">{round(total):,}</td>')
             else:
