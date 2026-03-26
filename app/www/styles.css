@@ -503,6 +503,50 @@ body > div.container-fluid {
 }
 
 /* ════════════════════════════════════════════
+   COLLAPSIBLE SECTION BUTTONS
+   ════════════════════════════════════════════ */
+
+.collapsible-section-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+    margin-top: 2px;
+}
+
+.collapsible-section-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--carnegie-white);
+    border: 1px solid var(--carnegie-gray-border);
+    border-radius: 9999px;
+    padding: 4px 12px 4px 14px;
+    font-family: 'Manrope', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--carnegie-navy);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    letter-spacing: 0.01em;
+}
+
+.collapsible-section-btn:hover {
+    background: #f4f1ed;
+    border-color: #c8c3bc;
+}
+
+.collapsible-btn-chevron {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--carnegie-gray-text);
+    transform: rotate(0deg);
+    transition: transform 0.2s ease;
+    line-height: 1;
+    display: inline-block;
+}
+
+/* ════════════════════════════════════════════
    SECONDARY METRICS ROW
    ════════════════════════════════════════════ */
 

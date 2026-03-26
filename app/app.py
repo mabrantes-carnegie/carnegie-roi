@@ -233,11 +233,25 @@ page_overview = ui.nav_panel(
             class_="funnel-strip",
         ),
 
-        # Section 3: Secondary metrics row
+        # Section 3a: Conversion Rates collapsible row
+        ui.tags.div(
+            ui.tags.button(
+                ui.tags.span("Show Conversion Rates", class_="collapsible-btn-label"),
+                ui.tags.span("\u203a", class_="collapsible-btn-chevron"),
+                class_="collapsible-section-btn",
+                onclick=(
+                    "var row=document.getElementById('conv-rates-row');"
+                    "var open=row.style.display!=='none'&&row.style.display!=='';"
+                    "row.style.display=open?'none':'flex';"
+                    "this.querySelector('.collapsible-btn-label').textContent=open?'Show Conversion Rates':'Hide Conversion Rates';"
+                    "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
+                ),
+            ),
+            class_="collapsible-section-header",
+        ),
         ui.tags.div(
             _secondary_badge("Admit Rate", "admitted_rate"),
             _secondary_badge("Yield Rate", "yield_rate"),
-            # Enrolled badge with tooltip
             ui.tags.div(
                 ui.tags.div("Enrolled", class_="secondary-label"),
                 ui.tags.div(ui.output_text("kpi_total_enrolled"), class_="secondary-value"),
@@ -245,9 +259,29 @@ page_overview = ui.nav_panel(
                 title="Students who completed enrollment. May differ from Net Deposits due to enrollment timing and process variations.",
                 class_="secondary-badge",
             ),
-            # Melt Rate badge
             ui.output_ui("melt_rate_secondary"),
-            # Cost/Net Deposit badge with inline expand link
+            id="conv-rates-row",
+            class_="secondary-row",
+            style="display:none;",
+        ),
+
+        # Section 3b: Cost Metrics collapsible row
+        ui.tags.div(
+            ui.tags.button(
+                ui.tags.span("Show Cost Metrics", class_="collapsible-btn-label"),
+                ui.tags.span("\u203a", class_="collapsible-btn-chevron"),
+                class_="collapsible-section-btn",
+                onclick=(
+                    "var row=document.getElementById('cost-metrics-row');"
+                    "var open=row.style.display!=='none'&&row.style.display!=='';"
+                    "row.style.display=open?'none':'flex';"
+                    "this.querySelector('.collapsible-btn-label').textContent=open?'Show Cost Metrics':'Hide Cost Metrics';"
+                    "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
+                ),
+            ),
+            class_="collapsible-section-header",
+        ),
+        ui.tags.div(
             ui.tags.div(
                 ui.tags.div("Cost per Net Deposit", class_="secondary-label"),
                 ui.tags.div(ui.output_text("kpi_cost_per_net_deposit"), class_="secondary-value"),
@@ -269,9 +303,10 @@ page_overview = ui.nav_panel(
                 ),
                 class_="secondary-badge",
             ),
+            id="cost-metrics-row",
             class_="secondary-row",
+            style="display:none;",
         ),
-        # Expandable cost detail panel — single server-rendered output, toggled by CSS class
         ui.output_ui("cost_detail_panel"),
 
         # Section 4: Main content (side by side)
@@ -978,7 +1013,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=26"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=27"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(src="paginated-tables.js"),
