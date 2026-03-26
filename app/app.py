@@ -502,17 +502,11 @@ def _month_options(min_dt, max_dt):
 
 def _digital_filters():
     """Shared filter bar for digital performance page."""
-    import calendar
-    # Default: previous month (first day → last day)
-    today = date.today()
-    if today.month == 1:
-        prev_month_start = date(today.year - 1, 12, 1)
-    else:
-        prev_month_start = date(today.year, today.month - 1, 1)
+    # Default: academic year 01/07/2025 → 30/06/2026
+    prev_month_start = date(2025, 7, 1)
     prev_month_val = prev_month_start.strftime("%Y-%m-%d")
-    prev_month_end = prev_month_start.replace(
-        day=calendar.monthrange(prev_month_start.year, prev_month_start.month)[1]
-    )
+    default_end_val = "2026-06-01"
+    prev_month_end = date(2026, 6, 30)
 
     month_opts = _month_options(_dig_min.date(), _dig_max.date())
 
@@ -549,7 +543,7 @@ def _digital_filters():
             ui.tags.div(
                 _month_select("dig_month_start", prev_month_val),
                 ui.tags.span("→", class_="ios-month-sep"),
-                _month_select("dig_month_end", prev_month_val),
+                _month_select("dig_month_end", default_end_val),
                 class_="ios-month-row",
             ),
             class_="inline-filter ios-month-filter",
