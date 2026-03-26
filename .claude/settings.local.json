@@ -61,7 +61,23 @@
       "Bash(.venv/Scripts/python.exe -c \"import sys; sys.path.insert\\(0,''app''\\); import app\")",
       "Bash(.venv/Scripts/python.exe -m py_compile app/server.py)",
       "Bash(.venv/Scripts/python.exe -m py_compile app/digital_server.py)",
-      "Bash(.venv/Scripts/python.exe -c \"import plotly; print\\(''Plotly version:'', plotly.__version__\\)\")"
+      "Bash(.venv/Scripts/python.exe -c \"import plotly; print\\(''Plotly version:'', plotly.__version__\\)\")",
+      "Bash(python -c \"import digital_server\")",
+      "Bash(.posit/python/bin/python -c \"import app.digital_server\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''app/digital_server.py''\\).read\\(\\)\\); print\\(''OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''app/digital_server.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''OK''\\)\")",
+      "Bash(python -c \"import pandas as pd; df=pd.read_csv\\(''c:/Users/mabrantes/Documents/Projects/carnegie-roi-1/data/q9_digital_interactions.csv''\\); print\\(df[''interaction_category''].unique\\(\\)\\)\")",
+      "Bash(python -c \"import pandas as pd; df=pd.read_csv\\(''c:/Users/mabrantes/Documents/Projects/carnegie-roi-1/data/q9_digital_interactions.csv''\\); print\\(sorted\\(df[''interaction_category''].unique\\(\\)\\)\\)\")",
+      "Bash(python -c \"import csv; cats=set\\(\\); f=open\\(''c:/Users/mabrantes/Documents/Projects/carnegie-roi-1/data/q9_digital_interactions.csv''\\); r=csv.DictReader\\(f\\); [cats.add\\(row[''interaction_category'']\\) for row in r]; print\\(sorted\\(cats\\)\\)\")",
+      "Bash(python -c \"import csv; names=set\\(\\); f=open\\(''c:/Users/mabrantes/Documents/Projects/carnegie-roi-1/data/q9_digital_interactions.csv''\\); r=csv.DictReader\\(f\\); [names.add\\(row[''conversion_name'']\\) for row in r]; print\\(sorted\\(list\\(names\\)\\)[:20]\\)\")",
+      "Bash(python -c \"import csv; f=open\\(''c:/Users/mabrantes/Documents/Projects/carnegie-roi-1/data/q10_digital_geo.csv''\\); r=csv.DictReader\\(f\\); row=next\\(r\\); print\\(list\\(row.keys\\(\\)\\)\\)\")",
+      "Bash(python -c \"import csv; regions=set\\(\\); f=open\\(''c:/Users/mabrantes/Documents/Projects/carnegie-roi-1/data/q10_digital_geo.csv''\\); r=csv.DictReader\\(f\\); [regions.add\\(row[''region'']\\) for row in r]; print\\(sorted\\(regions\\)[:30]\\)\")",
+      "Bash(python -c \"import csv; regions=set\\(\\); f=open\\(''c:/Users/mabrantes/Documents/Projects/carnegie-roi-1/data/q10_digital_geo.csv''\\); r=csv.DictReader\\(f\\); [regions.add\\(row[''region'']\\) for row in r]; states=[r for r in regions if r.endswith\\(''\\(State\\)''\\)]; print\\(sorted\\(states\\)[:10]\\); print\\(len\\(states\\)\\)\")",
+      "Bash(python app/app.py -c \"print\\(''''ok''''\\)\")",
+      "Bash(~/.venv/Scripts/python -c \":*)",
+      "Read(//c/Users/mabrantes/**)",
+      "Bash(/c/Users/mabrantes/AppData/Local/uv/cache/archive-v0/6Geu6903yVphaKkV8SXp7/Scripts/python.exe -c \":*)",
+      "Bash(find /c/Users/mabrantes -path */site-packages/pandas -type d)"
     ]
   }
 }
