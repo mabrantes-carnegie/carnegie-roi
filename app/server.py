@@ -669,10 +669,10 @@ def server_logic(input, output, session):
         # SVG layout
         # Left area: funnel trapezoids
         # Right margin: conversion rate pills (outside the funnel)
-        FUNNEL_W = 130      # width of funnel area
-        RIGHT_MARGIN = 58   # space for pills on right
+        FUNNEL_W = 105      # width of funnel area
+        RIGHT_MARGIN = 48   # space for pills on right
         W = FUNNEL_W + RIGHT_MARGIN
-        STEP_H = 23
+        STEP_H = 18
         GAP_H = 0           # no gap — continuous funnel, pills float on border
         TOTAL_H = n * STEP_H + 2
         MIN_W_PCT = 0.30
@@ -721,14 +721,14 @@ def server_logic(input, output, session):
             svg_parts.append(
                 f'<text x="{cx_block:.1f}" y="{label_y:.1f}" '
                 f'dominant-baseline="middle" text-anchor="middle" '
-                f'font-family="Manrope,sans-serif" font-size="6" font-weight="600" '
+                f'font-family="Manrope,sans-serif" font-size="4.5" font-weight="600" '
                 f'fill="rgba(255,255,255,0.80)" letter-spacing="0.06em">'
                 f'{label.upper()}</text>'
             )
             svg_parts.append(
                 f'<text x="{cx_block:.1f}" y="{val_y:.1f}" '
                 f'dominant-baseline="middle" text-anchor="middle" '
-                f'font-family="Manrope,sans-serif" font-size="9" font-weight="700" '
+                f'font-family="Manrope,sans-serif" font-size="7" font-weight="700" '
                 f'fill="#ffffff">'
                 f'{fmt_number(val)}</text>'
             )
@@ -745,13 +745,13 @@ def server_logic(input, output, session):
                     svg_parts.append(
                         f'<text x="{pill_x}" y="{pill_y - 5:.1f}" '
                         f'dominant-baseline="middle" text-anchor="start" '
-                        f'font-family="Manrope,sans-serif" font-size="6" font-weight="600" '
+                        f'font-family="Manrope,sans-serif" font-size="5" font-weight="600" '
                         f'fill="#9B9893">Melt</text>'
                     )
                     svg_parts.append(
-                        f'<text x="{pill_x}" y="{pill_y + 5:.1f}" '
+                        f'<text x="{pill_x}" y="{pill_y + 4:.1f}" '
                         f'dominant-baseline="middle" text-anchor="start" '
-                        f'font-family="Manrope,sans-serif" font-size="8" font-weight="700" '
+                        f'font-family="Manrope,sans-serif" font-size="6.5" font-weight="700" '
                         f'fill="{melt_color}">{melt:.1f}%</text>'
                     )
 
@@ -776,20 +776,20 @@ def server_logic(input, output, session):
                         rc = "#EA332D"
 
                     rate_text = f"{curr_rate:.1f}%"
-                    pill_w = 36
-                    pill_h = 11
-                    px = right_edge + 5
+                    pill_w = 28
+                    pill_h = 9
+                    px = right_edge + 4
                     py = border_y
 
                     svg_parts.append(
                         f'<rect x="{px:.1f}" y="{py - pill_h/2:.1f}" '
-                        f'width="{pill_w}" height="{pill_h}" rx="5" '
-                        f'fill="white" stroke="{rc}" stroke-width="1"/>'
+                        f'width="{pill_w}" height="{pill_h}" rx="4" '
+                        f'fill="white" stroke="{rc}" stroke-width="0.8"/>'
                     )
                     svg_parts.append(
                         f'<text x="{px + pill_w/2:.1f}" y="{py:.1f}" '
                         f'dominant-baseline="middle" text-anchor="middle" '
-                        f'font-family="Manrope,sans-serif" font-size="7.5" font-weight="700" '
+                        f'font-family="Manrope,sans-serif" font-size="6" font-weight="700" '
                         f'fill="{rc}">{rate_text}</text>'
                     )
 
