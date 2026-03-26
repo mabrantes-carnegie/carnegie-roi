@@ -2290,21 +2290,40 @@ def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str) -> "
 
 def _df_to_html(df, title):
     """Convert a DataFrame to a styled HTML section for creative tables."""
+    th_style = (
+        "padding:8px 12px;font-family:Manrope,sans-serif;font-size:11px;"
+        "font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;"
+        "border-bottom:1px solid #e5e1dc;text-align:right;white-space:nowrap;cursor:pointer;"
+    )
+    th_first_style = th_style.replace("text-align:right;", "text-align:left;")
+    td_base = (
+        "padding:7px 12px;font-family:Manrope,sans-serif;font-size:13px;"
+        "color:#021326;border-bottom:1px solid #f0eeea;text-align:right;"
+    )
+    td_first = td_base.replace("text-align:right;", "text-align:left;")
+
+    headers = "".join(
+        f'<th style="{th_first_style if ci == 0 else th_style}">{col}</th>'
+        for ci, col in enumerate(df.columns)
+    )
     rows_html = ""
     for _, row in df.iterrows():
-        cells = "".join(f"<td>{v}</td>" for v in row)
+        cells = "".join(
+            f'<td style="{td_first if ci == 0 else td_base}">{v}</td>'
+            for ci, v in enumerate(row)
+        )
         rows_html += f"<tr>{cells}</tr>"
-    headers = "".join(f"<th>{c}</th>" for c in df.columns)
-    return ui.HTML(f"""
-    <div class="creative-section" style="margin-bottom:24px;">
-        <h3 style="font-family:Manrope,sans-serif; font-size:14px; font-weight:600;
-                    color:#021326; margin:0 0 12px 0;">{title}</h3>
-        <div style="overflow-x:auto;">
-            <table class="creative-table sortable-table paginated-table" style="width:100%; border-collapse:collapse;
-                   font-family:Manrope,sans-serif; font-size:12px;">
-                <thead><tr style="border-bottom:2px solid #e5e1dc;">{headers}</tr></thead>
-                <tbody>{rows_html}</tbody>
-            </table>
-        </div>
-    </div>
-    """)
+
+    title_html = (
+        f'<div style="font-family:Manrope,sans-serif;font-size:14px;font-weight:600;'
+        f'color:#021326;margin:0 0 12px 0;">{title}</div>'
+    )
+    return ui.HTML(
+        f'<div style="margin-bottom:32px;">'
+        f'{title_html}'
+        f'<div style="overflow-x:auto;">'
+        f'<table class="sortable-table paginated-table" style="width:100%;border-collapse:collapse;">'
+        f"<thead><tr>{headers}</tr></thead>"
+        f"<tbody>{rows_html}</tbody>"
+        f"</table></div></div>"
+    )
