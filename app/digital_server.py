@@ -1924,17 +1924,27 @@ def digital_server(input, output, session):
         if map_df.empty:
             return ui.tags.div("No mappable state data available.", class_="empty-state")
 
+        import numpy as _np
+        z_raw = map_df["value"].fillna(0)
+        z_log = _np.log1p(z_raw)
+        _max_raw = z_raw.max()
+        _tick_vals = [_np.log1p(v) for v in [0, _max_raw * 0.1, _max_raw * 0.3, _max_raw * 0.6, _max_raw]]
+        _tick_text = [f"{int(v):,}" for v in [0, _max_raw * 0.1, _max_raw * 0.3, _max_raw * 0.6, _max_raw]]
+
         fig = go.Figure(go.Choropleth(
             locations=map_df["abbr"],
             locationmode="USA-states",
-            z=map_df["value"],
+            z=z_log,
+            customdata=z_raw,
             colorscale=[
                 [0, "#FFFFFF"], [0.3, "#FADADB"],
                 [0.6, "#F08080"], [1, "#EA332D"],
             ],
-            hovertemplate=f"<b>%{{location}}</b><br>{metric_short}: %{{z:,}}<extra></extra>",
+            zmin=0, zmax=float(z_log.max()),
+            hovertemplate=f"<b>%{{location}}</b><br>{metric_short}: %{{customdata:,}}<extra></extra>",
             colorbar=dict(
                 title=metric_short, thickness=12, len=0.6,
+                tickvals=_tick_vals, ticktext=_tick_text,
                 tickfont=dict(size=11, color=CARNEGIE_GRAY_TEXT),
                 title_font=dict(size=11, color=CARNEGIE_GRAY_TEXT),
             ),
