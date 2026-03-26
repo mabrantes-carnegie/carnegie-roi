@@ -113,15 +113,19 @@ def server_logic(input, output, session):
 
     @reactive.calc
     def filtered_main():
-        """Q6 filtered by global filters + current term_year."""
+        """Q6 filtered by global filters + current term_year, capped at current academic month."""
         df = _apply_global_filters(Q6.copy())
-        return df[df["term_year"] == int(input.term_year())]
+        df = df[df["term_year"] == int(input.term_year())]
+        current_acad_pos = ACAD_ORDER.get(date.today().month, 12)
+        return df[df["acad_pos"] <= current_acad_pos]
 
     @reactive.calc
     def prior_main():
-        """Q6 filtered by global filters + prior term_year."""
+        """Q6 filtered by global filters + prior term_year, capped at same academic month."""
         df = _apply_global_filters(Q6.copy())
-        return df[df["term_year"] == int(input.term_year()) - 1]
+        df = df[df["term_year"] == int(input.term_year()) - 1]
+        current_acad_pos = ACAD_ORDER.get(date.today().month, 12)
+        return df[df["acad_pos"] <= current_acad_pos]
 
     @reactive.calc
     def trending_main():
