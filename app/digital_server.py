@@ -1662,7 +1662,9 @@ def digital_server(input, output, session):
             return ui.tags.div("No data available.", class_="empty-state")
 
         grouped = df.groupby(["interaction_category", "product_name"])["total_interactions"].sum().reset_index()
-        cats = ["RFI/Lead Gen", "Visit/Event", "Apply", "Enroll/Deposit", "Other"]
+        # Use only categories present in the data, matching the trending chart order
+        cats_order = ["RFI/Lead Gen", "Visit/Event", "Apply", "Enroll/Deposit", "Other"]
+        cats = [c for c in cats_order if c in df["interaction_category"].unique()]
         products = grouped.groupby("product_name")["total_interactions"].sum().nlargest(8).index.tolist()
 
         fig = go.Figure()
@@ -1672,11 +1674,12 @@ def digital_server(input, output, session):
             fig.add_trace(go.Bar(
                 x=sub["interaction_category"], y=sub["total_interactions"],
                 name=prod, marker_color=STRATEGY_COLORS[i % len(STRATEGY_COLORS)],
+                width=0.45,
                 hovertemplate=f"<b>{prod}</b><br>%{{x}}<br>Interactions: %{{y:,.0f}}<extra></extra>",
             ))
-        layout = _base_layout(380)
+        layout = _base_layout(300)
         layout["barmode"] = "stack"
-        layout["bargap"] = 0.3
+        layout["bargap"] = 0.5
         layout["xaxis"]["tickfont"] = dict(family="Manrope, sans-serif", size=10, color="#9B9893")
         layout["xaxis"]["tickangle"] = 0
         fig.update_layout(**layout)
@@ -1691,38 +1694,44 @@ def digital_server(input, output, session):
             return ui.tags.div("No data available.", class_="empty-state")
         df_p = _dig_q9_filtered_prior()
 
-        agg_c = df_c.groupby(["interaction_category", "conversion_name"]).agg(
+        cats_order = ["RFI/Lead Gen", "Visit/Event", "Apply", "Enroll/Deposit", "Other"]
+
+        agg_c = df_c.groupby("interaction_category").agg(
             direct=("direct_conversions", "sum"),
             vt=("view_through_conversions", "sum"),
             total=("total_interactions", "sum"),
         ).reset_index()
 
-        agg_p = df_p.groupby(["interaction_category", "conversion_name"]).agg(
+        agg_p = df_p.groupby("interaction_category").agg(
             direct=("direct_conversions", "sum"),
             vt=("view_through_conversions", "sum"),
             total=("total_interactions", "sum"),
         ).reset_index() if not df_p.empty else pd.DataFrame(
-            columns=["interaction_category", "conversion_name", "direct", "vt", "total"]
+            columns=["interaction_category", "direct", "vt", "total"]
         )
 
         merged = agg_c.merge(
-            agg_p, on=["interaction_category", "conversion_name"],
+            agg_p, on="interaction_category",
             how="left", suffixes=("", "_p")
-        ).fillna(0).sort_values("total", ascending=False)
+        ).fillna(0)
+        # Order by cats_order, then any remaining
+        merged["_order"] = merged["interaction_category"].map(
+            {c: i for i, c in enumerate(cats_order)}
+        ).fillna(len(cats_order))
+        merged = merged.sort_values("_order")
 
         metric_cols = ["Direct Interaction", "View-through Interaction", "Total Interaction"]
         rows = []
         for _, r in merged.iterrows():
-            label = f"{r['interaction_category']} — {r['conversion_name']}"
             rows.append({
-                "label": label,
+                "label": r["interaction_category"],
                 "metrics": {
                     "Direct Interaction":       (f"{round(r['direct']):,}",  _pct_change(r["direct"],  r.get("direct_p",  0))),
                     "View-through Interaction": (f"{round(r['vt']):,}",      _pct_change(r["vt"],      r.get("vt_p",      0))),
                     "Total Interaction":        (f"{round(r['total']):,}",   _pct_change(r["total"],   r.get("total_p",   0))),
                 },
             })
-        return _yoy_delta_table(rows, "Category — Interaction Name", metric_cols)
+        return _yoy_delta_table(rows, "Category", metric_cols)
 
     # --- Interactions by campaign name ---
 
