@@ -741,12 +741,29 @@ def server_logic(input, output, session):
     def melt_rate_secondary():
         deposits = current_kpis().get("total_deposits", 0)
         net_deposits = current_kpis().get("total_net_deposits", 0)
+        prior_deps = prior_kpis().get("total_deposits", 0)
+        prior_net = prior_kpis().get("total_net_deposits", 0)
+
         if deposits > 0:
             melt = (1 - net_deposits / deposits) * 100
             melt_cls = "fg-melt--good" if melt < 3 else "fg-melt--warn" if melt <= 5 else "fg-melt--bad"
+
+            # vs PY delta — for melt rate, lower is better → invert sentiment
+            if prior_deps > 0:
+                prior_melt = (1 - prior_net / prior_deps) * 100
+                diff = melt - prior_melt
+                sign = "+" if diff > 0 else ""
+                yoy_text = f"vs. PY {sign}{diff:.1f}pp"
+                # higher melt = worse → positive diff is negative sentiment
+                sentiment = "negative" if diff > 0 else "positive" if diff < 0 else "neutral"
+                yoy_el = ui.tags.span(yoy_text, class_=f"kpi-badge kpi-badge--{sentiment}")
+            else:
+                yoy_el = ui.tags.span("vs. PY N/A", class_="kpi-badge kpi-badge--na")
+
             return ui.tags.div(
                 ui.tags.div("Melt Rate", class_="secondary-label"),
                 ui.tags.div(f"{melt:.1f}%", class_=f"secondary-value {melt_cls}"),
+                yoy_el,
                 title="Percentage of deposited students who withdrew before enrollment.",
                 class_="secondary-badge",
             )

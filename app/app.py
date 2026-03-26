@@ -157,12 +157,12 @@ def _sidebar_overlay():
 # --- Funnel KPI card helper (6 primary cards in a strip) ---
 
 PRIMARY_FUNNEL = [
-    ("Inquiries", "total_inquiries"),
-    ("App Starts", "total_app_starts"),
-    ("App Submits", "total_app_submits"),
-    ("Admits", "total_admits"),
-    ("Deposits", "total_deposits"),
-    ("Net Deposits", "total_net_deposits"),
+    ("Inquiries",    "total_inquiries",    "#EA332D"),
+    ("App Starts",   "total_app_starts",   "#C99D44"),
+    ("App Submits",  "total_app_submits",  "#021326"),
+    ("Admits",       "total_admits",       "#EA332D"),
+    ("Deposits",     "total_deposits",     "#C99D44"),
+    ("Net Deposits", "total_net_deposits", "#021326"),
 ]
 
 _COST_METRICS = [
@@ -174,7 +174,7 @@ _COST_METRICS = [
 ]
 
 
-def _funnel_kpi_card(label: str, key: str):
+def _funnel_kpi_card(label: str, key: str, border_color: str = "#EA332D"):
     """Compact funnel KPI card with value, YoY delta, goal text, and progress bar."""
     return ui.tags.div(
         ui.tags.div(label, class_="funnel-label"),
@@ -183,6 +183,7 @@ def _funnel_kpi_card(label: str, key: str):
         ui.output_ui(f"goal_text_{key}"),
         ui.output_ui(f"progress_{key}"),
         class_="funnel-card",
+        style=f"border-top:3px solid {border_color};",
     )
 
 
@@ -225,7 +226,7 @@ page_overview = ui.nav_panel(
 
         # Section 2: Funnel health strip (6 cards)
         ui.tags.div(
-            *[_funnel_kpi_card(label, key) for label, key in PRIMARY_FUNNEL],
+            *[_funnel_kpi_card(label, key, color) for label, key, color in PRIMARY_FUNNEL],
             class_="funnel-strip",
         ),
 
