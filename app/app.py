@@ -216,18 +216,7 @@ CAMPAIGN_METRIC_CHOICES = {
 page_overview = ui.nav_panel(
     "ROI Overview",
     ui.tags.div(
-        # Section 1: Page header
-        ui.tags.div(
-            ui.tags.div(
-                ui.tags.h1("ROI overview", class_="page-title"),
-                ui.output_ui("page_subtitle"),
-                class_="page-header-left",
-            ),
-            ui.output_ui("period_badge"),
-            class_="page-header",
-        ),
-
-        # Section 2: Funnel health strip (6 cards)
+        # Section 1: Funnel health strip (6 cards)
         ui.tags.div(
             *[_funnel_kpi_card(label, key, color) for label, key, color in PRIMARY_FUNNEL],
             class_="funnel-strip",
@@ -339,23 +328,21 @@ page_overview = ui.nav_panel(
 page_funnel = ui.nav_panel(
     "Funnel Deep Dive",
     ui.tags.div(
-        # Page-specific filters
+        # Section 1: Funnel waterfall
         ui.tags.div(
             ui.tags.div(
-                ui.input_selectize(
-                    "source_filter", "Lead Source",
-                    choices=[],
-                    multiple=True,
-                    options={"placeholder": "All"},
+                ui.tags.span("Enrollment funnel", class_="card-heading"),
+                ui.tags.div(
+                    ui.input_selectize(
+                        "source_filter", "Lead Source",
+                        choices=[],
+                        multiple=True,
+                        options={"placeholder": "All"},
+                    ),
+                    class_="inline-filter",
                 ),
-                class_="inline-filter",
+                class_="card-header-row",
             ),
-            class_="page-filter-bar",
-        ),
-
-        # Section 1: Funnel waterfall
-        ui.tags.h2("Enrollment funnel", class_="section-heading"),
-        ui.tags.div(
             ui.output_ui("funnel_waterfall"),
             class_="chart-card",
         ),
@@ -411,20 +398,19 @@ PROGRAM_TREND_METRICS = {
 page_programs = ui.nav_panel(
     "Programs",
     ui.tags.div(
-        # Program filter bar
-        ui.tags.div(
-            ui.input_selectize(
-                "program_name_filter", "Program",
-                choices=[],
-                multiple=True,
-                options={"placeholder": "All"},
-            ),
-            class_="page-filter-bar",
-        ),
         # Program trending vs goal
         ui.tags.div(
             ui.tags.div(
                 ui.tags.span("Program trending vs. goal", class_="card-heading"),
+                ui.tags.div(
+                    ui.input_selectize(
+                        "program_name_filter", "Program",
+                        choices=[],
+                        multiple=True,
+                        options={"placeholder": "All"},
+                    ),
+                    class_="inline-filter",
+                ),
                 _pill_dropdown("program_trend_metric", PROGRAM_TREND_METRICS, "total_inquiries"),
                 class_="card-header-row",
             ),
@@ -986,7 +972,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=28"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=29"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(src="paginated-tables.js"),
