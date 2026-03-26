@@ -334,6 +334,7 @@ page_funnel = ui.nav_panel(
                     "source_filter", "Lead Source",
                     choices=[],
                     multiple=True,
+                    options={"placeholder": "All"},
                 ),
                 class_="inline-filter",
             ),
@@ -404,6 +405,7 @@ page_programs = ui.nav_panel(
                 "program_name_filter", "Program",
                 choices=[],
                 multiple=True,
+                options={"placeholder": "All"},
             ),
             class_="page-filter-bar",
         ),
@@ -557,6 +559,7 @@ def _digital_filters():
                 "dig_group", "Group",
                 choices=get_digital_groups(),
                 multiple=True,
+                options={"placeholder": "All"},
             ),
             class_="inline-filter",
         ),
@@ -565,6 +568,7 @@ def _digital_filters():
                 "dig_subgroup", "Subgroup",
                 choices=get_digital_subgroups(),
                 multiple=True,
+                options={"placeholder": "All"},
             ),
             class_="inline-filter",
         ),
@@ -573,6 +577,7 @@ def _digital_filters():
                 "dig_product", "Product",
                 choices=get_digital_products(),
                 multiple=True,
+                options={"placeholder": "All"},
             ),
             class_="inline-filter",
         ),
@@ -581,6 +586,7 @@ def _digital_filters():
                 "dig_campaign", "Campaign",
                 choices=get_digital_campaigns(),
                 multiple=True,
+                options={"placeholder": "All"},
             ),
             class_="inline-filter",
         ),
@@ -794,6 +800,7 @@ page_digital = ui.nav_menu(
                     ui.input_selectize(
                         "dig_interaction_cat", "Interaction Category",
                         choices=[], multiple=True,
+                        options={"placeholder": "All"},
                     ),
                     class_="inline-filter",
                 ),
@@ -801,6 +808,7 @@ page_digital = ui.nav_menu(
                     ui.input_selectize(
                         "dig_conversion_name", "Paid Key Interaction",
                         choices=[], multiple=True,
+                        options={"placeholder": "All"},
                     ),
                     class_="inline-filter",
                 ),
@@ -862,6 +870,7 @@ page_digital = ui.nav_menu(
                 ui.input_selectize(
                     "dig_platform_campaign", "Platform Campaign",
                     choices=[], multiple=True,
+                    options={"placeholder": "All"},
                 ),
                 class_="page-filter-bar",
             ),
@@ -883,6 +892,7 @@ page_digital = ui.nav_menu(
                         choices=["Performance", "Performance with Recommendation",
                                  "Optimization", "Campaign Launch", "Budget", "Key Dates"],
                         multiple=True,
+                        options={"placeholder": "All"},
                     ),
                     class_="inline-filter",
                 ),
@@ -935,7 +945,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=21"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=22"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(

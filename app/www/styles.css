@@ -340,6 +340,14 @@ nav.navbar .navbar-nav {
     box-shadow: none !important;
 }
 
+/* Selectize placeholder — grey "All" when nothing is selected */
+.selectize-input input::placeholder {
+    color: #57595B !important;
+    opacity: 1 !important;
+}
+.selectize-input input::-webkit-input-placeholder { color: #57595B !important; }
+.selectize-input input::-moz-placeholder           { color: #57595B !important; }
+
 .sidebar-filters .form-check-input:checked {
     background-color: var(--carnegie-red) !important;
     border-color: var(--carnegie-red) !important;
