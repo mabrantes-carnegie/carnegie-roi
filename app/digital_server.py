@@ -886,7 +886,7 @@ def digital_server(input, output, session):
         return fmt_currency(_dig_q8()["budget"].sum())
 
     @render.ui
-    def dig_budget_delta_yoy():
+    def dig_budget_yoy_delta():
         return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_yoy()["budget"].sum(), invert=True)
 
     @render.text
@@ -895,7 +895,7 @@ def digital_server(input, output, session):
         return fmt_currency(_safe_div(df["budget"].sum(), df["clicks"].sum()))
 
     @render.ui
-    def dig_cpc_delta_yoy():
+    def dig_cpc_yoy_delta():
         df_c, df_p = _dig_q8(), _dig_q8_yoy()
         return _fmt_delta(
             _safe_div(df_c["budget"].sum(), df_c["clicks"].sum()),
@@ -908,7 +908,7 @@ def digital_server(input, output, session):
         return f"{_dig_q8()['direct_conversions'].sum():,.1f}"
 
     @render.ui
-    def dig_direct_conv_delta_yoy():
+    def dig_direct_conv_yoy_delta():
         return _fmt_delta(_dig_q8()["direct_conversions"].sum(), _dig_q8_yoy()["direct_conversions"].sum())
 
     @render.text
@@ -917,7 +917,7 @@ def digital_server(input, output, session):
         return fmt_currency(_safe_div(df["budget"].sum(), df["direct_conversions"].sum()))
 
     @render.ui
-    def dig_cpdc_delta_yoy():
+    def dig_cpdc_yoy_delta():
         df_c, df_p = _dig_q8(), _dig_q8_yoy()
         return _fmt_delta(
             _safe_div(df_c["budget"].sum(), df_c["direct_conversions"].sum()),
@@ -930,7 +930,7 @@ def digital_server(input, output, session):
         return fmt_number(_dig_q8()["in_platform_leads"].sum())
 
     @render.ui
-    def dig_ipl_delta_yoy():
+    def dig_ipl_yoy_delta():
         return _fmt_delta(_dig_q8()["in_platform_leads"].sum(), _dig_q8_yoy()["in_platform_leads"].sum())
 
     @render.text
@@ -939,7 +939,7 @@ def digital_server(input, output, session):
         return fmt_currency(_safe_div(df["budget"].sum(), df["in_platform_leads"].sum()))
 
     @render.ui
-    def dig_cpipl_delta_yoy():
+    def dig_cpipl_yoy_delta():
         df_c, df_p = _dig_q8(), _dig_q8_yoy()
         return _fmt_delta(
             _safe_div(df_c["budget"].sum(), df_c["in_platform_leads"].sum()),
@@ -952,7 +952,7 @@ def digital_server(input, output, session):
         return fmt_number(_dig_q8()["view_through_conversions"].sum())
 
     @render.ui
-    def dig_vtc_delta_yoy():
+    def dig_vtc_yoy_delta():
         return _fmt_delta(_dig_q8()["view_through_conversions"].sum(), _dig_q8_yoy()["view_through_conversions"].sum())
 
     @render.text
@@ -961,7 +961,7 @@ def digital_server(input, output, session):
         return fmt_currency(_safe_div(df["budget"].sum(), df["total_interactions"].sum()))
 
     @render.ui
-    def dig_cptc_delta_yoy():
+    def dig_cptc_yoy_delta():
         df_c, df_p = _dig_q8(), _dig_q8_yoy()
         return _fmt_delta(
             _safe_div(df_c["budget"].sum(), df_c["total_interactions"].sum()),
