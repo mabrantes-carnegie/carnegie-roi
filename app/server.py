@@ -739,7 +739,7 @@ def server_logic(input, output, session):
                 net_deposits = kpis.get("total_net_deposits", 0)
                 if deposits > 0:
                     melt = (1 - net_deposits / deposits) * 100
-                    melt_color = "#22A06B" if melt < 3 else "#C99D44" if melt <= 5 else "#EA332D"
+                    melt_color = "#132B23" if melt < 3 else "#C99D44" if melt <= 5 else "#560422"
                     pill_x = FUNNEL_W + 6
                     pill_y = y + STEP_H / 2
                     svg_parts.append(
@@ -769,11 +769,11 @@ def server_logic(input, output, session):
                     if prior_rate is None:
                         rc = "#9B9893"
                     elif curr_rate >= prior_rate:
-                        rc = "#22A06B"
+                        rc = "#132B23"
                     elif curr_rate >= prior_rate - 5:
                         rc = "#C99D44"
                     else:
-                        rc = "#EA332D"
+                        rc = "#560422"
 
                     rate_text = f"{curr_rate:.1f}%"
                     pill_w = 28
