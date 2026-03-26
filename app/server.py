@@ -1372,16 +1372,12 @@ def server_logic(input, output, session):
 
         # Sort ascending for horizontal bar (plotly renders bottom-to-top)
         curr = curr.sort_values(metric, ascending=True)
-        bar_colors = [
-            CHART_COLORS[0] if (pd.isna(y) or y >= 0) else CHART_COLORS[1]
-            for y in curr["yoy"]
-        ]
 
         fig = go.Figure(go.Bar(
             x=curr[metric],
             y=curr["program_display"],
             orientation="h",
-            marker_color=bar_colors,
+            marker_color="#C99D44",
             text=[f"{int(v):,}" for v in curr[metric]],
             textposition="outside",
             textfont=dict(family="Manrope, sans-serif", size=10, color=CARNEGIE_NAVY),
