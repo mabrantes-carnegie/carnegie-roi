@@ -1418,10 +1418,11 @@ def server_logic(input, output, session):
 
         import numpy as _np
         z_raw = map_df[metric].fillna(0)
-        z_log = _np.sqrt(z_raw)
+        _POW = 0.3
+        z_log = z_raw ** _POW
         # Build colorbar ticks in original scale
         _max_raw = z_raw.max()
-        _tick_vals = [_np.sqrt(v) for v in [0, _max_raw * 0.1, _max_raw * 0.3, _max_raw * 0.6, _max_raw]]
+        _tick_vals = [v ** _POW for v in [0, _max_raw * 0.1, _max_raw * 0.3, _max_raw * 0.6, _max_raw]]
         _tick_text = [f"{int(v):,}" for v in [0, _max_raw * 0.1, _max_raw * 0.3, _max_raw * 0.6, _max_raw]]
 
         fig = go.Figure(go.Choropleth(
