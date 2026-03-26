@@ -940,9 +940,9 @@ def server_logic(input, output, session):
                     font=dict(family="Manrope, sans-serif", size=11, color=font_color),
                     xanchor="center",
                     bgcolor=bg_color,
-                    bordercolor=border_color,
-                    borderwidth=1,
-                    borderpad=4,
+                    bordercolor=bg_color,
+                    borderwidth=0,
+                    borderpad=6,
                 ))
 
         # "Same period" note — bottom-left, below the legend
