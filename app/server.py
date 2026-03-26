@@ -198,13 +198,12 @@ def server_logic(input, output, session):
 
     @reactive.effect
     def _update_source_choices():
-        """Populate Lead Source filter from Q6 origin_source_first, sorted by inquiry volume."""
+        """Populate Lead Source filter from Q6 origin_source_first, sorted alphabetically."""
         df = filtered_main()
         if df.empty:
             ui.update_selectize("source_filter", choices=[], selected=[])
             return
-        src_totals = df.groupby("origin_source_first")["total_inquiries"].sum().sort_values(ascending=False)
-        sources = [s for s in src_totals.index.tolist() if s and str(s).strip() and s != "Unknown"]
+        sources = sorted([s for s in df["origin_source_first"].dropna().unique().tolist() if s and str(s).strip() and s != "Unknown"])
         ui.update_selectize("source_filter", choices=sources, selected=[])
 
     @reactive.effect
