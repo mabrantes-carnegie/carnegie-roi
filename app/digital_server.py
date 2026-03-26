@@ -28,6 +28,122 @@ CHART_COLORS = [
 STRATEGY_COLORS = CHART_COLORS
 
 
+_HEATMAP_COLOR = "#C99D44"
+
+
+def _hex_to_rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+
+def _plain_table(df: "pd.DataFrame") -> "ui.HTML":
+    """Render a DataFrame as a plain sortable HTML table (no heatmap)."""
+    th_style = (
+        "padding:8px 12px;font-family:Manrope,sans-serif;font-size:11px;"
+        "font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;"
+        "border-bottom:1px solid #e5e1dc;text-align:right;white-space:nowrap;cursor:pointer;"
+    )
+    th_first_style = th_style.replace("text-align:right;", "text-align:left;")
+    td_base = (
+        "padding:7px 12px;font-family:Manrope,sans-serif;font-size:13px;"
+        "color:#021326;border-bottom:1px solid #f0eeea;text-align:right;"
+    )
+    td_first = td_base.replace("text-align:right;", "text-align:left;")
+
+    headers = []
+    for ci, col in enumerate(df.columns):
+        s = th_first_style if ci == 0 else th_style
+        headers.append(f'<th style="{s}">{col}</th>')
+
+    rows_html = []
+    for _, row in df.iterrows():
+        cells = []
+        for ci, col in enumerate(df.columns):
+            style = td_first if ci == 0 else td_base
+            cells.append(f'<td style="{style}">{row[col]}</td>')
+        rows_html.append("<tr>" + "".join(cells) + "</tr>")
+
+    html = (
+        '<div style="overflow-x:auto;">'
+        '<table class="sortable-table" style="width:100%;border-collapse:collapse;">'
+        "<thead><tr>" + "".join(headers) + "</tr></thead>"
+        "<tbody>" + "".join(rows_html) + "</tbody>"
+        "</table></div>"
+    )
+    return ui.HTML(html)
+
+
+def _heatmap_table(df: "pd.DataFrame", heatmap_cols: list) -> "ui.HTML":
+    """Render a DataFrame as an HTML table with gold heatmap on specified columns."""
+    r, g, b = _hex_to_rgb(_HEATMAP_COLOR)
+
+    # Pre-compute per-column min/max for numeric scaling
+    col_ranges = {}
+    for col in heatmap_cols:
+        if col not in df.columns:
+            continue
+        # Values may be formatted strings — parse back to float for scaling
+        def _to_num(v):
+            if isinstance(v, (int, float)):
+                return float(v)
+            try:
+                return float(str(v).replace(",", "").replace("%", ""))
+            except Exception:
+                return None
+        nums = [_to_num(v) for v in df[col] if _to_num(v) is not None]
+        col_ranges[col] = (min(nums), max(nums)) if nums else (0, 1)
+
+    # Build HTML
+    th_style = (
+        "padding:8px 12px;font-family:Manrope,sans-serif;font-size:11px;"
+        "font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;"
+        "border-bottom:1px solid #e5e1dc;text-align:right;white-space:nowrap;cursor:pointer;"
+    )
+    th_first_style = th_style.replace("text-align:right;", "text-align:left;")
+    td_base = (
+        "padding:7px 12px;font-family:Manrope,sans-serif;font-size:13px;"
+        "color:#021326;border-bottom:1px solid #f0eeea;text-align:right;"
+    )
+    td_first = td_base.replace("text-align:right;", "text-align:left;")
+
+    rows_html = []
+    for _, row in df.iterrows():
+        cells = []
+        for ci, col in enumerate(df.columns):
+            val = row[col]
+            style = td_first if ci == 0 else td_base
+            if col in col_ranges:
+                def _to_num(v):
+                    if isinstance(v, (int, float)):
+                        return float(v)
+                    try:
+                        return float(str(v).replace(",", "").replace("%", ""))
+                    except Exception:
+                        return None
+                num = _to_num(val)
+                if num is not None:
+                    lo, hi = col_ranges[col]
+                    ratio = (num - lo) / (hi - lo) if hi > lo else 0
+                    alpha = round(0.08 + ratio * 0.62, 3)
+                    style += f"background:rgba({r},{g},{b},{alpha});"
+            cells.append(f'<td style="{style}">{val}</td>')
+        rows_html.append("<tr>" + "".join(cells) + "</tr>")
+
+    headers = []
+    for ci, col in enumerate(df.columns):
+        s = th_first_style if ci == 0 else th_style
+        headers.append(f'<th style="{s}">{col}</th>')
+
+    html = (
+        '<div style="overflow-x:auto;">'
+        '<table class="sortable-table" style="width:100%;border-collapse:collapse;">'
+        "<thead><tr>" + "".join(headers) + "</tr></thead>"
+        "<tbody>" + "".join(rows_html) + "</tbody>"
+        "</table></div>"
+    )
+    return ui.HTML(html)
+
+
 def _plotly_html(fig, no_toolbar=True):
     config = {"displayModeBar": False} if no_toolbar else {}
     return ui.HTML(fig.to_html(full_html=False, include_plotlyjs=False, config=config))
@@ -76,7 +192,7 @@ def _fmt_delta(curr, prev, invert=False):
     else:
         arrow, sentiment = "", "neutral"
     return ui.tags.span(
-        f"{arrow} {abs(rounded):.1f}% vs. prior",
+        f"{arrow} {abs(rounded):.1f}% vs. PY",
         class_=f"kpi-badge kpi-badge--{sentiment}",
     )
 
@@ -190,6 +306,58 @@ def digital_server(input, output, session):
         else:
             df = df.iloc[0:0]
 
+        grp = input.dig_group()
+        if grp and len(grp) > 0:
+            df = df[df["group_name"].isin(grp)]
+        sub = input.dig_subgroup()
+        if sub and len(sub) > 0:
+            df = df[df["subgroup_name"].isin(sub)]
+        prod = input.dig_product()
+        if prod and len(prod) > 0:
+            df = df[df["product_name"].isin(prod)]
+        camp = input.dig_campaign()
+        if camp and len(camp) > 0:
+            df = df[df["campaign_name"].isin(camp)]
+        return df
+
+    @reactive.calc
+    def _dig_q8_yoy():
+        """Same months as selected period but one year prior (Year-over-Year)."""
+        df = Q8.copy()
+        period = input.dig_period()
+        if period and len(period) == 2:
+            start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
+            yoy_start = start.replace(year=start.year - 1)
+            yoy_end   = end.replace(year=end.year - 1)
+            df = df[(df["day"] >= yoy_start) & (df["day"] <= yoy_end)]
+        else:
+            df = df.iloc[0:0]
+        grp = input.dig_group()
+        if grp and len(grp) > 0:
+            df = df[df["group_name"].isin(grp)]
+        sub = input.dig_subgroup()
+        if sub and len(sub) > 0:
+            df = df[df["subgroup_name"].isin(sub)]
+        prod = input.dig_product()
+        if prod and len(prod) > 0:
+            df = df[df["product_name"].isin(prod)]
+        camp = input.dig_campaign()
+        if camp and len(camp) > 0:
+            df = df[df["campaign_name"].isin(camp)]
+        return df
+
+    @reactive.calc
+    def _dig_q9_yoy():
+        """Same months as selected period but one year prior (YoY) for Q9."""
+        df = Q9.copy()
+        period = input.dig_period()
+        if period and len(period) == 2:
+            start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
+            yoy_start = start.replace(year=start.year - 1)
+            yoy_end   = end.replace(year=end.year - 1)
+            df = df[(df["day"] >= yoy_start) & (df["day"] <= yoy_end)]
+        else:
+            df = df.iloc[0:0]
         grp = input.dig_group()
         if grp and len(grp) > 0:
             df = df[df["group_name"].isin(grp)]
@@ -377,34 +545,518 @@ def digital_server(input, output, session):
         if df_curr.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        # Monthly aggregation
-        curr_monthly = df_curr.groupby(df_curr["day"].dt.to_period("M"))["total_interactions"].sum().reset_index()
-        curr_monthly["day"] = curr_monthly["day"].dt.to_timestamp()
-        curr_monthly["label"] = curr_monthly["day"].dt.strftime("%b %Y")
+        # Daily aggregation — one row per day in the selected period
+        curr_daily = (
+            df_curr.groupby("day")["total_interactions"].sum()
+            .reset_index()
+            .sort_values("day")
+        )
+
+        # Build full date spine for the selected period so every day shows on x-axis
+        period = input.dig_period()
+        if period and len(period) == 2:
+            start_dt = pd.Timestamp(period[0])
+            end_dt   = pd.Timestamp(period[1])
+        else:
+            start_dt = curr_daily["day"].min()
+            end_dt   = curr_daily["day"].max()
+
+        all_days = pd.DataFrame({"day": pd.date_range(start_dt, end_dt, freq="D")})
+        curr_daily = all_days.merge(curr_daily, on="day", how="left").fillna(0)
+
+        # x = actual dates so hover fires on every day; tick labels only on odd days
+        odd_days = curr_daily[curr_daily["day"].dt.day % 2 == 1]["day"]
+        tickvals = odd_days.tolist()
+        ticktext = [pd.Timestamp(d).strftime("%b ") + str(pd.Timestamp(d).day) for d in odd_days]
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(
-            x=curr_monthly["label"], y=curr_monthly["total_interactions"],
-            mode="lines+markers", name="Current",
-            line=dict(color=CHART_COLORS[0], width=2),
-            marker=dict(size=5),
-            hovertemplate="%{x}<br>Interactions: %{y:,.1f}<extra></extra>",
+            x=curr_daily["day"], y=curr_daily["total_interactions"],
+            mode="lines+markers", name="Total Conversions",
+            line=dict(color="#EA332D", width=2),
+            marker=dict(color="#EA332D", size=4),
+            hovertemplate="%{x|%b %e}<br>Total Conversions: %{y:,.0f}<extra></extra>",
         ))
 
         if not df_prior.empty:
-            prior_monthly = df_prior.groupby(df_prior["day"].dt.to_period("M"))["total_interactions"].sum().reset_index()
-            prior_monthly["day"] = prior_monthly["day"].dt.to_timestamp()
-            prior_monthly["label"] = prior_monthly["day"].dt.strftime("%b %Y")
+            prior_daily = (
+                df_prior.groupby("day")["total_interactions"].sum()
+                .reset_index()
+                .sort_values("day")
+            )
+            # Align prior days to same day-of-month positions as current period
+            prior_daily["day_num"] = prior_daily["day"].dt.day
+            curr_daily["day_num"] = curr_daily["day"].dt.day
+            merged = curr_daily[["day", "day_num"]].merge(
+                prior_daily[["day_num", "total_interactions"]], on="day_num", how="left"
+            ).fillna(0)
             fig.add_trace(go.Scatter(
-                x=prior_monthly["label"], y=prior_monthly["total_interactions"],
-                mode="lines+markers", name="Prior",
-                line=dict(color="#9B9893", width=2, dash="dash"),
-                marker=dict(size=4),
-                hovertemplate="%{x}<br>Interactions: %{y:,.1f}<extra></extra>",
+                x=merged["day"], y=merged["total_interactions"],
+                mode="lines+markers", name="Total Conversions (previous year)",
+                line=dict(color="#C99D44", width=1.8, dash="dash"),
+                marker=dict(color="#C99D44", size=3),
+                hovertemplate="%{x|%b %e}<br>Total Conversions (prev): %{y:,.0f}<extra></extra>",
             ))
 
-        fig.update_layout(**_base_layout(320))
+        layout = _base_layout(320)
+        layout["xaxis"] = dict(
+            tickvals=tickvals, ticktext=ticktext,
+            tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
+            showgrid=False, title="", tickangle=0,
+        )
+        fig.update_layout(**layout)
         return _plotly_html(fig)
+
+    # --- Key Interaction Categories bar chart ---
+
+    @render.ui
+    def dig_key_interaction_categories():
+        df = _dig_q9()
+        if df.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+
+        cats_order = ["RFI/Lead Gen", "Visit/Event", "Apply", "Enroll/Deposit", "Other"]
+        agg = df.groupby("interaction_category")["total_interactions"].sum().reset_index()
+        # Keep only known categories, preserve order
+        agg = agg[agg["interaction_category"].isin(cats_order)].copy()
+        agg["_order"] = agg["interaction_category"].map({c: i for i, c in enumerate(cats_order)})
+        agg = agg.sort_values("_order")
+
+        colors = ["#021326", "#A4B9D3", "#C99D44", "#6B8F71", "#8B7355"]
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=agg["interaction_category"],
+            y=agg["total_interactions"],
+            marker_color=[colors[i % len(colors)] for i in range(len(agg))],
+            hovertemplate="%{x}<br>Total Conversions: %{y:,.0f}<extra></extra>",
+            showlegend=False,
+            text=[f"{v:,.0f}" for v in agg["total_interactions"]],
+            textposition="inside",
+            textfont=dict(family="Manrope, sans-serif", size=11, color="#ffffff"),
+        ))
+        layout = _base_layout(320)
+        layout["margin"] = dict(l=16, r=16, t=8, b=40)
+        layout["xaxis"]["tickfont"] = dict(family="Manrope, sans-serif", size=10, color="#9B9893")
+        layout["xaxis"]["tickangle"] = 0
+        layout["yaxis"]["visible"] = False
+        fig.update_layout(**layout)
+        return _plotly_html(fig)
+
+    # --- Cost Per Total Conversion line chart ---
+
+    @render.ui
+    def dig_cost_per_total_conv():
+        df_curr = _dig_q8()
+        df_prior = _dig_q8_prior()
+        if df_curr.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+
+        # Build full date spine for current period
+        period = input.dig_period()
+        if period and len(period) == 2:
+            start_dt = pd.Timestamp(period[0])
+            end_dt   = pd.Timestamp(period[1])
+        else:
+            start_dt = df_curr["day"].min()
+            end_dt   = df_curr["day"].max()
+
+        all_days = pd.DataFrame({"day": pd.date_range(start_dt, end_dt, freq="D")})
+
+        curr_daily = (
+            df_curr.groupby("day")[["budget", "total_interactions"]].sum()
+            .reset_index().sort_values("day")
+        )
+        curr_daily = all_days.merge(curr_daily, on="day", how="left").fillna(0)
+        curr_daily["cptc"] = curr_daily.apply(
+            lambda r: _safe_div(r["budget"], r["total_interactions"]), axis=1
+        )
+
+        odd_days = curr_daily[curr_daily["day"].dt.day % 2 == 1]["day"]
+        tickvals = odd_days.tolist()
+        ticktext = [pd.Timestamp(d).strftime("%b ") + str(pd.Timestamp(d).day) for d in odd_days]
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=curr_daily["day"], y=curr_daily["cptc"],
+            mode="lines+markers", name="Cost Per Total Conversion",
+            line=dict(color="#EA332D", width=2),
+            marker=dict(color="#EA332D", size=4),
+            hovertemplate="%{x|%b %e}<br>Cost/Conv: $%{y:,.2f}<extra></extra>",
+        ))
+
+        if not df_prior.empty:
+            prior_daily = (
+                df_prior.groupby("day")[["budget", "total_interactions"]].sum()
+                .reset_index().sort_values("day")
+            )
+            prior_daily["cptc"] = prior_daily.apply(
+                lambda r: _safe_div(r["budget"], r["total_interactions"]), axis=1
+            )
+            prior_daily["day_num"] = prior_daily["day"].dt.day
+            curr_daily["day_num"] = curr_daily["day"].dt.day
+            merged = curr_daily[["day", "day_num"]].merge(
+                prior_daily[["day_num", "cptc"]], on="day_num", how="left"
+            )
+            fig.add_trace(go.Scatter(
+                x=merged["day"], y=merged["cptc"],
+                mode="lines+markers", name="Cost Per Total Conversion (previous month)",
+                line=dict(color="#C99D44", width=1.8, dash="dash"),
+                marker=dict(color="#C99D44", size=3),
+                hovertemplate="%{x|%b %e}<br>Cost/Conv (prev): $%{y:,.2f}<extra></extra>",
+            ))
+
+        layout = _base_layout(320)
+        layout["yaxis"]["tickprefix"] = "$"
+        layout["xaxis"] = dict(
+            tickvals=tickvals, ticktext=ticktext,
+            tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
+            showgrid=False, title="", tickangle=0,
+        )
+        fig.update_layout(**layout)
+        return _plotly_html(fig)
+
+    # ══════════════════════════════════════════════════════════
+    # TAB 1b: OVERVIEW YoY  (same outputs, _yoy suffix, compare curr vs prior year)
+    # ══════════════════════════════════════════════════════════
+
+    @render.text
+    def dig_key_interactions_yoy():
+        v = _dig_q8()["total_interactions"].sum()
+        return f"{v:,.1f}"
+
+    @render.ui
+    def dig_key_interactions_delta_yoy():
+        return _fmt_delta(_dig_q8()["total_interactions"].sum(), _dig_q8_yoy()["total_interactions"].sum())
+
+    @render.text
+    def dig_cpi_yoy():
+        df = _dig_q8()
+        return fmt_currency(_safe_div(df["budget"].sum(), df["total_interactions"].sum()))
+
+    @render.ui
+    def dig_cpi_delta_yoy():
+        df_c, df_p = _dig_q8(), _dig_q8_yoy()
+        return _fmt_delta(
+            _safe_div(df_c["budget"].sum(), df_c["total_interactions"].sum()),
+            _safe_div(df_p["budget"].sum(), df_p["total_interactions"].sum()),
+            invert=True,
+        )
+
+    @render.text
+    def dig_inquiry_int_yoy():
+        v = _dig_q9()[_dig_q9()["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum()
+        return f"{v:,.1f}"
+
+    @render.ui
+    def dig_inquiry_int_delta_yoy():
+        curr = _dig_q9()[_dig_q9()["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum()
+        py = _dig_q9_yoy()
+        prev_v = py[py["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum() if not py.empty else 0
+        return _fmt_delta(curr, prev_v)
+
+    @render.text
+    def dig_visit_int_yoy():
+        v = _dig_q9()[_dig_q9()["interaction_category"] == "Visit/Event"]["total_interactions"].sum()
+        return f"{v:,.1f}"
+
+    @render.ui
+    def dig_visit_int_delta_yoy():
+        curr = _dig_q9()[_dig_q9()["interaction_category"] == "Visit/Event"]["total_interactions"].sum()
+        py = _dig_q9_yoy()
+        prev_v = py[py["interaction_category"] == "Visit/Event"]["total_interactions"].sum() if not py.empty else 0
+        return _fmt_delta(curr, prev_v)
+
+    @render.text
+    def dig_apply_int_yoy():
+        v = _dig_q9()[_dig_q9()["interaction_category"] == "Apply"]["total_interactions"].sum()
+        return f"{v:,.1f}"
+
+    @render.ui
+    def dig_apply_int_delta_yoy():
+        curr = _dig_q9()[_dig_q9()["interaction_category"] == "Apply"]["total_interactions"].sum()
+        py = _dig_q9_yoy()
+        prev_v = py[py["interaction_category"] == "Apply"]["total_interactions"].sum() if not py.empty else 0
+        return _fmt_delta(curr, prev_v)
+
+    @render.text
+    def dig_budget_yoy():
+        return fmt_currency(_dig_q8()["budget"].sum())
+
+    @render.ui
+    def dig_budget_delta_yoy():
+        return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_yoy()["budget"].sum(), invert=True)
+
+    @render.text
+    def dig_cpc_yoy():
+        df = _dig_q8()
+        return fmt_currency(_safe_div(df["budget"].sum(), df["clicks"].sum()))
+
+    @render.ui
+    def dig_cpc_delta_yoy():
+        df_c, df_p = _dig_q8(), _dig_q8_yoy()
+        return _fmt_delta(
+            _safe_div(df_c["budget"].sum(), df_c["clicks"].sum()),
+            _safe_div(df_p["budget"].sum(), df_p["clicks"].sum()),
+            invert=True,
+        )
+
+    @render.text
+    def dig_direct_conv_yoy():
+        return f"{_dig_q8()['direct_conversions'].sum():,.1f}"
+
+    @render.ui
+    def dig_direct_conv_delta_yoy():
+        return _fmt_delta(_dig_q8()["direct_conversions"].sum(), _dig_q8_yoy()["direct_conversions"].sum())
+
+    @render.text
+    def dig_cpdc_yoy():
+        df = _dig_q8()
+        return fmt_currency(_safe_div(df["budget"].sum(), df["direct_conversions"].sum()))
+
+    @render.ui
+    def dig_cpdc_delta_yoy():
+        df_c, df_p = _dig_q8(), _dig_q8_yoy()
+        return _fmt_delta(
+            _safe_div(df_c["budget"].sum(), df_c["direct_conversions"].sum()),
+            _safe_div(df_p["budget"].sum(), df_p["direct_conversions"].sum()),
+            invert=True,
+        )
+
+    @render.text
+    def dig_ipl_yoy():
+        return fmt_number(_dig_q8()["in_platform_leads"].sum())
+
+    @render.ui
+    def dig_ipl_delta_yoy():
+        return _fmt_delta(_dig_q8()["in_platform_leads"].sum(), _dig_q8_yoy()["in_platform_leads"].sum())
+
+    @render.text
+    def dig_cpipl_yoy():
+        df = _dig_q8()
+        return fmt_currency(_safe_div(df["budget"].sum(), df["in_platform_leads"].sum()))
+
+    @render.ui
+    def dig_cpipl_delta_yoy():
+        df_c, df_p = _dig_q8(), _dig_q8_yoy()
+        return _fmt_delta(
+            _safe_div(df_c["budget"].sum(), df_c["in_platform_leads"].sum()),
+            _safe_div(df_p["budget"].sum(), df_p["in_platform_leads"].sum()),
+            invert=True,
+        )
+
+    @render.text
+    def dig_vtc_yoy():
+        return fmt_number(_dig_q8()["view_through_conversions"].sum())
+
+    @render.ui
+    def dig_vtc_delta_yoy():
+        return _fmt_delta(_dig_q8()["view_through_conversions"].sum(), _dig_q8_yoy()["view_through_conversions"].sum())
+
+    @render.text
+    def dig_cptc_yoy():
+        df = _dig_q8()
+        return fmt_currency(_safe_div(df["budget"].sum(), df["total_interactions"].sum()))
+
+    @render.ui
+    def dig_cptc_delta_yoy():
+        df_c, df_p = _dig_q8(), _dig_q8_yoy()
+        return _fmt_delta(
+            _safe_div(df_c["budget"].sum(), df_c["total_interactions"].sum()),
+            _safe_div(df_p["budget"].sum(), df_p["total_interactions"].sum()),
+            invert=True,
+        )
+
+    @render.ui
+    def dig_trending_chart_yoy():
+        df_curr = _dig_q8()
+        df_prior = _dig_q8_yoy()
+        if df_curr.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+
+        curr_daily = (
+            df_curr.groupby("day")["total_interactions"].sum()
+            .reset_index().sort_values("day")
+        )
+        period = input.dig_period()
+        if period and len(period) == 2:
+            start_dt, end_dt = pd.Timestamp(period[0]), pd.Timestamp(period[1])
+        else:
+            start_dt, end_dt = curr_daily["day"].min(), curr_daily["day"].max()
+
+        all_days = pd.DataFrame({"day": pd.date_range(start_dt, end_dt, freq="D")})
+        curr_daily = all_days.merge(curr_daily, on="day", how="left").fillna(0)
+        curr_daily["label"] = curr_daily["day"].dt.day.astype(str)
+
+        # Build prior year label for legend
+        prior_year = start_dt.year - 1
+        curr_year  = start_dt.year
+        curr_legend = f"Total Conversions {curr_year}"
+        prior_legend = f"Total Conversions {prior_year}"
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=curr_daily["label"], y=curr_daily["total_interactions"],
+            mode="lines+markers", name=curr_legend,
+            line=dict(color="#EA332D", width=2),
+            marker=dict(color="#EA332D", size=4),
+            hovertemplate="%{x}<br>" + curr_legend + ": %{y:,.0f}<extra></extra>",
+        ))
+
+        if not df_prior.empty:
+            prior_daily = (
+                df_prior.groupby("day")["total_interactions"].sum()
+                .reset_index().sort_values("day")
+            )
+            prior_daily["label"] = prior_daily["day"].dt.day.astype(str)
+            fig.add_trace(go.Scatter(
+                x=prior_daily["label"], y=prior_daily["total_interactions"],
+                mode="lines+markers", name=prior_legend,
+                line=dict(color="#C99D44", width=1.8, dash="dash"),
+                marker=dict(color="#C99D44", size=3),
+                hovertemplate="%{x}<br>" + prior_legend + ": %{y:,.0f}<extra></extra>",
+            ))
+
+        layout = _base_layout(320)
+        layout["xaxis"] = dict(
+            tickvals=curr_daily["label"].tolist(),
+            ticktext=curr_daily["label"].tolist(),
+            tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
+            showgrid=False, title="", tickangle=0,
+        )
+        fig.update_layout(**layout)
+        return _plotly_html(fig)
+
+    @render.ui
+    def dig_strategy_bar_yoy():
+        df = _dig_q8()
+        if df.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+        strat = df.groupby("product_name")["impressions"].sum().sort_values(ascending=True).reset_index()
+        strat = strat[strat["impressions"] > 0]
+        if strat.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+        total = strat["impressions"].sum()
+        strat["pct"] = (strat["impressions"] / total * 100).round(1)
+        x_max = strat["impressions"].max() * 1.28
+        fig = go.Figure(go.Bar(
+            x=strat["impressions"], y=strat["product_name"],
+            orientation="h", marker_color=CHART_COLORS[0],
+            text=[f"{p:.1f}%" for p in strat["pct"]], textposition="outside",
+            textfont=dict(family="Manrope, sans-serif", size=10, color=CARNEGIE_NAVY),
+            hovertemplate="<b>%{y}</b><br>Impressions: %{x:,}<extra></extra>",
+        ))
+        layout = _base_layout(max(260, len(strat) * 28 + 60))
+        layout["margin"] = dict(l=8, r=8, t=8, b=24, autoexpand=True)
+        layout["xaxis"] = dict(showgrid=True, gridcolor="#F0EEEA", title="", range=[0, x_max])
+        layout["yaxis"] = dict(showgrid=False, title="", automargin=True)
+        fig.update_layout(**layout)
+        return _plotly_html(fig)
+
+    @render.ui
+    def dig_strategy_trend_yoy():
+        df = _dig_q8()
+        if df.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+        top5 = df.groupby("product_name")["impressions"].sum().nlargest(5).index.tolist()
+        df_top = df[df["product_name"].isin(top5)].copy()
+
+        period = input.dig_period()
+        if period and len(period) == 2:
+            start_dt = pd.Timestamp(period[0])
+            end_dt   = pd.Timestamp(period[1])
+        else:
+            start_dt = df_top["day"].min()
+            end_dt   = df_top["day"].max()
+
+        all_days = pd.date_range(start_dt, end_dt, freq="D")
+        odd_days = [d for d in all_days if d.day % 2 == 1]
+        tickvals = odd_days
+        ticktext = [d.strftime("%b ") + str(d.day) for d in odd_days]
+
+        fig = go.Figure()
+        for i, prod in enumerate(top5):
+            sub = df_top[df_top["product_name"] == prod].groupby("day")["impressions"].sum().reset_index()
+            spine = pd.DataFrame({"day": all_days})
+            sub = spine.merge(sub, on="day", how="left").fillna(0)
+            fig.add_trace(go.Scatter(
+                x=sub["day"], y=sub["impressions"],
+                mode="lines+markers", name=prod,
+                line=dict(color=_STRATEGY_TREND_COLORS[i % len(_STRATEGY_TREND_COLORS)], width=2),
+                marker=dict(color=_STRATEGY_TREND_COLORS[i % len(_STRATEGY_TREND_COLORS)], size=4),
+                hovertemplate=f"<b>{prod}</b><br>%{{x|%b %e}}<br>Impressions: %{{y:,.0f}}<extra></extra>",
+            ))
+
+        layout = _base_layout(320)
+        layout["xaxis"] = dict(
+            tickvals=tickvals, ticktext=ticktext,
+            tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
+            showgrid=False, title="", tickangle=0,
+        )
+        fig.update_layout(**layout)
+        return _plotly_html(fig)
+
+    @render.ui
+    def dig_subgroup_table_yoy():
+        df_c = _dig_q8()
+        df_p = _dig_q8_yoy()
+        if df_c.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+        metrics = ["impressions", "clicks", "direct_conversions",
+                   "view_through_conversions", "in_platform_leads", "total_interactions"]
+        curr = df_c.groupby("subgroup_name")[metrics].sum().reset_index()
+        curr["CTR"] = (curr["clicks"] / curr["impressions"].replace(0, float("nan")) * 100).round(2)
+        if not df_p.empty:
+            prev = df_p.groupby("subgroup_name")[metrics].sum().reset_index()
+            for m in metrics:
+                prev_map = prev.set_index("subgroup_name")[m]
+                curr[f"{m}_delta"] = curr.apply(
+                    lambda r: _pct_change(r[m], prev_map.get(r["subgroup_name"], 0)), axis=1
+                )
+        else:
+            for m in metrics:
+                curr[f"{m}_delta"] = "N/A"
+        for c in metrics:
+            curr[c] = curr[c].round(0).astype(int)
+        display = curr.sort_values("impressions", ascending=False)
+        cols = {"subgroup_name": "Subgroup", "impressions": "Impressions",
+                "clicks": "Clicks", "CTR": "CTR %",
+                "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
+                "in_platform_leads": "In-Platform Leads", "total_interactions": "Total Interactions"}
+        display = display.rename(columns=cols)
+        heatmap_cols = ["Impressions", "Clicks", "CTR %", "Direct Conv.",
+                        "View-through", "In-Platform Leads", "Total Interactions"]
+        return _heatmap_table(display[[c for c in cols.values() if c in display.columns]], heatmap_cols)
+
+    @render.ui
+    def dig_strategy_table_yoy():
+        df_c = _dig_q8()
+        if df_c.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+        metrics = ["impressions", "clicks", "direct_conversions",
+                   "view_through_conversions", "in_platform_leads", "total_interactions"]
+        curr = df_c.groupby("product_name")[metrics].sum().reset_index()
+        curr["CTR"] = (curr["clicks"] / curr["impressions"].replace(0, float("nan")) * 100).round(2)
+        for c in metrics:
+            curr[c] = curr[c].round(0).astype(int)
+        display = curr.sort_values("impressions", ascending=False).rename(columns={
+            "product_name": "Strategy", "impressions": "Impressions",
+            "clicks": "Clicks", "CTR": "CTR %",
+            "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
+            "in_platform_leads": "In-Platform Leads", "total_interactions": "Total Interactions",
+        })
+        show = ["Strategy", "Impressions", "Clicks", "CTR %", "Direct Conv.",
+                "View-through", "In-Platform Leads", "Total Interactions"]
+        heatmap_cols = ["Impressions", "Clicks", "CTR %", "Direct Conv.",
+                        "View-through", "In-Platform Leads", "Total Interactions"]
+        return _heatmap_table(display[[c for c in show if c in display.columns]], heatmap_cols)
+
+    @render.ui
+    def dig_interactions_by_month_yoy():
+        return ui.tags.div()  # placeholder — same as Overview
+
+    @render.ui
+    def dig_interactions_by_strategy_month_yoy():
+        return ui.tags.div()  # placeholder — same as Overview
 
     # --- Strategy bar chart ---
 
@@ -421,6 +1073,7 @@ def digital_server(input, output, session):
 
         total = strat["impressions"].sum()
         strat["pct"] = (strat["impressions"] / total * 100).round(1)
+        x_max = strat["impressions"].max() * 1.28
 
         fig = go.Figure(go.Bar(
             x=strat["impressions"], y=strat["product_name"],
@@ -431,13 +1084,15 @@ def digital_server(input, output, session):
             hovertemplate="<b>%{y}</b><br>Impressions: %{x:,}<extra></extra>",
         ))
         layout = _base_layout(max(260, len(strat) * 28 + 60))
-        layout["margin"] = dict(l=140, r=60, t=8, b=24)
-        layout["xaxis"] = dict(showgrid=True, gridcolor="#F0EEEA", title="")
-        layout["yaxis"] = dict(showgrid=False, title="")
+        layout["margin"] = dict(l=8, r=8, t=8, b=24, autoexpand=True)
+        layout["xaxis"] = dict(showgrid=True, gridcolor="#F0EEEA", title="", range=[0, x_max])
+        layout["yaxis"] = dict(showgrid=False, title="", automargin=True)
         fig.update_layout(**layout)
         return _plotly_html(fig)
 
     # --- Strategy trend ---
+
+    _STRATEGY_TREND_COLORS = ["#A4B9D3", "#FBCFB1", "#E9DBF6", "#B3C7BD", "#FFF8B4"]
 
     @render.ui
     def dig_strategy_trend():
@@ -447,86 +1102,102 @@ def digital_server(input, output, session):
 
         top5 = df.groupby("product_name")["impressions"].sum().nlargest(5).index.tolist()
         df_top = df[df["product_name"].isin(top5)].copy()
-        monthly = df_top.groupby([df_top["day"].dt.to_period("M"), "product_name"])["impressions"].sum().reset_index()
-        monthly["day"] = monthly["day"].dt.to_timestamp()
-        monthly["label"] = monthly["day"].dt.strftime("%b %Y")
+
+        period = input.dig_period()
+        if period and len(period) == 2:
+            start_dt = pd.Timestamp(period[0])
+            end_dt   = pd.Timestamp(period[1])
+        else:
+            start_dt = df_top["day"].min()
+            end_dt   = df_top["day"].max()
+
+        all_days = pd.date_range(start_dt, end_dt, freq="D")
+        odd_days = [d for d in all_days if d.day % 2 == 1]
+        tickvals = odd_days
+        ticktext = [d.strftime("%b ") + str(d.day) for d in odd_days]
 
         fig = go.Figure()
         for i, prod in enumerate(top5):
-            sub = monthly[monthly["product_name"] == prod]
+            sub = df_top[df_top["product_name"] == prod].groupby("day")["impressions"].sum().reset_index()
+            spine = pd.DataFrame({"day": all_days})
+            sub = spine.merge(sub, on="day", how="left").fillna(0)
             fig.add_trace(go.Scatter(
-                x=sub["label"], y=sub["impressions"],
+                x=sub["day"], y=sub["impressions"],
                 mode="lines+markers", name=prod,
-                line=dict(color=STRATEGY_COLORS[i % len(STRATEGY_COLORS)], width=2),
-                marker=dict(size=4),
-                hovertemplate=f"<b>{prod}</b><br>%{{x}}<br>Impressions: %{{y:,}}<extra></extra>",
+                line=dict(color=_STRATEGY_TREND_COLORS[i % len(_STRATEGY_TREND_COLORS)], width=2),
+                marker=dict(color=_STRATEGY_TREND_COLORS[i % len(_STRATEGY_TREND_COLORS)], size=4),
+                hovertemplate=f"<b>{prod}</b><br>%{{x|%b %e}}<br>Impressions: %{{y:,.0f}}<extra></extra>",
             ))
-        fig.update_layout(**_base_layout(320))
+
+        layout = _base_layout(320)
+        layout["xaxis"] = dict(
+            tickvals=tickvals, ticktext=ticktext,
+            tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
+            showgrid=False, title="", tickangle=0,
+        )
+        fig.update_layout(**layout)
         return _plotly_html(fig)
 
     # --- Subgroup performance table ---
 
-    @render.data_frame
+    @render.ui
     def dig_subgroup_table():
         df_c = _dig_q8()
         df_p = _dig_q8_prior()
         if df_c.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
 
         metrics = ["impressions", "clicks", "direct_conversions",
                    "view_through_conversions", "in_platform_leads", "total_interactions"]
         curr = df_c.groupby("subgroup_name")[metrics].sum().reset_index()
         curr["CTR"] = (curr["clicks"] / curr["impressions"].replace(0, float("nan")) * 100).round(2)
-
-        if not df_p.empty:
-            prev = df_p.groupby("subgroup_name")[metrics].sum().reset_index()
-            for m in metrics:
-                prev_map = prev.set_index("subgroup_name")[m]
-                curr[f"{m}_delta"] = curr.apply(
-                    lambda r: _pct_change(r[m], prev_map.get(r["subgroup_name"], 0)), axis=1
-                )
-        else:
-            for m in metrics:
-                curr[f"{m}_delta"] = "N/A"
-
-        display = curr.sort_values("impressions", ascending=False)
-        cols = {"subgroup_name": "Subgroup", "impressions": "Impressions",
-                "clicks": "Clicks", "CTR": "CTR %",
-                "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
-                "in_platform_leads": "In-Platform Leads", "total_interactions": "Total Interactions"}
-        display = display.rename(columns=cols)
-        show = list(cols.values())
-        return render.DataGrid(display[[c for c in show if c in display.columns]], filters=False)
+        for c in metrics:
+            curr[c] = curr[c].round(0).astype(int)
+        display = curr.sort_values("impressions", ascending=False).rename(columns={
+            "subgroup_name": "Subgroup", "impressions": "Impressions",
+            "clicks": "Clicks", "CTR": "CTR %",
+            "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
+            "in_platform_leads": "In-Platform Leads", "total_interactions": "Total Interactions",
+        })
+        heatmap_cols = ["Impressions", "Clicks", "CTR %", "Direct Conv.",
+                        "View-through", "In-Platform Leads", "Total Interactions"]
+        show = ["Subgroup", "Impressions", "Clicks", "CTR %", "Direct Conv.",
+                "View-through", "In-Platform Leads", "Total Interactions"]
+        return _heatmap_table(display[[c for c in show if c in display.columns]], heatmap_cols)
 
     # --- Strategy performance table ---
 
-    @render.data_frame
+    @render.ui
     def dig_strategy_table():
         df_c = _dig_q8()
         if df_c.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
 
         metrics = ["impressions", "clicks", "direct_conversions",
                    "view_through_conversions", "in_platform_leads", "total_interactions"]
         curr = df_c.groupby("product_name")[metrics].sum().reset_index()
         curr["CTR"] = (curr["clicks"] / curr["impressions"].replace(0, float("nan")) * 100).round(2)
+        for c in metrics:
+            curr[c] = curr[c].round(0).astype(int)
         display = curr.sort_values("impressions", ascending=False).rename(columns={
             "product_name": "Strategy", "impressions": "Impressions",
             "clicks": "Clicks", "CTR": "CTR %",
             "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
             "in_platform_leads": "In-Platform Leads", "total_interactions": "Total Interactions",
         })
+        heatmap_cols = ["Impressions", "Clicks", "CTR %", "Direct Conv.",
+                        "View-through", "In-Platform Leads", "Total Interactions"]
         show = ["Strategy", "Impressions", "Clicks", "CTR %", "Direct Conv.",
                 "View-through", "In-Platform Leads", "Total Interactions"]
-        return render.DataGrid(display[[c for c in show if c in display.columns]], filters=False)
+        return _heatmap_table(display[[c for c in show if c in display.columns]], heatmap_cols)
 
     # --- Interactions by month & year ---
 
-    @render.data_frame
+    @render.ui
     def dig_interactions_by_month():
         df = _dig_q8()
         if df.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
 
         df = df.copy()
         df["year"] = df["day"].dt.year
@@ -539,18 +1210,18 @@ def digital_server(input, output, session):
         pivot_wide = pivot_wide[cols]
         pivot_wide["Grand Total"] = pivot_wide.sum(axis=1)
         pivot_wide = pivot_wide.reset_index().rename(columns={"year": "Year"})
-        # Format
-        for c in cols + ["Grand Total"]:
-            pivot_wide[c] = pivot_wide[c].apply(lambda v: f"{v:,.1f}")
-        return render.DataGrid(pivot_wide, filters=False)
+        heatmap_cols = cols + ["Grand Total"]
+        for c in heatmap_cols:
+            pivot_wide[c] = pivot_wide[c].apply(lambda v: f"{round(v):,}")
+        return _heatmap_table(pivot_wide, heatmap_cols)
 
     # --- Interactions by strategy & month ---
 
-    @render.data_frame
+    @render.ui
     def dig_interactions_by_strategy_month():
         df = _dig_q8()
         if df.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
 
         df = df.copy()
         df["ym"] = df["day"].dt.strftime("%Y-%m")
@@ -560,9 +1231,10 @@ def digital_server(input, output, session):
         pivot_wide["Grand Total"] = pivot_wide.sum(axis=1)
         pivot_wide = pivot_wide.sort_values("Grand Total", ascending=False).reset_index()
         pivot_wide = pivot_wide.rename(columns={"product_name": "Strategy"})
-        for c in pivot_wide.columns[1:]:
-            pivot_wide[c] = pivot_wide[c].apply(lambda v: f"{v:,.1f}" if isinstance(v, (int, float)) else v)
-        return render.DataGrid(pivot_wide, filters=False)
+        heatmap_cols = [c for c in pivot_wide.columns if c != "Strategy"]
+        for c in heatmap_cols:
+            pivot_wide[c] = pivot_wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
+        return _heatmap_table(pivot_wide, heatmap_cols)
 
     # ══════════════════════════════════════════════════════════
     # TAB 2: INTERACTIONS
@@ -712,11 +1384,11 @@ def digital_server(input, output, session):
 
     # --- Interaction breakdown table ---
 
-    @render.data_frame
+    @render.ui
     def dig_interaction_breakdown_table():
         df = _dig_q9_filtered()
         if df.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
 
         agg = df.groupby(["interaction_category", "conversion_name"]).agg(
             direct=("direct_conversions", "sum"),
@@ -729,16 +1401,16 @@ def digital_server(input, output, session):
             "direct": "Direct Conv.", "vt": "View-through", "total": "Total Interactions",
         })
         for c in ["Direct Conv.", "View-through", "Total Interactions"]:
-            agg[c] = agg[c].apply(lambda v: f"{v:,.1f}")
-        return render.DataGrid(agg, filters=False)
+            agg[c] = agg[c].apply(lambda v: f"{round(v):,}")
+        return _plain_table(agg)
 
     # --- Interactions by campaign name ---
 
-    @render.data_frame
+    @render.ui
     def dig_interactions_campaign_table():
         df = _dig_q9_filtered()
         if df.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
 
         pivot = df.groupby(["product_name", "campaign_name", "interaction_category"])["total_interactions"].sum().reset_index()
         wide = pivot.pivot_table(
@@ -753,16 +1425,16 @@ def digital_server(input, output, session):
         wide = wide.sort_values("Grand Total", ascending=False)
         wide = wide.rename(columns={"product_name": "Strategy", "campaign_name": "Campaign Name"})
         for c in wide.columns[2:]:
-            wide[c] = wide[c].apply(lambda v: f"{v:,.1f}" if isinstance(v, (int, float)) else v)
-        return render.DataGrid(wide, filters=False)
+            wide[c] = wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
+        return _plain_table(wide)
 
     # --- Interactions by month pivot ---
 
-    @render.data_frame
+    @render.ui
     def dig_interactions_month_table():
         df = _dig_q9_filtered()
         if df.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
 
         df = df.copy()
         df["ym"] = df["day"].dt.strftime("%Y-%m")
@@ -777,16 +1449,16 @@ def digital_server(input, output, session):
         wide = wide.sort_values("Grand Total", ascending=False)
         wide = wide.rename(columns={"interaction_category": "Category", "conversion_name": "Conversion Name"})
         for c in num_cols + ["Grand Total"]:
-            wide[c] = wide[c].apply(lambda v: f"{v:,.1f}" if isinstance(v, (int, float)) else v)
-        return render.DataGrid(wide, filters=False)
+            wide[c] = wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
+        return _plain_table(wide)
 
     # --- Interactions detail table ---
 
-    @render.data_frame
+    @render.ui
     def dig_interactions_detail_table():
         df = _dig_q9_filtered()
         if df.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
 
         agg = df.groupby(["interaction_category", "conversion_name", "product_name", "campaign_name"]).agg(
             total=("total_interactions", "sum"),
@@ -799,25 +1471,30 @@ def digital_server(input, output, session):
             "total": "Total Conv.", "direct": "Direct Conv.", "vt": "View-through Conv.",
         })
         for c in ["Total Conv.", "Direct Conv.", "View-through Conv."]:
-            agg[c] = agg[c].apply(lambda v: f"{v:,.1f}")
-        return render.DataGrid(agg, filters=False)
+            agg[c] = agg[c].apply(lambda v: f"{round(v):,}")
+        return _plain_table(agg)
 
     # ══════════════════════════════════════════════════════════
     # TAB 3: GEOGRAPHY
     # ══════════════════════════════════════════════════════════
 
-    @render.data_frame
+    @render.ui
     def dig_geo_table():
         df = _apply_dig_filters_monthly(Q10.copy())
         if df.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
 
-        metric = input.dig_geo_metric() if hasattr(input, "dig_geo_metric") else "impressions"
+        try:
+            metric = input.dig_geo_metric()
+        except Exception:
+            metric = "impressions"
         metrics = ["impressions", "clicks", "direct_conversions",
                    "view_through_conversions", "total_conversions"]
         agg = df.groupby("region")[metrics].sum().reset_index()
         agg["CTR"] = (agg["clicks"] / agg["impressions"].replace(0, float("nan")) * 100).round(2)
         agg = agg.sort_values(metric, ascending=False)
+        for c in metrics:
+            agg[c] = agg[c].round(0).astype(int)
         agg = agg.rename(columns={
             "region": "Region", "impressions": "Impressions", "clicks": "Clicks",
             "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
@@ -825,7 +1502,7 @@ def digital_server(input, output, session):
         })
         show = ["Region", "Impressions", "Clicks", "CTR", "Direct Conv.",
                 "View-through", "Total Conversions"]
-        return render.DataGrid(agg[[c for c in show if c in agg.columns]], filters=False)
+        return _plain_table(agg[[c for c in show if c in agg.columns]])
 
     # ══════════════════════════════════════════════════════════
     # TAB 4: CREATIVE
@@ -985,29 +1662,29 @@ def digital_server(input, output, session):
             df = df[df["note_type"].isin(nt)]
         return df
 
-    @render.data_frame
+    @render.ui
     def dig_perf_notes_table():
         df = _dig_notes()
         df = df[df["note_type"].isin(["Performance", "Performance with Recommendation"])]
         if df.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
         df = df.sort_values("day", ascending=False).copy()
         df["Date"] = df["day"].dt.strftime("%b %d, %Y")
         display = df[["Date", "notes"]].rename(columns={"notes": "Performance Insight Notes"})
-        return render.DataGrid(display, filters=False)
+        return _plain_table(display)
 
-    @render.data_frame
+    @render.ui
     def dig_optim_table():
         df = _dig_notes()
         df = df[df["note_type"] == "Optimization"]
         if df.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
         df = df.sort_values("day", ascending=False).copy()
         df["Date"] = df["day"].dt.strftime("%b %d, %Y")
         display = df[["Date", "campaign_name", "notes"]].rename(columns={
             "campaign_name": "Campaign", "notes": "Optimization Notes",
         })
-        return render.DataGrid(display, filters=False)
+        return _plain_table(display)
 
 
 def _pct_change(curr, prev):

@@ -13,7 +13,7 @@ from metrics import (
     compute_geo_detail,
 )
 from formatters import fmt_number, fmt_pct, fmt_currency, fmt_yoy
-from digital_server import digital_server
+from digital_server import digital_server, _plain_table
 
 # ── Carnegie brand colors for Plotly ─────────────────────────
 
@@ -132,24 +132,36 @@ def server_logic(input, output, session):
     def filtered_deep_dive():
         """Q6 current year + page-specific Lead Source and Program Level filters."""
         df = filtered_main()
-        src = input.source_filter()
-        if src and len(src) > 0:
-            df = df[df["origin_source_first"].isin(src)]
-        pl = input.program_level_adv()
-        if pl and len(pl) > 0:
-            df = df[df["program_level"].isin(pl)]
+        try:
+            src = input.source_filter()
+            if src and len(src) > 0:
+                df = df[df["origin_source_first"].isin(src)]
+        except Exception:
+            pass
+        try:
+            pl = input.program_level_adv()
+            if pl and len(pl) > 0:
+                df = df[df["program_level"].isin(pl)]
+        except Exception:
+            pass
         return df
 
     @reactive.calc
     def prior_deep_dive():
         """Q6 prior year + page-specific Lead Source filter."""
         df = prior_main()
-        src = input.source_filter()
-        if src and len(src) > 0:
-            df = df[df["origin_source_first"].isin(src)]
-        pl = input.program_level_adv()
-        if pl and len(pl) > 0:
-            df = df[df["program_level"].isin(pl)]
+        try:
+            src = input.source_filter()
+            if src and len(src) > 0:
+                df = df[df["origin_source_first"].isin(src)]
+        except Exception:
+            pass
+        try:
+            pl = input.program_level_adv()
+            if pl and len(pl) > 0:
+                df = df[df["program_level"].isin(pl)]
+        except Exception:
+            pass
         return df
 
     @reactive.calc
@@ -575,16 +587,6 @@ def server_logic(input, output, session):
             prior_label = f"{prior_ty - 1}-{str(prior_ty)[-2:]}"
             curr_label = f"{current_ty - 1}-{str(current_ty)[-2:]}"
 
-            if not prior.empty:
-                fig.add_trace(go.Scatter(
-                    x=prior["month_label"], y=prior[y_col],
-                    mode="lines+markers",
-                    name=prior_label,
-                    line=dict(color="#C99D44", width=1.8, dash="dash"),
-                    marker=dict(color="#C99D44", size=5),
-                    hovertemplate=f"<b>%{{x}} {prior_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
-                ))
-
             if not curr.empty:
                 fig.add_trace(go.Scatter(
                     x=curr["month_label"], y=curr[y_col],
@@ -593,6 +595,16 @@ def server_logic(input, output, session):
                     line=dict(color="#EA332D", width=2.5),
                     marker=dict(color="#EA332D", size=7),
                     hovertemplate=f"<b>%{{x}} {curr_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
+                ))
+
+            if not prior.empty:
+                fig.add_trace(go.Scatter(
+                    x=prior["month_label"], y=prior[y_col],
+                    mode="lines+markers",
+                    name=prior_label,
+                    line=dict(color="#C99D44", width=1.8, dash="dash"),
+                    marker=dict(color="#C99D44", size=5),
+                    hovertemplate=f"<b>%{{x}} {prior_label}</b><br>{stage_label}: %{{y:,.0f}}<extra></extra>",
                 ))
 
                 if len(curr) >= 3:
@@ -762,46 +774,107 @@ def server_logic(input, output, session):
         curr_vals = [curr.get(k, 0) for k in PRIMARY_KEYS]
         prior_vals = [prior.get(k, 0) for k in PRIMARY_KEYS]
 
+        curr_ty = int(input.term_year())
+        prior_ty = curr_ty - 1
+        curr_label = f"{curr_ty - 1}-{str(curr_ty)[-2:]}"
+        prior_label = f"{prior_ty - 1}-{str(prior_ty)[-2:]}"
+
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            x=labels, y=curr_vals, name="Current Year",
+            x=labels, y=curr_vals, name=curr_label,
             marker_color=CHART_COLORS[0],
             text=[f"{v:,}" for v in curr_vals], textposition="outside",
             textfont=dict(family="Manrope, sans-serif", size=11),
-            hovertemplate="<b>%{x}</b><br>Current: %{y:,}<extra></extra>",
+            hovertemplate="<b>%{x}</b><br>" + curr_label + ": %{y:,}<extra></extra>",
         ))
         fig.add_trace(go.Bar(
-            x=labels, y=prior_vals, name="Prior Year",
+            x=labels, y=prior_vals, name=prior_label,
             marker_color=CHART_COLORS[1],
             text=[f"{v:,}" for v in prior_vals], textposition="outside",
             textfont=dict(family="Manrope, sans-serif", size=11),
-            hovertemplate="<b>%{x}</b><br>Prior: %{y:,}<extra></extra>",
+            hovertemplate="<b>%{x}</b><br>" + prior_label + ": %{y:,}<extra></extra>",
             opacity=0.5,
         ))
 
-        for i in range(len(PRIMARY_KEYS) - 1):
-            if curr_vals[i] > 0:
-                rate = (curr_vals[i + 1] / curr_vals[i]) * 100
-                fig.add_annotation(
-                    x=(i + i + 1) / 2, y=max(curr_vals[i], curr_vals[i + 1]) * 1.05,
-                    text=f"{rate:.1f}%", showarrow=False,
-                    font=dict(family="Manrope, sans-serif", size=11, color=CARNEGIE_GRAY_TEXT),
-                )
+        # YoY % annotations + bracket connectors above each bar group
+        annotations = []
+        shapes = []
+        all_vals = curr_vals + prior_vals
+        y_max = max(v for v in all_vals if v > 0) if any(v > 0 for v in all_vals) else 1
+        label_y = y_max * 1.28
+        line_y  = y_max * 1.18
+        # In grouped bar mode with 2 traces, bar centers are at x ± 0.2
+        bar_half = 0.2
+        for i, (cv, pv) in enumerate(zip(curr_vals, prior_vals)):
+            if pv and pv != 0:
+                pct = (cv - pv) / pv * 100
+                arrow = "▲" if pct >= 0 else "▼"
+                color = "#132B23" if pct >= 0 else "#560422"
+                annotations.append(dict(
+                    x=i, y=label_y, xref="x", yref="y",
+                    text=f"<b>{arrow} {abs(pct):.1f}%</b>",
+                    showarrow=False,
+                    font=dict(family="Manrope, sans-serif", size=12, color=color),
+                    xanchor="center",
+                ))
+                line_color = "#9B9893"
+                lw = 1
+                # Left vertical leg (curr bar center → line_y)
+                shapes.append(dict(
+                    type="line", xref="x", yref="y",
+                    x0=i - bar_half, y0=cv, x1=i - bar_half, y1=line_y,
+                    line=dict(color=line_color, width=lw, dash="dot"),
+                ))
+                # Right vertical leg (prior bar center → line_y)
+                shapes.append(dict(
+                    type="line", xref="x", yref="y",
+                    x0=i + bar_half, y0=pv, x1=i + bar_half, y1=line_y,
+                    line=dict(color=line_color, width=lw, dash="dot"),
+                ))
+                # Horizontal connector
+                shapes.append(dict(
+                    type="line", xref="x", yref="y",
+                    x0=i - bar_half, y0=line_y, x1=i + bar_half, y1=line_y,
+                    line=dict(color=line_color, width=lw, dash="dot"),
+                ))
 
-        fig.update_layout(
-            **_base_chart_layout(380),
-            barmode="group",
+        # "Same period" note — bottom-left, below the legend
+        current_month_name = date.today().strftime("%b")
+        note_text = (
+            f"Same period compared: Jul – {current_month_name} &nbsp;|&nbsp; "
+            f"{curr_label} vs {prior_label}"
         )
+        annotations.append(dict(
+            x=0, y=-0.18, xref="paper", yref="paper",
+            text=note_text,
+            showarrow=False,
+            font=dict(family="Manrope, sans-serif", size=10, color=CARNEGIE_GRAY_TEXT),
+            xanchor="left",
+        ))
+
+        layout = _base_chart_layout(420)
+        layout["barmode"] = "group"
+        layout["bargap"] = 0.35
+        layout["annotations"] = annotations
+        layout["shapes"] = shapes
+        layout["yaxis"] = dict(
+            tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
+            gridcolor="#F0EEEA", gridwidth=0.8,
+            showline=False, nticks=5, title="",
+            range=[0, y_max * 1.42],
+        )
+        layout["margin"] = dict(l=48, r=16, t=8, b=52)
+        fig.update_layout(**layout)
         return _plotly_html(fig)
 
     # --- Source Performance Table (Q2 — campaign attribution) ---
 
-    @render.data_frame
+    @render.ui
     def source_table():
         """Source performance table — same columns as program detail, grouped by lead source."""
         df_curr = filtered_deep_dive()
         if df_curr.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
 
         agg_cols = ["total_inquiries", "total_app_starts", "total_app_submits",
                     "total_enrolled", "total_deposits", "total_net_deposits"]
@@ -855,14 +928,16 @@ def server_logic(input, output, session):
             "Enrolled", "% Enrolled", "Inq→Enroll Rate",
             "Deposits", "Net Deposits",
         ]
-        return render.DataGrid(display[cols], filters=False)
+        return _plain_table(display[cols])
 
     # --- Origin Source Trend Chart (Q6 — first-touch, monthly) ---
 
     @render.ui
     def source_trend_chart():
-        req(input.source_trend_metric())
-        metric_col = input.source_trend_metric()  # e.g. "total_inquiries"
+        try:
+            metric_col = input.source_trend_metric()
+        except Exception:
+            metric_col = "total_inquiries"
         df = filtered_deep_dive()
 
         if df.empty:
@@ -1049,8 +1124,10 @@ def server_logic(input, output, session):
 
     @render.ui
     def program_trend_chart():
-        req(input.program_trend_metric())
-        metric_col = input.program_trend_metric()
+        try:
+            metric_col = input.program_trend_metric()
+        except Exception:
+            metric_col = "total_inquiries"
         df = _apply_global_filters(Q6.copy())
         df = df[df["program_name"].notna() & (df["program_name"].str.strip() != "")].copy()
         df["program_display"] = df["program_name"].apply(_clean_program_name)
@@ -1203,11 +1280,11 @@ def server_logic(input, output, session):
         fig.update_layout(**layout)
         return _plotly_html(fig)
 
-    @render.data_frame
+    @render.ui
     def program_detail_table():
         df = filtered_programs()
         if df.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
 
         curr = df.groupby("program_display").agg(
             total_inquiries=("total_inquiries", "sum"),
@@ -1265,7 +1342,7 @@ def server_logic(input, output, session):
             "Enrolled", "% Enrolled", "Inq→Enroll Rate",
             "Deposits", "Net Deposits",
         ]
-        return render.DataGrid(display[cols], filters=False)
+        return _plain_table(display[cols])
 
     # --- Geography Map + Top States (Q6 state data) ---
 
@@ -1310,7 +1387,10 @@ def server_logic(input, output, session):
 
     @render.ui
     def geo_map_title():
-        metric = input.geo_map_metric() if hasattr(input, "geo_map_metric") else "total_inquiries"
+        try:
+            metric = input.geo_map_metric()
+        except Exception:
+            metric = "total_inquiries"
         label = _GEO_METRIC_LABELS.get(metric, "Student inquiries by state")
         return ui.tags.h2(label, class_="section-heading", style="margin:0;")
 
@@ -1320,7 +1400,10 @@ def server_logic(input, output, session):
         if df.empty:
             return ui.tags.div("No data available for the selected filters.", class_="empty-state")
 
-        metric = input.geo_map_metric() if hasattr(input, "geo_map_metric") else "total_inquiries"
+        try:
+            metric = input.geo_map_metric()
+        except Exception:
+            metric = "total_inquiries"
         metric_short = _GEO_METRIC_SHORT.get(metric, "Inquiries")
 
         # Aggregate by state + location_type from Q6
@@ -1430,18 +1513,18 @@ def server_logic(input, output, session):
 
     # --- Geography City Detail Table (Q3 — US only by default) ---
 
-    @render.data_frame
+    @render.ui
     def geo_detail_table():
         df = filtered_q3()
         if df.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
         # Filter to US only by default; include_intl toggle if present
         include_all = getattr(input, "include_intl_unknown", lambda: False)()
         if not include_all:
             df = df[df["location_type"] == "US"]
         detail = compute_geo_detail(df)
         if detail.empty:
-            return render.DataGrid(pd.DataFrame({"No data available": []}))
+            return ui.tags.div("No data available.", class_="empty-state")
         display = detail.rename(columns={
             "student_state": "State",
             "student_city": "City",
@@ -1453,7 +1536,7 @@ def server_logic(input, output, session):
         })
         show_cols = ["State", "City", "Inquiries", "App Starts",
                      "App Submits", "Deposits", "Net Deposits"]
-        return render.DataGrid(display[show_cols], filters=False)
+        return _plain_table(display[show_cols])
 
     # ══════════════════════════════════════════════════════════
     # PAGE 4: DIGITAL PERFORMANCE

@@ -337,33 +337,6 @@ page_funnel = ui.nav_panel(
                 ),
                 class_="inline-filter",
             ),
-            # Advanced filters (collapsible)
-            ui.tags.div(
-                ui.tags.a(
-                    "+ Advanced filters",
-                    href="#",
-                    class_="advanced-toggle",
-                    onclick=(
-                        "var panel=this.nextElementSibling;"
-                        "panel.style.display=panel.style.display==='none'?'flex':'none';"
-                        "this.textContent=panel.style.display==='none'?'+ Advanced filters':'− Advanced filters';"
-                        "return false;"
-                    ),
-                ),
-                ui.tags.div(
-                    ui.tags.div(
-                        ui.input_selectize(
-                            "program_level_adv", "Program Level",
-                            choices=[],
-                            multiple=True,
-                        ),
-                        class_="inline-filter",
-                    ),
-                    class_="advanced-filters-panel",
-                    style="display:none;",
-                ),
-                class_="advanced-filters-wrap",
-            ),
             class_="page-filter-bar",
         ),
 
@@ -377,7 +350,7 @@ page_funnel = ui.nav_panel(
         # Section 2: Source performance table (full width)
         ui.tags.h2("Source performance", class_="section-heading"),
         ui.tags.div(
-            ui.output_data_frame("source_table"),
+            ui.output_ui("source_table"),
             class_="carnegie-table-card",
         ),
 
@@ -457,7 +430,7 @@ page_programs = ui.nav_panel(
         # Program detail table
         ui.tags.h2("Program detail", class_="section-heading"),
         ui.tags.div(
-            ui.output_data_frame("program_detail_table"),
+            ui.output_ui("program_detail_table"),
             class_="carnegie-table-card",
         ),
         style=_CW,
@@ -498,7 +471,7 @@ page_geography = ui.nav_panel(
             style="margin-bottom:12px;",
         ),
         ui.tags.div(
-            ui.output_data_frame("geo_detail_table"),
+            ui.output_ui("geo_detail_table"),
             class_="carnegie-table-card",
         ),
         style=_CW,
@@ -510,19 +483,74 @@ page_geography = ui.nav_panel(
 
 _dig_min, _dig_max = get_digital_date_range()
 
+def _month_options(min_dt, max_dt):
+    """Return list of (value, label) for every month in [min_dt, max_dt]."""
+    opts = []
+    cur = min_dt.replace(day=1)
+    end = max_dt.replace(day=1)
+    while cur <= end:
+        opts.append((cur.strftime("%Y-%m-%d"), cur.strftime("%b %Y")))
+        # advance one month
+        if cur.month == 12:
+            cur = cur.replace(year=cur.year + 1, month=1)
+        else:
+            cur = cur.replace(month=cur.month + 1)
+    return opts
+
+
 def _digital_filters():
     """Shared filter bar for digital performance page."""
-    return ui.tags.div(
-        ui.tags.div(
-            ui.input_date_range(
-                "dig_period", "Period",
-                start=date(2025, 7, 1),
-                end=_dig_max.date(),
-                min=_dig_min.date(),
-                max=_dig_max.date(),
+    import calendar
+    # Default: previous month (first day → last day)
+    today = date.today()
+    if today.month == 1:
+        prev_month_start = date(today.year - 1, 12, 1)
+    else:
+        prev_month_start = date(today.year, today.month - 1, 1)
+    prev_month_val = prev_month_start.strftime("%Y-%m-%d")
+    prev_month_end = prev_month_start.replace(
+        day=calendar.monthrange(prev_month_start.year, prev_month_start.month)[1]
+    )
+
+    month_opts = _month_options(_dig_min.date(), _dig_max.date())
+
+    def _month_select(select_id, default_val):
+        options = [
+            ui.tags.option(
+                label,
+                value=val,
+                selected=(val == default_val),
+            )
+            for val, label in month_opts
+        ]
+        return ui.tags.div(
+            ui.tags.select(
+                *options,
+                id=select_id,
+                class_="ios-month-select",
+                onchange=(
+                    "var s=document.getElementById('dig_month_start').value;"
+                    "var e=document.getElementById('dig_month_end').value;"
+                    "var ep=e.split('-'); var ey=+ep[0]; var em=+ep[1];"
+                    "var lastDay=new Date(ey, em, 0).getDate();"
+                    "var endStr=ep[0]+'-'+ep[1]+'-'+lastDay.toString().padStart(2,'0');"
+                    "Shiny.setInputValue('dig_period',[s, endStr],{priority:'event'});"
+                ),
             ),
-            class_="inline-filter",
-            style="min-width:220px;",
+            class_="ios-month-wrap",
+        )
+
+    return ui.tags.div(
+        # Month range picker
+        ui.tags.div(
+            ui.tags.span("Period", class_="ios-month-label"),
+            ui.tags.div(
+                _month_select("dig_month_start", prev_month_val),
+                ui.tags.span("→", class_="ios-month-sep"),
+                _month_select("dig_month_end", prev_month_val),
+                class_="ios-month-row",
+            ),
+            class_="inline-filter ios-month-filter",
         ),
         ui.tags.div(
             ui.input_selectize(
@@ -549,26 +577,24 @@ def _digital_filters():
             class_="inline-filter",
         ),
         ui.tags.div(
-            ui.tags.a(
-                "+ Campaign",
-                href="#",
-                class_="advanced-toggle",
-                onclick=(
-                    "var panel=this.nextElementSibling;"
-                    "panel.style.display=panel.style.display==='none'?'block':'none';"
-                    "this.textContent=panel.style.display==='none'?'+ Campaign':'− Campaign';"
-                    "return false;"
-                ),
-            ),
-            ui.tags.div(
-                ui.input_selectize(
-                    "dig_campaign", "Campaign",
-                    choices=get_digital_campaigns(),
-                    multiple=True,
-                ),
-                style="display:none; margin-top:6px;",
+            ui.input_selectize(
+                "dig_campaign", "Campaign",
+                choices=get_digital_campaigns(),
+                multiple=True,
             ),
             class_="inline-filter",
+        ),
+        # Hidden date range input — gives Shiny a registered input with the correct default
+        # value baked in at render time. The JS selects override it when the user changes months.
+        ui.tags.div(
+            ui.input_date_range(
+                "dig_period", None,
+                start=prev_month_start,
+                end=prev_month_end,
+                min=_dig_min.date(),
+                max=_dig_max.date(),
+            ),
+            style="display:none;",
         ),
         class_="page-filter-bar",
         style="flex-wrap:wrap; gap:12px;",
@@ -590,271 +616,284 @@ def _dig_metric_card(label, output_id):
     """Small metric card for engagement grid."""
     return ui.tags.div(
         ui.tags.div(label, class_="secondary-label"),
-        ui.tags.div(ui.output_text(f"dig_{output_id}"), class_="secondary-value"),
-        ui.output_ui(f"dig_{output_id}_delta"),
-        class_="secondary-badge",
+        ui.tags.div(
+            ui.tags.div(ui.output_text(f"dig_{output_id}"), class_="secondary-value"),
+            ui.output_ui(f"dig_{output_id}_delta"),
+            class_="secondary-value-row",
+        ),
+        class_="secondary-badge dig-metric-badge",
     )
 
 
-_dig_tab_overview = ui.nav_panel(
-    "Overview",
+_dig_overview_content = ui.tags.div(
+    # KPI strip
     ui.tags.div(
-        # KPI strip
-        ui.tags.div(
-            _dig_kpi_card("Key Interactions", "key_interactions", "#EA332D"),
-            _dig_kpi_card("Cost per Interaction", "cpi", "#021326"),
-            _dig_kpi_card("Inquiry Interactions", "inquiry_int", "#C99D44"),
-            _dig_kpi_card("Visit Interactions", "visit_int", "#E8B9A4"),
-            _dig_kpi_card("Apply Interactions", "apply_int", "#8B1A1A"),
-            class_="funnel-strip",
-        ),
-
-        # Trending + engagement grid
-        ui.tags.div(
-            # Left: trending
-            ui.tags.div(
-                ui.tags.span("Trending performance", class_="card-heading"),
-                ui.output_ui("dig_trending_chart"),
-                class_="chart-card",
-                style="flex:3;",
-            ),
-            # Right: engagement metrics (2×4 grid)
-            ui.tags.div(
-                ui.tags.span("Engagement & spend", class_="card-heading"),
-                ui.tags.div(
-                    _dig_metric_card("Budget", "budget"),
-                    _dig_metric_card("Cost per Click", "cpc"),
-                    _dig_metric_card("Direct Conversions", "direct_conv"),
-                    _dig_metric_card("Cost per Direct Conv.", "cpdc"),
-                    _dig_metric_card("In-Platform Leads", "ipl"),
-                    _dig_metric_card("Cost per In-Plat. Lead", "cpipl"),
-                    _dig_metric_card("View-through Conv.", "vtc"),
-                    _dig_metric_card("Cost per Total Conv.", "cptc"),
-                    class_="dig-metric-grid",
-                ),
-                class_="chart-card",
-                style="flex:2;",
-            ),
-            class_="main-content-row",
-        ),
-
-        # Strategy section
-        ui.tags.div(
-            ui.tags.div(
-                ui.tags.span("Performance by strategy", class_="card-heading"),
-                ui.output_ui("dig_strategy_bar"),
-                class_="chart-card",
-                style="flex:1;",
-            ),
-            ui.tags.div(
-                ui.tags.span("Strategy trend", class_="card-heading"),
-                ui.output_ui("dig_strategy_trend"),
-                class_="chart-card",
-                style="flex:1;",
-            ),
-            class_="main-content-row",
-        ),
-
-        # Subgroup table
-        ui.tags.h2("Performance by subgroup", class_="section-heading"),
-        ui.tags.div(
-            ui.output_data_frame("dig_subgroup_table"),
-            class_="carnegie-table-card",
-        ),
-
-        # Strategy table
-        ui.tags.h2("Performance by strategy", class_="section-heading"),
-        ui.tags.div(
-            ui.output_data_frame("dig_strategy_table"),
-            class_="carnegie-table-card",
-        ),
-
-        # Interactions by month pivot
-        ui.tags.h2("Interactions by month & year", class_="section-heading"),
-        ui.tags.div(
-            ui.output_data_frame("dig_interactions_by_month"),
-            class_="carnegie-table-card",
-        ),
-
-        # Interactions by strategy & month pivot
-        ui.tags.h2("Interactions by strategy & month", class_="section-heading"),
-        ui.tags.div(
-            ui.output_data_frame("dig_interactions_by_strategy_month"),
-            class_="carnegie-table-card",
-        ),
+        _dig_kpi_card("Key Interactions", "key_interactions", "#EA332D"),
+        _dig_kpi_card("Cost per Interaction", "cpi", "#021326"),
+        _dig_kpi_card("Inquiry Interactions", "inquiry_int", "#C99D44"),
+        _dig_kpi_card("Visit Interactions", "visit_int", "#E8B9A4"),
+        _dig_kpi_card("Apply Interactions", "apply_int", "#8B1A1A"),
+        class_="funnel-strip",
     ),
-)
-
-
-_dig_tab_interactions = ui.nav_panel(
-    "Interactions",
+    # Row A: Trending + Key Interaction Categories
     ui.tags.div(
-        # Tab-specific filters
         ui.tags.div(
-            ui.tags.div(
-                ui.input_selectize(
-                    "dig_interaction_cat", "Interaction Category",
-                    choices=[], multiple=True,
-                ),
-                class_="inline-filter",
-            ),
-            ui.tags.div(
-                ui.input_selectize(
-                    "dig_conversion_name", "Paid Key Interaction",
-                    choices=[], multiple=True,
-                ),
-                class_="inline-filter",
-            ),
-            class_="page-filter-bar",
-            style="flex-wrap:wrap; gap:12px;",
+            ui.tags.span("Trending performance", class_="card-heading"),
+            ui.output_ui("dig_trending_chart"),
+            class_="chart-card",
+            style="flex:3;",
         ),
-
-        # Category KPI cards
         ui.tags.div(
-            _dig_kpi_card("RFI / Lead Gen", "cat_rfi", "#EA332D"),
-            _dig_kpi_card("Visit / Events", "cat_visit", "#021326"),
-            _dig_kpi_card("Apply", "cat_apply", "#C99D44"),
-            _dig_kpi_card("Enroll / Deposit", "cat_enroll", "#E8B9A4"),
-            _dig_kpi_card("Other", "cat_other", "#8B1A1A"),
-            class_="funnel-strip",
+            ui.tags.span("Key Interaction Categories", class_="card-heading"),
+            ui.output_ui("dig_key_interaction_categories"),
+            class_="chart-card",
+            style="flex:2;",
         ),
-
-        # Category trending
-        ui.tags.h2("Key interaction category trending", class_="section-heading"),
+        class_="main-content-row",
+    ),
+    # Row B: Engagement & spend (narrow=42fr) + Cost Per Total Conversion (wide=58fr)
+    ui.tags.div(
         ui.tags.div(
-            ui.output_ui("dig_cat_trend_chart"),
+            ui.tags.span("Engagement & spend", class_="card-heading"),
+            ui.tags.div(
+                _dig_metric_card("Budget", "budget"),
+                _dig_metric_card("Cost per Click", "cpc"),
+                _dig_metric_card("Direct Conversions", "direct_conv"),
+                _dig_metric_card("Cost per Direct Conv.", "cpdc"),
+                _dig_metric_card("In-Platform Leads", "ipl"),
+                _dig_metric_card("Cost per In-Plat. Lead", "cpipl"),
+                _dig_metric_card("View-through Conv.", "vtc"),
+                _dig_metric_card("Cost per Total Conv.", "cptc"),
+                class_="dig-metric-grid",
+            ),
             class_="chart-card",
         ),
-
-        # Category × strategy bar
-        ui.tags.h2("Key interactions by category & strategy", class_="section-heading"),
         ui.tags.div(
-            ui.output_ui("dig_cat_strategy_chart"),
+            ui.tags.span("Cost Per Total Conversion", class_="card-heading"),
+            ui.output_ui("dig_cost_per_total_conv"),
             class_="chart-card",
         ),
-
-        # Tables
-        ui.tags.h2("Breakdown by interaction category & name", class_="section-heading"),
-        ui.tags.div(
-            ui.output_data_frame("dig_interaction_breakdown_table"),
-            class_="carnegie-table-card",
-        ),
-
-        ui.tags.h2("Key interactions by campaign name", class_="section-heading"),
-        ui.tags.div(
-            ui.output_data_frame("dig_interactions_campaign_table"),
-            class_="carnegie-table-card",
-        ),
-
-        ui.tags.h2("Key interactions by month", class_="section-heading"),
-        ui.tags.div(
-            ui.output_data_frame("dig_interactions_month_table"),
-            class_="carnegie-table-card",
-        ),
-
-        ui.tags.h2("Key interactions by campaign & interaction name", class_="section-heading"),
-        ui.tags.div(
-            ui.output_data_frame("dig_interactions_detail_table"),
-            class_="carnegie-table-card",
-        ),
+        class_="main-content-row",
+        style="grid-template-columns: 42fr 58fr;",
     ),
+    # Strategy section
+    ui.tags.div(
+        ui.tags.div(
+            ui.tags.span("Performance by strategy", class_="card-heading"),
+            ui.output_ui("dig_strategy_bar"),
+            class_="chart-card",
+        ),
+        ui.tags.div(
+            ui.tags.span("Strategy trend", class_="card-heading"),
+            ui.output_ui("dig_strategy_trend"),
+            class_="chart-card",
+        ),
+        class_="main-content-row",
+        style="grid-template-columns: 42fr 58fr;",
+    ),
+    ui.tags.h2("Performance by subgroup", class_="section-heading"),
+    ui.tags.div(ui.output_ui("dig_subgroup_table"), class_="carnegie-table-card"),
+    ui.tags.h2("Performance by strategy", class_="section-heading"),
+    ui.tags.div(ui.output_ui("dig_strategy_table"), class_="carnegie-table-card"),
+    ui.tags.h2("Interactions by month & year", class_="section-heading"),
+    ui.tags.div(ui.output_ui("dig_interactions_by_month"), class_="carnegie-table-card"),
+    ui.tags.h2("Interactions by strategy & month", class_="section-heading"),
+    ui.tags.div(ui.output_ui("dig_interactions_by_strategy_month"), class_="carnegie-table-card"),
 )
 
 
-_dig_tab_geography = ui.nav_panel(
-    "Geography",
-    ui.tags.div(
-        ui.tags.div(
-            ui.tags.span("Regional performance", class_="card-heading"),
-            ui.tags.div(
-                ui.input_radio_buttons(
-                    "dig_geo_metric", None,
-                    choices={
-                        "impressions": "Impressions",
-                        "clicks": "Clicks",
-                        "total_conversions": "Total Conversions",
-                    },
-                    selected="impressions",
-                    inline=True,
-                ),
-                class_="pill-toggle",
-            ),
-            class_="card-header-row",
-        ),
-        ui.tags.h2("Region performance", class_="section-heading"),
-        ui.tags.div(
-            ui.output_data_frame("dig_geo_table"),
-            class_="carnegie-table-card",
-        ),
-    ),
-)
-
-
-_dig_tab_creative = ui.nav_panel(
-    "Creative",
-    ui.tags.div(
-        ui.tags.div(
-            ui.input_selectize(
-                "dig_platform_campaign", "Platform Campaign",
-                choices=[], multiple=True,
-            ),
-            class_="page-filter-bar",
-        ),
-        ui.output_ui("dig_creative_sections"),
-    ),
-)
-
-
-_dig_tab_insights = ui.nav_panel(
-    "Insights",
-    ui.tags.div(
-        # Tab-specific filters
-        ui.tags.div(
-            ui.tags.div(
-                ui.input_switch("dig_milestone_only", "Milestones only", value=False),
-                class_="inline-filter",
-            ),
-            ui.tags.div(
-                ui.input_selectize(
-                    "dig_note_type", "Note Type",
-                    choices=["Performance", "Performance with Recommendation",
-                             "Optimization", "Campaign Launch", "Budget", "Key Dates"],
-                    multiple=True,
-                ),
-                class_="inline-filter",
-            ),
-            class_="page-filter-bar",
-            style="flex-wrap:wrap; gap:12px;",
-        ),
-
-        ui.tags.h2("Performance insights & analysis", class_="section-heading"),
-        ui.tags.div(
-            ui.output_data_frame("dig_perf_notes_table"),
-            class_="carnegie-table-card",
-        ),
-
-        ui.tags.h2("Campaign optimization history", class_="section-heading"),
-        ui.tags.div(
-            ui.output_data_frame("dig_optim_table"),
-            class_="carnegie-table-card",
-        ),
-    ),
-)
-
-
-page_digital = ui.nav_panel(
-    "Digital Performance",
-    ui.tags.div(
-        _digital_filters(),
-        ui.navset_pill(
-            _dig_tab_overview,
-            _dig_tab_interactions,
-            _dig_tab_geography,
-            _dig_tab_creative,
-            _dig_tab_insights,
-            id="dig_tabs",
-        ),
+def _dig_page(content_div):
+    """Wrap a digital sub-page: content only (filters are rendered once globally)."""
+    return ui.tags.div(
+        content_div,
         style=_CW,
+    )
+
+
+# ── Overview YoY tab content (mirrors Overview, _yoy output IDs) ──────────
+_dig_overview_yoy_content = ui.tags.div(
+    ui.tags.div(
+        _dig_kpi_card("Key Interactions", "key_interactions_yoy", "#EA332D"),
+        _dig_kpi_card("Cost per Interaction", "cpi_yoy", "#021326"),
+        _dig_kpi_card("Inquiry Interactions", "inquiry_int_yoy", "#C99D44"),
+        _dig_kpi_card("Visit Interactions", "visit_int_yoy", "#E8B9A4"),
+        _dig_kpi_card("Apply Interactions", "apply_int_yoy", "#8B1A1A"),
+        class_="funnel-strip",
+    ),
+    ui.tags.div(
+        ui.tags.div(
+            ui.tags.span("Trending performance (YoY)", class_="card-heading"),
+            ui.output_ui("dig_trending_chart_yoy"),
+            class_="chart-card",
+            style="flex:3;",
+        ),
+        ui.tags.div(
+            ui.tags.span("Engagement & spend", class_="card-heading"),
+            ui.tags.div(
+                _dig_metric_card("Budget", "budget_yoy"),
+                _dig_metric_card("Cost per Click", "cpc_yoy"),
+                _dig_metric_card("Direct Conversions", "direct_conv_yoy"),
+                _dig_metric_card("Cost per Direct Conv.", "cpdc_yoy"),
+                _dig_metric_card("In-Platform Leads", "ipl_yoy"),
+                _dig_metric_card("Cost per In-Plat. Lead", "cpipl_yoy"),
+                _dig_metric_card("View-through Conv.", "vtc_yoy"),
+                _dig_metric_card("Cost per Total Conv.", "cptc_yoy"),
+                class_="dig-metric-grid",
+            ),
+            class_="chart-card",
+            style="flex:2;",
+        ),
+        class_="main-content-row",
+    ),
+    ui.tags.div(
+        ui.tags.div(
+            ui.tags.span("Performance by strategy", class_="card-heading"),
+            ui.output_ui("dig_strategy_bar_yoy"),
+            class_="chart-card",
+            style="flex:1;",
+        ),
+        ui.tags.div(
+            ui.tags.span("Strategy trend", class_="card-heading"),
+            ui.output_ui("dig_strategy_trend_yoy"),
+            class_="chart-card",
+            style="flex:1;",
+        ),
+        class_="main-content-row",
+    ),
+    ui.tags.h2("Performance by subgroup", class_="section-heading"),
+    ui.tags.div(
+        ui.output_ui("dig_subgroup_table_yoy"),
+        class_="carnegie-table-card",
+    ),
+    ui.tags.h2("Performance by strategy", class_="section-heading"),
+    ui.tags.div(
+        ui.output_ui("dig_strategy_table_yoy"),
+        class_="carnegie-table-card",
+    ),
+)
+
+
+page_digital = ui.nav_menu(
+    "Digital Performance",
+
+    ui.nav_panel(
+        "Overview",
+        _dig_page(_dig_overview_content),
+    ),
+
+    ui.nav_panel(
+        "Overview YoY",
+        _dig_page(_dig_overview_yoy_content),
+    ),
+
+    ui.nav_panel(
+        "Interactions",
+        _dig_page(ui.tags.div(
+            ui.tags.div(
+                ui.tags.div(
+                    ui.input_selectize(
+                        "dig_interaction_cat", "Interaction Category",
+                        choices=[], multiple=True,
+                    ),
+                    class_="inline-filter",
+                ),
+                ui.tags.div(
+                    ui.input_selectize(
+                        "dig_conversion_name", "Paid Key Interaction",
+                        choices=[], multiple=True,
+                    ),
+                    class_="inline-filter",
+                ),
+                class_="page-filter-bar",
+                style="flex-wrap:wrap; gap:12px;",
+            ),
+            ui.tags.div(
+                _dig_kpi_card("RFI / Lead Gen", "cat_rfi", "#EA332D"),
+                _dig_kpi_card("Visit / Events", "cat_visit", "#021326"),
+                _dig_kpi_card("Apply", "cat_apply", "#C99D44"),
+                _dig_kpi_card("Enroll / Deposit", "cat_enroll", "#E8B9A4"),
+                _dig_kpi_card("Other", "cat_other", "#8B1A1A"),
+                class_="funnel-strip",
+            ),
+            ui.tags.h2("Key interaction category trending", class_="section-heading"),
+            ui.tags.div(ui.output_ui("dig_cat_trend_chart"), class_="chart-card"),
+            ui.tags.h2("Key interactions by category & strategy", class_="section-heading"),
+            ui.tags.div(ui.output_ui("dig_cat_strategy_chart"), class_="chart-card"),
+            ui.tags.h2("Breakdown by interaction category & name", class_="section-heading"),
+            ui.tags.div(ui.output_ui("dig_interaction_breakdown_table"), class_="carnegie-table-card"),
+            ui.tags.h2("Key interactions by campaign name", class_="section-heading"),
+            ui.tags.div(ui.output_ui("dig_interactions_campaign_table"), class_="carnegie-table-card"),
+            ui.tags.h2("Key interactions by month", class_="section-heading"),
+            ui.tags.div(ui.output_ui("dig_interactions_month_table"), class_="carnegie-table-card"),
+            ui.tags.h2("Key interactions by campaign & interaction name", class_="section-heading"),
+            ui.tags.div(ui.output_ui("dig_interactions_detail_table"), class_="carnegie-table-card"),
+        )),
+    ),
+
+    ui.nav_panel(
+        "Geography",
+        _dig_page(ui.tags.div(
+            ui.tags.div(
+                ui.tags.span("Regional performance", class_="card-heading"),
+                ui.tags.div(
+                    ui.input_radio_buttons(
+                        "dig_geo_metric", None,
+                        choices={
+                            "impressions": "Impressions",
+                            "clicks": "Clicks",
+                            "total_conversions": "Total Conversions",
+                        },
+                        selected="impressions",
+                        inline=True,
+                    ),
+                    class_="pill-toggle",
+                ),
+                class_="card-header-row",
+            ),
+            ui.tags.h2("Region performance", class_="section-heading"),
+            ui.tags.div(ui.output_ui("dig_geo_table"), class_="carnegie-table-card"),
+        )),
+    ),
+
+    ui.nav_panel(
+        "Creative",
+        _dig_page(ui.tags.div(
+            ui.tags.div(
+                ui.input_selectize(
+                    "dig_platform_campaign", "Platform Campaign",
+                    choices=[], multiple=True,
+                ),
+                class_="page-filter-bar",
+            ),
+            ui.output_ui("dig_creative_sections"),
+        )),
+    ),
+
+    ui.nav_panel(
+        "Insights",
+        _dig_page(ui.tags.div(
+            ui.tags.div(
+                ui.tags.div(
+                    ui.input_switch("dig_milestone_only", "Milestones only", value=False),
+                    class_="inline-filter",
+                ),
+                ui.tags.div(
+                    ui.input_selectize(
+                        "dig_note_type", "Note Type",
+                        choices=["Performance", "Performance with Recommendation",
+                                 "Optimization", "Campaign Launch", "Budget", "Key Dates"],
+                        multiple=True,
+                    ),
+                    class_="inline-filter",
+                ),
+                class_="page-filter-bar",
+                style="flex-wrap:wrap; gap:12px;",
+            ),
+            ui.tags.h2("Performance insights & analysis", class_="section-heading"),
+            ui.tags.div(ui.output_ui("dig_perf_notes_table"), class_="carnegie-table-card"),
+            ui.tags.h2("Campaign optimization history", class_="section-heading"),
+            ui.tags.div(ui.output_ui("dig_optim_table"), class_="carnegie-table-card"),
+        )),
     ),
 )
 
@@ -896,15 +935,42 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=16"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=21"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
+            ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(
                 "document.addEventListener('click',function(){"
                 "document.querySelectorAll('.pill-dropdown-menu').forEach(function(m){"
                 "m.style.display='none';});});"
             ),
+            # Show/hide digital filters based on active tab (uses Shiny nav input)
+            ui.tags.script("""
+(function() {
+  var DIG_TABS = ['Overview','Overview YoY','Interactions','Geography','Creative','Insights'];
+  function updateDigFilters(tabVal) {
+    var bar = document.getElementById('dig-global-filters');
+    if (!bar) return;
+    bar.style.display = DIG_TABS.indexOf(tabVal) !== -1 ? '' : 'none';
+  }
+  $(document).on('shiny:inputchanged', function(e) {
+    if (e.name === 'nav') updateDigFilters(e.value);
+  });
+  $(document).on('shiny:connected', function() {
+    try {
+      var val = Shiny.shinyapp.$inputValues ? Shiny.shinyapp.$inputValues['nav'] : '';
+      updateDigFilters(val || '');
+    } catch(err) { updateDigFilters(''); }
+  });
+})();
+"""),
         ),
         _sidebar_overlay(),
+        # Digital filters rendered once globally
+        ui.tags.div(
+            _digital_filters(),
+            id="dig-global-filters",
+            style="display:none;",
+        ),
     ],
 )
 

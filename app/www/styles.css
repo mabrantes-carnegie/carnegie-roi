@@ -118,6 +118,47 @@ nav.navbar .navbar-nav {
     background: transparent !important;
 }
 
+/* Digital Performance dropdown menu */
+.navbar-nav .dropdown-menu {
+    background: #ffffff !important;
+    border: 1px solid rgba(2,19,38,0.12) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 32px rgba(2,19,38,0.13) !important;
+    padding: 6px !important;
+    min-width: 200px !important;
+    margin-top: 4px !important;
+}
+
+.navbar-nav .dropdown-menu .dropdown-item {
+    font-family: 'Manrope', sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+    color: #021326 !important;
+    padding: 9px 16px !important;
+    border-radius: 8px !important;
+    transition: background 0.12s, color 0.12s !important;
+    background: transparent !important;
+}
+
+.navbar-nav .dropdown-menu .dropdown-item:hover,
+.navbar-nav .dropdown-menu .dropdown-item:focus {
+    background: #F8F4F0 !important;
+    color: #EA332D !important;
+}
+
+.navbar-nav .dropdown-menu .dropdown-item.active,
+.navbar-nav .dropdown-menu .dropdown-item:active {
+    background: #F8F4F0 !important;
+    color: #EA332D !important;
+}
+
+.navbar-nav .dropdown-toggle::after {
+    margin-left: 5px !important;
+    vertical-align: 0.15em !important;
+}
+
 .navbar-title-text {
     font-family: 'Lora', Georgia, serif !important;
     font-size: 20px !important;
@@ -468,6 +509,19 @@ body > div.container-fluid {
     flex: 0 1 auto;
 }
 
+.dig-metric-badge {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.secondary-value-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 .secondary-label {
     font-size: 12px;
     font-weight: 600;
@@ -705,6 +759,101 @@ body > div.container-fluid {
 }
 
 /* ════════════════════════════════════════════
+   iOS-STYLE MONTH PICKER
+   ════════════════════════════════════════════ */
+
+.ios-month-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ios-month-label {
+    font-family: 'Manrope', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--carnegie-gray-text);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-left: 2px;
+}
+
+.ios-month-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ios-month-sep {
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    color: var(--carnegie-gray-text);
+    line-height: 1;
+    margin-top: 1px;
+}
+
+.ios-month-wrap {
+    position: relative;
+}
+
+.ios-month-wrap::before,
+.ios-month-wrap::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    height: 28%;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.ios-month-wrap::before {
+    top: 0;
+    background: linear-gradient(to bottom, rgba(248,244,240,0.85) 0%, transparent 100%);
+    border-radius: 12px 12px 0 0;
+}
+
+.ios-month-wrap::after {
+    bottom: 0;
+    background: linear-gradient(to top, rgba(248,244,240,0.85) 0%, transparent 100%);
+    border-radius: 0 0 12px 12px;
+}
+
+.ios-month-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--carnegie-white);
+    border: 1.5px solid var(--carnegie-gray-border);
+    border-radius: 12px;
+    padding: 7px 28px 7px 14px;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--carnegie-navy);
+    cursor: pointer;
+    outline: none;
+    box-shadow: 0 2px 8px rgba(2,19,38,0.07), inset 0 1px 2px rgba(255,255,255,0.9);
+    min-width: 128px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+}
+
+.ios-month-select:focus {
+    border-color: var(--carnegie-navy);
+    box-shadow: 0 0 0 3px rgba(2,19,38,0.10), 0 2px 8px rgba(2,19,38,0.07);
+}
+
+.ios-month-select option {
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--carnegie-navy);
+    background: var(--carnegie-white);
+    padding: 6px 14px;
+}
+
+/* ════════════════════════════════════════════
    ATTENTION CARD
    ════════════════════════════════════════════ */
 
@@ -807,6 +956,21 @@ body > div.container-fluid {
     padding: 20px;
     margin-bottom: 20px;
     overflow-x: auto;
+}
+
+/* Sortable table column indicators */
+table.sortable-table thead th:hover {
+    color: #021326;
+}
+table.sortable-table thead th[data-sort="asc"]::after {
+    content: " ▲";
+    font-size: 9px;
+    opacity: 0.7;
+}
+table.sortable-table thead th[data-sort="desc"]::after {
+    content: " ▼";
+    font-size: 9px;
+    opacity: 0.7;
 }
 
 .shiny-data-grid {
@@ -1279,4 +1443,16 @@ body > div.container-fluid {
     padding-top: 8px;
     border-top: 1px solid var(--carnegie-gray-border);
     flex-wrap: wrap;
+}
+
+/* Digital global filter bar — rendered once, shown only on Digital tabs */
+#dig-global-filters {
+    width: 100%;
+    background: var(--carnegie-off-white);
+    border-bottom: 1px solid var(--carnegie-gray-border);
+    padding-left: clamp(3rem, 2.286rem + 1.905vw, 4rem);
+    padding-right: clamp(3rem, 2.286rem + 1.905vw, 4rem);
+    padding-top: 12px;
+    padding-bottom: 4px;
+    box-sizing: border-box;
 }
