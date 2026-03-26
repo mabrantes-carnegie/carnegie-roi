@@ -666,145 +666,135 @@ def server_logic(input, output, session):
         vals = [kpis.get(k, 0) for _, k in stages]
         max_val = max(v for v in vals if v > 0) or 1
 
-        # SVG dimensions
-        W = 260
-        STEP_H = 44        # height of each trapezoid block
-        GAP_H = 18         # height of connector gap between blocks
-        TOTAL_H = n * STEP_H + (n - 1) * GAP_H + 4
-        MIN_W_PCT = 0.28   # narrowest block as fraction of W
+        # SVG layout
+        # Left area: funnel trapezoids
+        # Right margin: conversion rate pills (outside the funnel)
+        FUNNEL_W = 200      # width of funnel area
+        RIGHT_MARGIN = 80   # space for pills on right
+        W = FUNNEL_W + RIGHT_MARGIN
+        STEP_H = 46
+        GAP_H = 0           # no gap — continuous funnel, pills float on border
+        TOTAL_H = n * STEP_H + 2
+        MIN_W_PCT = 0.30
         MAX_W_PCT = 1.0
 
-        # Color palette: Carnegie Red gradient light → dark
         colors = [
-            "#F4A09B", "#EF7A74", "#EA554E",
-            "#D93C36", "#C42E28", "#A82420",
+            "#F0908A", "#E86E67", "#E04D46",
+            "#CE3830", "#B82D27", "#9E231E",
         ]
+
+        # Pre-compute widths
+        ratios = [(v / max_val) ** 0.55 for v in vals]
+        widths = [MIN_W_PCT + r * (MAX_W_PCT - MIN_W_PCT) for r in ratios]
 
         svg_parts = [
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {TOTAL_H}" '
-            f'width="100%" style="display:block;max-width:{W}px;margin:0 auto;">'
+            f'width="100%" style="display:block;margin:0 auto;">'
         ]
-
-        # Drop shadow filter
         svg_parts.append(
             '<defs>'
-            '<filter id="fgshadow" x="-10%" y="-10%" width="120%" height="130%">'
-            '<feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000018"/>'
+            '<filter id="fgs" x="-5%" y="-5%" width="115%" height="120%">'
+            '<feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#00000020"/>'
             '</filter>'
             '</defs>'
         )
 
         for i, (label, key) in enumerate(stages):
             val = vals[i]
-            ratio = (val / max_val) ** 0.55  # power scale so small stages still visible
-            w_pct = MIN_W_PCT + ratio * (MAX_W_PCT - MIN_W_PCT)
+            top_w = widths[i] * FUNNEL_W
+            bot_w = widths[i + 1] * FUNNEL_W if i < n - 1 else top_w * 0.85
+            top_x = (FUNNEL_W - top_w) / 2
+            bot_x = (FUNNEL_W - bot_w) / 2
+            y = i * STEP_H
 
-            # Next stage width for bottom edge of trapezoid
-            if i < n - 1:
-                next_val = vals[i + 1]
-                next_ratio = (next_val / max_val) ** 0.55
-                next_w_pct = MIN_W_PCT + next_ratio * (MAX_W_PCT - MIN_W_PCT)
-            else:
-                next_w_pct = w_pct * 0.88  # last stage tapers slightly
-
-            top_w = w_pct * W
-            bot_w = next_w_pct * W
-            top_x = (W - top_w) / 2
-            bot_x = (W - bot_w) / 2
-            y = i * (STEP_H + GAP_H)
-
-            # Trapezoid points
-            pts = f"{top_x},{y} {top_x+top_w},{y} {bot_x+bot_w},{y+STEP_H} {bot_x},{y+STEP_H}"
-            color = colors[i]
+            pts = f"{top_x:.1f},{y} {top_x+top_w:.1f},{y} {bot_x+bot_w:.1f},{y+STEP_H} {bot_x:.1f},{y+STEP_H}"
 
             svg_parts.append(
-                f'<polygon points="{pts}" fill="{color}" rx="4" filter="url(#fgshadow)"/>'
+                f'<polygon points="{pts}" fill="{colors[i]}" filter="url(#fgs)"/>'
             )
 
-            # Label (left-aligned inside block)
-            text_y = y + STEP_H / 2
-            label_x = top_x + 12
-            val_x = top_x + top_w - 12
+            # Label: small uppercase, top portion of block
+            label_y = y + STEP_H * 0.36
+            val_y   = y + STEP_H * 0.72
+            cx_block = FUNNEL_W / 2
 
             svg_parts.append(
-                f'<text x="{label_x:.1f}" y="{text_y:.1f}" '
-                f'dominant-baseline="middle" text-anchor="start" '
-                f'font-family="Manrope,sans-serif" font-size="11" font-weight="600" '
-                f'fill="rgba(255,255,255,0.92)" letter-spacing="0.03em">'
-                f'{label}</text>'
+                f'<text x="{cx_block:.1f}" y="{label_y:.1f}" '
+                f'dominant-baseline="middle" text-anchor="middle" '
+                f'font-family="Manrope,sans-serif" font-size="9.5" font-weight="600" '
+                f'fill="rgba(255,255,255,0.80)" letter-spacing="0.06em">'
+                f'{label.upper()}</text>'
             )
             svg_parts.append(
-                f'<text x="{val_x:.1f}" y="{text_y:.1f}" '
-                f'dominant-baseline="middle" text-anchor="end" '
-                f'font-family="Manrope,sans-serif" font-size="13" font-weight="700" '
+                f'<text x="{cx_block:.1f}" y="{val_y:.1f}" '
+                f'dominant-baseline="middle" text-anchor="middle" '
+                f'font-family="Manrope,sans-serif" font-size="15" font-weight="700" '
                 f'fill="#ffffff">'
                 f'{fmt_number(val)}</text>'
             )
 
-            # Connector with conversion rate
+            # Melt Rate inline — to the right of last block
+            if i == n - 1:
+                deposits = kpis.get("total_deposits", 0)
+                net_deposits = kpis.get("total_net_deposits", 0)
+                if deposits > 0:
+                    melt = (1 - net_deposits / deposits) * 100
+                    melt_color = "#22A06B" if melt < 3 else "#C99D44" if melt <= 5 else "#EA332D"
+                    pill_x = FUNNEL_W + 6
+                    pill_y = y + STEP_H / 2
+                    svg_parts.append(
+                        f'<text x="{pill_x}" y="{pill_y - 7:.1f}" '
+                        f'dominant-baseline="middle" text-anchor="start" '
+                        f'font-family="Manrope,sans-serif" font-size="9" font-weight="600" '
+                        f'fill="#9B9893">Melt</text>'
+                    )
+                    svg_parts.append(
+                        f'<text x="{pill_x}" y="{pill_y + 7:.1f}" '
+                        f'dominant-baseline="middle" text-anchor="start" '
+                        f'font-family="Manrope,sans-serif" font-size="12" font-weight="700" '
+                        f'fill="{melt_color}">{melt:.1f}%</text>'
+                    )
+
+            # Conversion rate pill — on right edge, centred on the border between blocks
             if i < n - 1:
                 curr_rate = (vals[i + 1] / val * 100) if val > 0 else None
                 prior_val = prior.get(key, 0)
                 prior_rate = (prior.get(stages[i + 1][1], 0) / prior_val * 100) if prior_val > 0 else None
 
-                conn_y_top = y + STEP_H
-                conn_y_bot = conn_y_top + GAP_H
-                conn_mid_y = conn_y_top + GAP_H / 2
-
-                # Thin connector line
-                cx = W / 2
-                svg_parts.append(
-                    f'<line x1="{cx}" y1="{conn_y_top}" x2="{cx}" y2="{conn_y_bot}" '
-                    f'stroke="#D0CBC5" stroke-width="1" stroke-dasharray="2,2"/>'
-                )
+                border_y = y + STEP_H  # exact border between block i and i+1
+                # Right edge of block i at its bottom
+                right_edge = bot_x + bot_w
 
                 if curr_rate is not None:
                     if prior_rate is None:
-                        rate_color = "#9B9893"
+                        rc = "#9B9893"
                     elif curr_rate >= prior_rate:
-                        rate_color = "#22A06B"
+                        rc = "#22A06B"
                     elif curr_rate >= prior_rate - 5:
-                        rate_color = "#C99D44"
+                        rc = "#C99D44"
                     else:
-                        rate_color = "#EA332D"
+                        rc = "#EA332D"
 
                     rate_text = f"{curr_rate:.1f}%"
-                    # Pill background
-                    pill_w = 46
-                    pill_h = 14
+                    pill_w = 52
+                    pill_h = 18
+                    px = right_edge + 6
+                    py = border_y
+
                     svg_parts.append(
-                        f'<rect x="{cx - pill_w/2:.1f}" y="{conn_mid_y - pill_h/2:.1f}" '
-                        f'width="{pill_w}" height="{pill_h}" rx="7" '
-                        f'fill="white" stroke="{rate_color}" stroke-width="1"/>'
+                        f'<rect x="{px:.1f}" y="{py - pill_h/2:.1f}" '
+                        f'width="{pill_w}" height="{pill_h}" rx="9" '
+                        f'fill="white" stroke="{rc}" stroke-width="1.2"/>'
                     )
                     svg_parts.append(
-                        f'<text x="{cx}" y="{conn_mid_y:.1f}" '
+                        f'<text x="{px + pill_w/2:.1f}" y="{py:.1f}" '
                         f'dominant-baseline="middle" text-anchor="middle" '
-                        f'font-family="Manrope,sans-serif" font-size="9" font-weight="700" '
-                        f'fill="{rate_color}">{rate_text}</text>'
+                        f'font-family="Manrope,sans-serif" font-size="11" font-weight="700" '
+                        f'fill="{rc}">{rate_text}</text>'
                     )
 
         svg_parts.append('</svg>')
-        svg_html = "".join(svg_parts)
-
-        # Melt rate footer
-        deposits = kpis.get("total_deposits", 0)
-        net_deposits = kpis.get("total_net_deposits", 0)
-        if deposits > 0:
-            melt = (1 - net_deposits / deposits) * 100
-            melt_cls = "fg-melt--good" if melt < 3 else "fg-melt--warn" if melt <= 5 else "fg-melt--bad"
-            melt_el = ui.tags.div(
-                ui.tags.span(f"Melt Rate: {melt:.1f}%", class_=f"fg-melt-value {melt_cls}"),
-                class_="fg-melt",
-            )
-        else:
-            melt_el = ui.tags.div()
-
-        return ui.tags.div(
-            ui.HTML(svg_html),
-            melt_el,
-            class_="fg-panel",
-        )
+        return ui.tags.div(ui.HTML("".join(svg_parts)), class_="fg-panel")
 
     # --- Goal context text (shown below YoY badge on each KPI card) ---
 
