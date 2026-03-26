@@ -751,14 +751,20 @@ def server_logic(input, output, session):
             # vs PY delta — for melt rate, lower is better → invert sentiment
             if prior_deps > 0:
                 prior_melt = (1 - prior_net / prior_deps) * 100
-                diff = melt - prior_melt
-                sign = "+" if diff > 0 else ""
-                yoy_text = f"vs. PY {sign}{diff:.1f}pp"
-                # higher melt = worse → positive diff is negative sentiment
-                sentiment = "negative" if diff > 0 else "positive" if diff < 0 else "neutral"
+                diff = round(melt - prior_melt)
+                # higher melt = worse → up arrow is negative sentiment
+                if diff > 0:
+                    yoy_text = f"\u25b2 {diff}pp vs. PY"
+                    sentiment = "negative"
+                elif diff < 0:
+                    yoy_text = f"\u25bc {abs(diff)}pp vs. PY"
+                    sentiment = "positive"
+                else:
+                    yoy_text = "0pp vs. PY"
+                    sentiment = "neutral"
                 yoy_el = ui.tags.span(yoy_text, class_=f"kpi-badge kpi-badge--{sentiment}")
             else:
-                yoy_el = ui.tags.span("vs. PY N/A", class_="kpi-badge kpi-badge--na")
+                yoy_el = ui.tags.span("N/A", class_="kpi-badge kpi-badge--na")
 
             return ui.tags.div(
                 ui.tags.div("Melt Rate", class_="secondary-label"),
