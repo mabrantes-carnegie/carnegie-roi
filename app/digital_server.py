@@ -1758,7 +1758,7 @@ def digital_server(input, output, session):
         heatmap_cols = [c for c in wide.columns if c not in ["Strategy", "Campaign Name"]]
         for c in heatmap_cols:
             wide[c] = wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
-        return _heatmap_table(wide, heatmap_cols)
+        return _heatmap_table(wide, heatmap_cols, paginated=True)
 
     # --- Interactions by month pivot ---
 
@@ -1815,7 +1815,7 @@ def digital_server(input, output, session):
             wide[c] = wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
 
         col_order = ["Category", "Conversion Name"] + display_month_cols + ["Grand Total"]
-        return _heatmap_table(wide[[c for c in col_order if c in wide.columns]], heatmap_cols)
+        return _heatmap_table(wide[[c for c in col_order if c in wide.columns]], heatmap_cols, paginated=True)
 
     # --- Interactions detail table ---
 
@@ -1838,7 +1838,7 @@ def digital_server(input, output, session):
         heatmap_cols = ["Total Conv.", "Direct Conv.", "View-through Conv."]
         for c in heatmap_cols:
             agg[c] = agg[c].apply(lambda v: f"{round(v):,}")
-        return _heatmap_table(agg, heatmap_cols)
+        return _heatmap_table(agg, heatmap_cols, paginated=True)
 
     # ══════════════════════════════════════════════════════════
     # TAB 3: GEOGRAPHY
@@ -2300,7 +2300,7 @@ def _df_to_html(df, title):
         <h3 style="font-family:Manrope,sans-serif; font-size:14px; font-weight:600;
                     color:#021326; margin:0 0 12px 0;">{title}</h3>
         <div style="overflow-x:auto;">
-            <table class="creative-table" style="width:100%; border-collapse:collapse;
+            <table class="creative-table sortable-table paginated-table" style="width:100%; border-collapse:collapse;
                    font-family:Manrope,sans-serif; font-size:12px;">
                 <thead><tr style="border-bottom:2px solid #e5e1dc;">{headers}</tr></thead>
                 <tbody>{rows_html}</tbody>

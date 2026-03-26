@@ -1466,7 +1466,7 @@ def server_logic(input, output, session):
             "Enrolled", "% Enrolled", "Inq→Enroll Rate",
             "Deposits", "Net Deposits",
         ]
-        return _plain_table(display[cols])
+        return _plain_table(display[cols], paginated=True)
 
     # --- Geography Map + Top States (Q6 state data) ---
 
