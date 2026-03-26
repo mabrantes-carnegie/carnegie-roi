@@ -312,6 +312,21 @@ def server_logic(input, output, session):
         badge_class = f"kpi-badge kpi-badge--{sentiment}"
         return ui.tags.span(text, class_=badge_class)
 
+    def _yoy_badge_pp(key: str):
+        """YoY badge for percentage-point metrics (absolute diff, not relative %)."""
+        curr = current_kpis().get(key)
+        prior = prior_kpis().get(key)
+        if curr is None or prior is None:
+            return ui.tags.span("N/A", class_="kpi-badge kpi-badge--na")
+        diff = round(curr - prior)
+        if diff > 0:
+            text, sentiment = f"\u25b2 {diff}pp vs. PY", "positive"
+        elif diff < 0:
+            text, sentiment = f"\u25bc {abs(diff)}pp vs. PY", "negative"
+        else:
+            text, sentiment = "0pp vs. PY", "neutral"
+        return ui.tags.span(text, class_=f"kpi-badge kpi-badge--{sentiment}")
+
     @render.ui
     def yoy_total_inquiries():
         return _yoy_badge("total_inquiries")
@@ -338,11 +353,11 @@ def server_logic(input, output, session):
 
     @render.ui
     def yoy_admitted_rate():
-        return _yoy_badge("admitted_rate")
+        return _yoy_badge_pp("admitted_rate")
 
     @render.ui
     def yoy_yield_rate():
-        return _yoy_badge("yield_rate")
+        return _yoy_badge_pp("yield_rate")
 
     @render.ui
     def yoy_total_enrolled():
