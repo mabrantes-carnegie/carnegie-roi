@@ -1195,22 +1195,46 @@ def digital_server(input, output, session):
 
     @render.ui
     def dig_interactions_by_month():
-        df = _dig_q8()
+        # Apply only non-date filters so all years/months are always visible
+        df = Q8.copy()
+        grp = input.dig_group()
+        if grp and len(grp) > 0:
+            df = df[df["group_name"].isin(grp)]
+        sub = input.dig_subgroup()
+        if sub and len(sub) > 0:
+            df = df[df["subgroup_name"].isin(sub)]
+        prod = input.dig_product()
+        if prod and len(prod) > 0:
+            df = df[df["product_name"].isin(prod)]
+        camp = input.dig_campaign()
+        if camp and len(camp) > 0:
+            df = df[df["campaign_name"].isin(camp)]
+
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
         df = df.copy()
         df["year"] = df["day"].dt.year
         df["month_name"] = df["day"].dt.strftime("%b")
+
+        # Keep only the last 3 years available in the data
+        all_years = sorted(df["year"].unique())
+        years_to_show = all_years[-3:]
+        df = df[df["year"].isin(years_to_show)]
+
         pivot = df.groupby(["year", "month_name"])["total_interactions"].sum().reset_index()
         pivot_wide = pivot.pivot(index="year", columns="month_name", values="total_interactions").fillna(0)
+
+        # Always show all 12 months as columns, even if no data
         month_order = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        cols = [m for m in month_order if m in pivot_wide.columns]
-        pivot_wide = pivot_wide[cols]
+        for m in month_order:
+            if m not in pivot_wide.columns:
+                pivot_wide[m] = 0
+        pivot_wide = pivot_wide[month_order]
         pivot_wide["Grand Total"] = pivot_wide.sum(axis=1)
         pivot_wide = pivot_wide.reset_index().rename(columns={"year": "Year"})
-        heatmap_cols = cols + ["Grand Total"]
+        heatmap_cols = month_order + ["Grand Total"]
         for c in heatmap_cols:
             pivot_wide[c] = pivot_wide[c].apply(lambda v: f"{round(v):,}")
         return _heatmap_table(pivot_wide, heatmap_cols)
