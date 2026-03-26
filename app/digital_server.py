@@ -1341,13 +1341,13 @@ def digital_server(input, output, session):
         display = curr.sort_values("impressions", ascending=False).rename(columns={
             "subgroup_name": "Subgroup", "impressions": "Impressions",
             "clicks": "Clicks", "CTR": "CTR %",
-            "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
+            "direct_conversions": "Direct Key Int.", "view_through_conversions": "View-Through Int.",
             "in_platform_leads": "In-Platform Leads", "total_interactions": "Total Interactions",
         })
-        heatmap_cols = ["Impressions", "Clicks", "CTR %", "Direct Conv.",
-                        "View-through", "In-Platform Leads", "Total Interactions"]
-        show = ["Subgroup", "Impressions", "Clicks", "CTR %", "Direct Conv.",
-                "View-through", "In-Platform Leads", "Total Interactions"]
+        heatmap_cols = ["Impressions", "Clicks", "CTR %", "Direct Key Int.",
+                        "View-Through Int.", "In-Platform Leads", "Total Interactions"]
+        show = ["Subgroup", "Impressions", "Clicks", "CTR %", "Direct Key Int.",
+                "View-Through Int.", "In-Platform Leads", "Total Interactions"]
         return _heatmap_table(display[[c for c in show if c in display.columns]], heatmap_cols)
 
     # --- Strategy performance table ---
@@ -1367,13 +1367,13 @@ def digital_server(input, output, session):
         display = curr.sort_values("impressions", ascending=False).rename(columns={
             "product_name": "Strategy", "impressions": "Impressions",
             "clicks": "Clicks", "CTR": "CTR %",
-            "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
+            "direct_conversions": "Direct Key Int.", "view_through_conversions": "View-Through Int.",
             "in_platform_leads": "In-Platform Leads", "total_interactions": "Total Interactions",
         })
-        heatmap_cols = ["Impressions", "Clicks", "CTR %", "Direct Conv.",
-                        "View-through", "In-Platform Leads", "Total Interactions"]
-        show = ["Strategy", "Impressions", "Clicks", "CTR %", "Direct Conv.",
-                "View-through", "In-Platform Leads", "Total Interactions"]
+        heatmap_cols = ["Impressions", "Clicks", "CTR %", "Direct Key Int.",
+                        "View-Through Int.", "In-Platform Leads", "Total Interactions"]
+        show = ["Strategy", "Impressions", "Clicks", "CTR %", "Direct Key Int.",
+                "View-Through Int.", "In-Platform Leads", "Total Interactions"]
         return _heatmap_table(display[[c for c in show if c in display.columns]], heatmap_cols)
 
     # --- Interactions by month & year ---
@@ -1833,9 +1833,9 @@ def digital_server(input, output, session):
         agg = agg.rename(columns={
             "interaction_category": "Category", "conversion_name": "Conversion Name",
             "product_name": "Strategy", "campaign_name": "Campaign Name",
-            "total": "Total Conv.", "direct": "Direct Conv.", "vt": "View-through Conv.",
+            "total": "Total Key Int.", "direct": "Direct Key Int.", "vt": "View-Through Int.",
         })
-        heatmap_cols = ["Total Conv.", "Direct Conv.", "View-through Conv."]
+        heatmap_cols = ["Total Key Int.", "Direct Key Int.", "View-Through Int."]
         for c in heatmap_cols:
             agg[c] = agg[c].apply(lambda v: f"{round(v):,}")
         return _heatmap_table(agg, heatmap_cols, paginated=True)
@@ -1869,7 +1869,7 @@ def digital_server(input, output, session):
     _DIG_GEO_METRIC_SHORT = {
         "impressions": "Impressions",
         "clicks": "Clicks",
-        "total_conversions": "Total Conv.",
+        "total_conversions": "Total Key Int.",
     }
 
     _DIG_SMALL_STATES = {"CT", "DE", "DC", "MA", "MD", "NH", "NJ", "RI", "VT"}
@@ -2019,11 +2019,11 @@ def digital_server(input, output, session):
             agg[c] = agg[c].round(0).astype(int)
         agg = agg.rename(columns={
             "region": "Region", "impressions": "Impressions", "clicks": "Clicks",
-            "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
+            "direct_conversions": "Direct Key Int.", "view_through_conversions": "View-Through Int.",
             "total_conversions": "Total Conversions",
         })
-        show = ["Region", "Impressions", "Clicks", "CTR", "Direct Conv.",
-                "View-through", "Total Conversions"]
+        show = ["Region", "Impressions", "Clicks", "CTR", "Direct Key Int.",
+                "View-Through Int.", "Total Conversions"]
         display = agg[[c for c in show if c in agg.columns]]
         heatmap_cols = [c for c in display.columns if c != "Region"]
         return _heatmap_table(display, heatmap_cols, paginated=True)
@@ -2058,37 +2058,37 @@ def digital_server(input, output, session):
               "direct_conversions", "view_through_conversions", "total_conversions"],
              {"campaign_name": "Campaign", "ad_group": "Ad Group", "creative": "Creative",
               "ad_url": "Landing Page", "impressions": "Impressions", "clicks": "Clicks",
-              "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
-              "total_conversions": "Total Conv."}),
+              "direct_conversions": "Direct Key Int.", "view_through_conversions": "View-Through Int.",
+              "total_conversions": "Total Key Int."}),
             ("Meta", lambda p: p == "Meta",
              ["campaign_name", "creative", "ad_description", "image_url", "ad_url",
               "impressions", "clicks", "direct_conversions", "view_through_conversions",
               "in_platform_leads", "total_conversions"],
              {"campaign_name": "Campaign", "creative": "Ad Name", "ad_description": "Description",
               "image_url": "Image", "ad_url": "Landing Page", "impressions": "Impressions",
-              "clicks": "Clicks", "direct_conversions": "Direct Conv.",
-              "view_through_conversions": "View-through", "in_platform_leads": "In-Platform Leads",
-              "total_conversions": "Total Conv."}),
+              "clicks": "Clicks", "direct_conversions": "Direct Key Int.",
+              "view_through_conversions": "View-Through Int.", "in_platform_leads": "In-Platform Leads",
+              "total_conversions": "Total Key Int."}),
             ("YouTube", lambda p: p == "YouTube",
              ["campaign_name", "ad_description", "ad_url", "impressions", "clicks",
               "direct_conversions", "view_through_conversions", "total_conversions",
               "video_starts", "video_completions"],
              {"campaign_name": "Campaign", "ad_description": "Description",
               "ad_url": "Landing Page", "impressions": "Impressions", "clicks": "Clicks",
-              "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
-              "total_conversions": "Total Conv.", "video_starts": "Video Starts",
+              "direct_conversions": "Direct Key Int.", "view_through_conversions": "View-Through Int.",
+              "total_conversions": "Total Key Int.", "video_starts": "Video Starts",
               "video_completions": "Video Completions"}),
             ("Snapchat", lambda p: "Snapchat" in p,
              ["campaign_name", "ad_description", "ad_url", "impressions", "clicks", "total_conversions"],
              {"campaign_name": "Campaign", "ad_description": "Description",
               "ad_url": "Landing Page", "impressions": "Impressions",
-              "clicks": "Clicks (Swipe Ups)", "total_conversions": "Total Conv."}),
+              "clicks": "Clicks (Swipe Ups)", "total_conversions": "Total Key Int."}),
             ("TikTok", lambda p: p == "TikTok",
              ["campaign_name", "ad_description", "ad_url", "impressions", "clicks",
               "total_conversions", "followers", "likes", "shares", "comments"],
              {"campaign_name": "Campaign", "ad_description": "Description",
               "ad_url": "Landing Page", "impressions": "Impressions", "clicks": "Clicks",
-              "total_conversions": "Total Conv.", "followers": "Followers",
+              "total_conversions": "Total Key Int.", "followers": "Followers",
               "likes": "Likes", "shares": "Shares", "comments": "Comments"}),
             ("Spotify", lambda p: p == "Spotify",
              ["campaign_name", "ad_description", "ad_url", "impressions", "clicks"],
@@ -2098,23 +2098,23 @@ def digital_server(input, output, session):
              ["campaign_name", "ad_description", "ad_url", "impressions", "clicks", "total_conversions"],
              {"campaign_name": "Campaign", "ad_description": "Description",
               "ad_url": "Landing Page", "impressions": "Impressions", "clicks": "Clicks",
-              "total_conversions": "Total Conv."}),
+              "total_conversions": "Total Key Int."}),
             ("IP Targeting", lambda p: "IP" in p,
              ["campaign_name", "creative", "ad_url", "impressions", "clicks",
               "direct_conversions", "view_through_conversions", "total_conversions"],
              {"campaign_name": "Campaign", "creative": "Creative",
               "ad_url": "Landing Page", "impressions": "Impressions", "clicks": "Clicks",
-              "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
-              "total_conversions": "Total Conv."}),
+              "direct_conversions": "Direct Key Int.", "view_through_conversions": "View-Through Int.",
+              "total_conversions": "Total Key Int."}),
             ("LinkedIn", lambda p: "LinkedIn" in p,
              ["campaign_name", "ad_description", "image_url", "ad_url",
               "impressions", "clicks", "direct_conversions", "view_through_conversions",
               "in_platform_leads", "total_conversions"],
              {"campaign_name": "Campaign", "ad_description": "Description",
               "image_url": "Image", "ad_url": "Landing Page", "impressions": "Impressions",
-              "clicks": "Clicks", "direct_conversions": "Direct Conv.",
-              "view_through_conversions": "View-through", "in_platform_leads": "In-Platform Leads",
-              "total_conversions": "Total Conv."}),
+              "clicks": "Clicks", "direct_conversions": "Direct Key Int.",
+              "view_through_conversions": "View-Through Int.", "in_platform_leads": "In-Platform Leads",
+              "total_conversions": "Total Key Int."}),
         ]
 
         for title, filter_fn, cols, renames in _PLATFORM_CONFIGS:
@@ -2154,11 +2154,11 @@ def digital_server(input, output, session):
             display = kw_agg.rename(columns={
                 "campaign_name": "Campaign", "keyword": "Keyword", "match_type": "Match Type",
                 "impressions": "Impressions", "clicks": "Clicks",
-                "direct_conversions": "Direct Conv.", "CTR": "CTR %", "CPC": "CPC",
+                "direct_conversions": "Direct Key Int.", "CTR": "CTR %", "CPC": "CPC",
                 "Cost/Conv.": "Cost/Conv.",
             })
             show = ["Campaign", "Keyword", "Match Type", "Impressions", "Clicks",
-                    "CTR %", "CPC", "Direct Conv.", "Cost/Conv."]
+                    "CTR %", "CPC", "Direct Key Int.", "Cost/Conv."]
             html = _df_to_html(display[[c for c in show if c in display.columns]], "PPC Keyword Performance")
             sections.append(html)
 
@@ -2232,7 +2232,7 @@ def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str) -> "
     ]
     col_labels = [
         "Impressions", "Clicks", "CTR",
-        "Direct Conversion", "View-through Conv.", "In-Platform Leads",
+        "Direct Key Interaction", "View-Through Int.", "In-Platform Leads",
         "Total Conversions", "Conversion Rate",
     ]
 
@@ -2277,8 +2277,8 @@ def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str) -> "
             "Clicks":              (_fmt_int(r["clicks"]),              _pct_change(r["clicks"], p.get("clicks", 0)) if p else "N/A"),
             "CTR":                 (_fmt_pct(ctr_curr * 100 if ctr_curr is not None else None),
                                     _pct_change(ctr_curr, ctr_prev) if (ctr_curr is not None and ctr_prev is not None) else "N/A"),
-            "Direct Conversion":   (_fmt_int(r["direct_conversions"]),  _pct_change(r["direct_conversions"], p.get("direct_conversions", 0)) if p else "N/A"),
-            "View-through Conv.":  (_fmt_int(r["view_through_conversions"]), _pct_change(r["view_through_conversions"], p.get("view_through_conversions", 0)) if p else "N/A"),
+            "Direct Key Interaction":   (_fmt_int(r["direct_conversions"]),  _pct_change(r["direct_conversions"], p.get("direct_conversions", 0)) if p else "N/A"),
+            "View-Through Int.":  (_fmt_int(r["view_through_conversions"]), _pct_change(r["view_through_conversions"], p.get("view_through_conversions", 0)) if p else "N/A"),
             "In-Platform Leads":   (_fmt_int(r["in_platform_leads"]),   _pct_change(r["in_platform_leads"], p.get("in_platform_leads", 0)) if p else "N/A"),
             "Total Conversions":   (_fmt_int(r["total_interactions"]),  _pct_change(r["total_interactions"], p.get("total_interactions", 0)) if p else "N/A"),
             "Conversion Rate":     (_fmt_pct(conv_rate_curr * 100 if conv_rate_curr is not None else None),
