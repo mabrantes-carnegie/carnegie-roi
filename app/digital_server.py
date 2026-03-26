@@ -121,6 +121,23 @@ def _yoy_delta_table(
             f'{sign}{num:.1f}%</span>'
         )
 
+    # Pre-compute per-column min/max for heatmap scaling (value cells only)
+    hr, hg, hb = _hex_to_rgb(_HEATMAP_COLOR)
+
+    def _to_num(v):
+        if isinstance(v, (int, float)):
+            return float(v)
+        try:
+            return float(str(v).replace(",", "").replace("%", "").strip())
+        except Exception:
+            return None
+
+    col_ranges = {}
+    for col in metric_cols:
+        nums = [_to_num(r["metrics"].get(col, ("—", ""))[0]) for r in rows]
+        nums = [n for n in nums if n is not None]
+        col_ranges[col] = (min(nums), max(nums)) if len(nums) > 1 else (0, 1)
+
     # Headers
     header_cells = [f'<th style="{th_first}">{label_col}</th>']
     for col in metric_cols:
@@ -133,7 +150,15 @@ def _yoy_delta_table(
         cells = [f'<td style="{td_first}">{r["label"]}</td>']
         for col in metric_cols:
             val, delta = r["metrics"].get(col, ("—", ""))
-            cells.append(f'<td style="{td}">{val}</td>')
+            # Apply heatmap background to value cell
+            cell_style = td
+            num = _to_num(val)
+            if num is not None and col in col_ranges:
+                lo, hi = col_ranges[col]
+                ratio = (num - lo) / (hi - lo) if hi > lo else 0
+                alpha = round(0.08 + ratio * 0.62, 3)
+                cell_style += f"background:rgba({hr},{hg},{hb},{alpha});"
+            cells.append(f'<td style="{cell_style}">{val}</td>')
             cells.append(f'<td style="{td_delta}">{_delta_badge(delta)}</td>')
         rows_html.append("<tr>" + "".join(cells) + "</tr>")
 
