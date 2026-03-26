@@ -2146,6 +2146,7 @@ def digital_server(input, output, session):
                 impressions=("impressions", "sum"), clicks=("clicks", "sum"),
                 direct_conversions=("direct_conversions", "sum"), budget=("budget", "sum"),
             ).reset_index()
+            kw_agg["direct_conversions"] = kw_agg["direct_conversions"].round(2)
             kw_agg["CTR"] = (kw_agg["clicks"] / kw_agg["impressions"].replace(0, float("nan")) * 100).round(2)
             kw_agg["CPC"] = (kw_agg["budget"] / kw_agg["clicks"].replace(0, float("nan"))).round(2)
             kw_agg["Cost/Conv."] = (kw_agg["budget"] / kw_agg["direct_conversions"].replace(0, float("nan"))).round(2)
