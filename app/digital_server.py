@@ -1842,6 +1842,151 @@ def digital_server(input, output, session):
     # TAB 3: GEOGRAPHY
     # ══════════════════════════════════════════════════════════
 
+    # State name → 2-letter abbreviation lookup
+    _STATE_NAME_TO_ABBR = {
+        "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR",
+        "California": "CA", "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE",
+        "District of Columbia": "DC", "Florida": "FL", "Georgia": "GA", "Hawaii": "HI",
+        "Idaho": "ID", "Illinois": "IL", "Indiana": "IN", "Iowa": "IA", "Kansas": "KS",
+        "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD",
+        "Massachusetts": "MA", "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS",
+        "Missouri": "MO", "Montana": "MT", "Nebraska": "NE", "Nevada": "NV",
+        "New Hampshire": "NH", "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY",
+        "North Carolina": "NC", "North Dakota": "ND", "Ohio": "OH", "Oklahoma": "OK",
+        "Oregon": "OR", "Pennsylvania": "PA", "Rhode Island": "RI", "South Carolina": "SC",
+        "South Dakota": "SD", "Tennessee": "TN", "Texas": "TX", "Utah": "UT",
+        "Vermont": "VT", "Virginia": "VA", "Washington": "WA", "West Virginia": "WV",
+        "Wisconsin": "WI", "Wyoming": "WY", "Puerto Rico": "PR",
+    }
+
+    _DIG_GEO_METRIC_LABELS = {
+        "impressions": "Impressions by state",
+        "clicks": "Clicks by state",
+        "total_conversions": "Total Conversions by state",
+    }
+    _DIG_GEO_METRIC_SHORT = {
+        "impressions": "Impressions",
+        "clicks": "Clicks",
+        "total_conversions": "Total Conv.",
+    }
+
+    _DIG_SMALL_STATES = {"CT", "DE", "DC", "MA", "MD", "NH", "NJ", "RI", "VT"}
+    _DIG_STATE_CENTROIDS = {
+        "AL": (32.7, -86.7), "AK": (64.2, -153.4), "AZ": (34.3, -111.1),
+        "AR": (34.9, -92.4), "CA": (37.2, -119.5), "CO": (39.0, -105.5),
+        "CT": (41.6, -72.7), "DE": (39.0, -75.5), "FL": (27.8, -81.7),
+        "GA": (32.7, -83.4), "HI": (20.3, -156.4), "ID": (44.4, -114.6),
+        "IL": (40.0, -89.2), "IN": (40.3, -86.1), "IA": (42.0, -93.5),
+        "KS": (38.5, -98.4), "KY": (37.5, -85.3), "LA": (31.1, -91.9),
+        "ME": (45.4, -69.0), "MD": (39.1, -76.8), "MA": (42.3, -71.8),
+        "MI": (44.3, -85.4), "MN": (46.4, -93.1), "MS": (32.7, -89.7),
+        "MO": (38.3, -92.5), "MT": (46.9, -110.5), "NE": (41.5, -99.9),
+        "NV": (39.3, -116.6), "NH": (43.7, -71.6), "NJ": (40.1, -74.5),
+        "NM": (34.5, -106.2), "NY": (42.9, -75.5), "NC": (35.5, -79.4),
+        "ND": (47.4, -100.5), "OH": (40.4, -82.8), "OK": (35.6, -96.9),
+        "OR": (44.0, -120.5), "PA": (40.9, -77.8), "RI": (41.7, -71.5),
+        "SC": (33.8, -80.9), "SD": (44.4, -100.4), "TN": (35.9, -86.7),
+        "TX": (31.5, -99.3), "UT": (39.3, -111.1), "VT": (44.1, -72.7),
+        "VA": (37.5, -78.9), "WA": (47.4, -120.6), "WV": (38.6, -80.6),
+        "WI": (44.3, -89.8), "WY": (43.0, -107.6),
+        "DC": (38.9, -77.0), "PR": (18.2, -66.5),
+    }
+
+    @render.ui
+    def dig_geo_map_title():
+        try:
+            metric = input.dig_geo_metric()
+        except Exception:
+            metric = "impressions"
+        label = _DIG_GEO_METRIC_LABELS.get(metric, "Impressions by state")
+        return ui.tags.h2(label, class_="section-heading", style="margin:0;")
+
+    @render.ui
+    def dig_geo_map():
+        df = _apply_dig_filters_monthly(Q10.copy())
+        if df.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+
+        try:
+            metric = input.dig_geo_metric()
+        except Exception:
+            metric = "impressions"
+        metric_short = _DIG_GEO_METRIC_SHORT.get(metric, "Impressions")
+
+        # Filter to state-level rows and map to abbreviations
+        state_df = df[df["region"].str.endswith(" (State)")].copy()
+        state_df["state_name"] = state_df["region"].str.replace(r" \(State\)$", "", regex=True)
+        state_df["abbr"] = state_df["state_name"].map(_STATE_NAME_TO_ABBR)
+        state_df = state_df.dropna(subset=["abbr"])
+        map_df = state_df.groupby("abbr")[metric].sum().reset_index()
+        map_df.columns = ["abbr", "value"]
+
+        if map_df.empty:
+            return ui.tags.div("No mappable state data available.", class_="empty-state")
+
+        fig = go.Figure(go.Choropleth(
+            locations=map_df["abbr"],
+            locationmode="USA-states",
+            z=map_df["value"],
+            colorscale=[
+                [0, "#FFFFFF"], [0.3, "#C8D6E5"],
+                [0.6, "#6B8FB5"], [1, "#021326"],
+            ],
+            hovertemplate=f"<b>%{{location}}</b><br>{metric_short}: %{{z:,}}<extra></extra>",
+            colorbar=dict(
+                title=metric_short, thickness=12, len=0.6,
+                tickfont=dict(size=11, color=CARNEGIE_GRAY_TEXT),
+                title_font=dict(size=11, color=CARNEGIE_GRAY_TEXT),
+            ),
+        ))
+        fig.update_layout(
+            font=dict(family="Manrope, sans-serif", color=CARNEGIE_NAVY),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=0, r=0, t=8, b=8), height=420,
+            geo=dict(
+                bgcolor="rgba(0,0,0,0)", lakecolor=CARNEGIE_BG,
+                landcolor="#eae6e1", showlakes=True, showframe=False,
+                scope="usa", projection_type="albers usa",
+            ),
+        )
+
+        # Text labels for large states
+        label_rows = map_df[
+            map_df["abbr"].isin(_DIG_STATE_CENTROIDS) &
+            ~map_df["abbr"].isin(_DIG_SMALL_STATES) &
+            (map_df["value"] > 0)
+        ]
+        if not label_rows.empty:
+            lats = [_DIG_STATE_CENTROIDS[s][0] for s in label_rows["abbr"]]
+            lons = [_DIG_STATE_CENTROIDS[s][1] for s in label_rows["abbr"]]
+            texts = [f"{s}<br>{int(v):,}" for s, v in zip(label_rows["abbr"], label_rows["value"])]
+            fig.add_scattergeo(
+                lat=lats, lon=lons, text=texts, mode="text",
+                textfont=dict(family="Manrope, sans-serif", size=9, color="#1A1A1A"),
+                showlegend=False, hoverinfo="skip", geo="geo",
+            )
+
+        # Top 5 states panel
+        top_states = map_df.nlargest(5, "value")
+        top_rows = [
+            ui.tags.div(
+                ui.tags.span(row["abbr"]),
+                ui.tags.span(f"{int(row['value']):,}", class_="count"),
+                class_="top-state-row",
+            )
+            for _, row in top_states.iterrows()
+        ]
+
+        return ui.tags.div(
+            ui.tags.div(_plotly_html(fig, no_toolbar=False)),
+            ui.tags.div(
+                ui.tags.div("TOP STATES", class_="top-states-title"),
+                *top_rows,
+                class_="top-states",
+            ),
+            class_="map-layout",
+        )
+
     @render.ui
     def dig_geo_table():
         df = _apply_dig_filters_monthly(Q10.copy())

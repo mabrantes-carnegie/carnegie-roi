@@ -867,21 +867,21 @@ page_digital = ui.nav_menu(
         "Geography",
         _dig_page(ui.tags.div(
             ui.tags.div(
-                ui.tags.span("Regional performance", class_="card-heading"),
                 ui.tags.div(
-                    ui.input_radio_buttons(
-                        "dig_geo_metric", None,
-                        choices={
+                    ui.output_ui("dig_geo_map_title"),
+                    _pill_dropdown(
+                        "dig_geo_metric",
+                        {
                             "impressions": "Impressions",
                             "clicks": "Clicks",
                             "total_conversions": "Total Conversions",
                         },
-                        selected="impressions",
-                        inline=True,
+                        "impressions",
                     ),
-                    class_="pill-toggle",
+                    class_="card-header-row",
                 ),
-                class_="card-header-row",
+                ui.output_ui("dig_geo_map"),
+                class_="chart-card",
             ),
             ui.tags.h2("Region performance", class_="section-heading"),
             ui.tags.div(ui.output_ui("dig_geo_table"), class_="carnegie-table-card"),
