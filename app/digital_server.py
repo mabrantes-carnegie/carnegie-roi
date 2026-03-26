@@ -972,60 +972,39 @@ def digital_server(input, output, session):
     @render.ui
     def dig_trending_chart_yoy():
         df_curr = _dig_q8()
-        df_prior = _dig_q8_yoy()
         if df_curr.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        # Group by month
+        # Group by month, show impressions only (no prior year line on YoY page)
+        df_curr = df_curr.copy()
         df_curr["month"] = df_curr["day"].dt.to_period("M")
         curr_monthly = (
             df_curr.groupby("month")["impressions"].sum()
             .reset_index().sort_values("month")
         )
-        curr_monthly["label"] = curr_monthly["month"].dt.strftime("%b %y")
-
-        period = input.dig_period()
-        if period and len(period) == 2:
-            start_dt = pd.Timestamp(period[0])
-            curr_year = start_dt.year
-            prior_year = curr_year - 1
-        else:
-            curr_year = df_curr["day"].dt.year.max()
-            prior_year = curr_year - 1
-
-        curr_legend = f"Impressions {curr_year}"
-        prior_legend = f"Impressions {prior_year}"
+        # Convert period back to timestamp for proper x-axis date handling
+        curr_monthly["month_dt"] = curr_monthly["month"].dt.to_timestamp()
+        curr_monthly["label"] = curr_monthly["month_dt"].dt.strftime("%b %y")
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(
-            x=curr_monthly["label"], y=curr_monthly["impressions"],
-            mode="lines+markers", name=curr_legend,
+            x=curr_monthly["month_dt"], y=curr_monthly["impressions"],
+            mode="lines+markers", name="Impressions",
             line=dict(color="#EA332D", width=2),
-            marker=dict(color="#EA332D", size=4),
-            hovertemplate="%{x}<br>" + curr_legend + ": %{y:,.0f}<extra></extra>",
+            marker=dict(color="#EA332D", size=5),
+            hovertemplate="%{x|%b %y}<br>Impressions: %{y:,.0f}<extra></extra>",
         ))
-
-        if not df_prior.empty:
-            df_prior["month"] = df_prior["day"].dt.to_period("M")
-            prior_monthly = (
-                df_prior.groupby("month")["impressions"].sum()
-                .reset_index().sort_values("month")
-            )
-            prior_monthly["label"] = prior_monthly["month"].dt.strftime("%b %y")
-            fig.add_trace(go.Scatter(
-                x=prior_monthly["label"], y=prior_monthly["impressions"],
-                mode="lines+markers", name=prior_legend,
-                line=dict(color="#C99D44", width=1.8, dash="dash"),
-                marker=dict(color="#C99D44", size=3),
-                hovertemplate="%{x}<br>" + prior_legend + ": %{y:,.0f}<extra></extra>",
-            ))
 
         layout = _base_layout(320)
         layout["xaxis"] = dict(
-            tickvals=curr_monthly["label"].tolist(),
+            tickvals=curr_monthly["month_dt"].tolist(),
             ticktext=curr_monthly["label"].tolist(),
             tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
             showgrid=False, title="", tickangle=0,
+        )
+        layout["legend"] = dict(
+            orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5,
+            font=dict(family="Manrope, sans-serif", size=11, color="#57595B"),
         )
         fig.update_layout(**layout)
         return _plotly_html(fig)
