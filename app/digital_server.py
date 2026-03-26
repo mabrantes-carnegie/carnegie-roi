@@ -2319,7 +2319,7 @@ def _df_to_html(df, title):
         f'color:#021326;margin:0 0 12px 0;">{title}</div>'
     )
     return ui.HTML(
-        f'<div style="margin-bottom:32px;">'
+        f'<div class="carnegie-table-card" style="margin-bottom:20px;">'
         f'{title_html}'
         f'<div style="overflow-x:auto;">'
         f'<table class="sortable-table paginated-table" style="width:100%;border-collapse:collapse;">'
