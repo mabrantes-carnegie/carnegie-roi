@@ -1233,9 +1233,37 @@ def server_logic(input, output, session):
         return display
 
     @reactive.calc
+    def _prog_base():
+        """Q6 filtered by global filters + page-level Period, Student Type, Lead Source."""
+        df = _apply_global_filters(Q6.copy())
+        try:
+            period = input.prog_period()
+            if period and len(period) == 2 and "event_date" in df.columns:
+                start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
+                df = df[(df["event_date"] >= start) & (df["event_date"] <= end)]
+        except Exception:
+            pass
+        try:
+            st = input.prog_student_type()
+            if st and len(st) > 0:
+                df = df[df["student_type"].isin(st)]
+        except Exception:
+            pass
+        try:
+            src = input.prog_lead_source()
+            if src and len(src) > 0:
+                df = df[df["origin_source_first"].isin(src)]
+        except Exception:
+            pass
+        return df
+
+    @reactive.calc
     def filtered_programs():
-        """Q6 filtered by global + program_name_filter, programs only."""
-        df = filtered_main()
+        """Q6 filtered by global + page-level filters + program_name_filter, programs only."""
+        df = _prog_base()
+        df = df[df["term_year"] == int(input.term_year())]
+        current_acad_pos = ACAD_ORDER.get(date.today().month, 12)
+        df = df[df["acad_pos"] <= current_acad_pos]
         df = df[df["program_name"].notna() & (df["program_name"].str.strip() != "")]
         df = df.copy()
         df["program_display"] = df["program_name"].apply(_clean_program_name)
@@ -1246,8 +1274,11 @@ def server_logic(input, output, session):
 
     @reactive.calc
     def prior_programs():
-        """Q6 prior year filtered the same way as filtered_programs."""
-        df = prior_main()
+        """Q6 prior year filtered by global + page-level filters + program_name_filter."""
+        df = _prog_base()
+        df = df[df["term_year"] == int(input.term_year()) - 1]
+        current_acad_pos = ACAD_ORDER.get(date.today().month, 12)
+        df = df[df["acad_pos"] <= current_acad_pos]
         df = df[df["program_name"].notna() & (df["program_name"].str.strip() != "")]
         df = df.copy()
         df["program_display"] = df["program_name"].apply(_clean_program_name)
@@ -1258,12 +1289,24 @@ def server_logic(input, output, session):
 
     @reactive.effect
     def _update_program_name_choices():
-        df = filtered_main()
+        df = _prog_base()
         df = df[df["program_name"].notna() & (df["program_name"].str.strip() != "")].copy()
         df["program_display"] = df["program_name"].apply(_clean_program_name)
         programs = df["program_display"].dropna().unique().tolist()
         opts = sorted([p for p in programs if p != "Not Specified"])
         ui.update_selectize("program_name_filter", choices=opts, selected=[])
+
+    @reactive.effect
+    def _update_prog_student_type_choices():
+        df = _apply_global_filters(Q6.copy())
+        types = sorted([t for t in df["student_type"].dropna().unique().tolist() if t and t != "Unknown"])
+        ui.update_selectize("prog_student_type", choices=types, selected=[])
+
+    @reactive.effect
+    def _update_prog_lead_source_choices():
+        df = _apply_global_filters(Q6.copy())
+        sources = sorted([s for s in df["origin_source_first"].dropna().unique().tolist() if s and str(s).strip() and s != "Unknown"])
+        ui.update_selectize("prog_lead_source", choices=sources, selected=[])
 
     @render.ui
     def program_trend_chart():
@@ -1271,24 +1314,39 @@ def server_logic(input, output, session):
             metric_col = input.program_trend_metric()
         except Exception:
             metric_col = "total_inquiries"
-        df = _apply_global_filters(Q6.copy())
-        df["program_display"] = df["program_name"].apply(
-            lambda x: _clean_program_name(x) if (x and str(x).strip()) else None
-        )
-
-        # Apply program name filter if set (blank programs never appear in filter options)
-        sel = input.program_name_filter()
-        if sel and len(sel) > 0:
-            df = df[df["program_display"].isin(sel)]
-
-        if df.empty:
-            return ui.tags.div("No program data for the selected filters.", class_="empty-state")
 
         current_ty = int(input.term_year())
         metric_label = PRIMARY_LABELS.get(metric_col, metric_col)
 
+        sel = input.program_name_filter()
+
+        # ── Both years: global + student_type + lead_source, NO period filter.
+        #    The chart uses term_year + acad_pos for its time axis, so the
+        #    event_date-based Period filter must NOT be applied here.
+        trend_base = _apply_global_filters(Q6.copy())
+        try:
+            st = input.prog_student_type()
+            if st and len(st) > 0:
+                trend_base = trend_base[trend_base["student_type"].isin(st)]
+        except Exception:
+            pass
+        try:
+            src = input.prog_lead_source()
+            if src and len(src) > 0:
+                trend_base = trend_base[trend_base["origin_source_first"].isin(src)]
+        except Exception:
+            pass
+        trend_base = trend_base.copy()
+        trend_base["program_display"] = trend_base["program_name"].apply(
+            lambda x: _clean_program_name(x) if (x and str(x).strip()) else None
+        )
+        if sel and len(sel) > 0:
+            trend_base = trend_base[trend_base["program_display"].isin(sel)]
+
+        if trend_base.empty:
+            return ui.tags.div("No program data for the selected filters.", class_="empty-state")
+
         # Goal — pro-rated by program selection
-        # Count distinct named programs in the full (unfiltered-by-program) dataset
         goal_total = GOALS.get(metric_col)
         if goal_total:
             all_named = _apply_global_filters(Q6.copy())
@@ -1297,16 +1355,15 @@ def server_logic(input, output, session):
             ]["program_name"].apply(_clean_program_name).nunique()
             goal_per_program = goal_total / n_programs_total if n_programs_total > 0 else goal_total
 
-            sel_programs = input.program_name_filter()
-            if sel_programs and len(sel_programs) > 0:
-                goal_value = round(goal_per_program * len(sel_programs))
+            if sel and len(sel) > 0:
+                goal_value = round(goal_per_program * len(sel))
             else:
                 goal_value = goal_total
         else:
             goal_value = None
 
-        # Build monthly cumulative series for current year — grouped across all programs
-        curr_df = df[df["term_year"] == current_ty].copy()
+        # Build monthly cumulative series for current year
+        curr_df = trend_base[trend_base["term_year"] == current_ty].copy()
         if curr_df.empty:
             return ui.tags.div("No data for the selected term year.", class_="empty-state")
 
@@ -1319,8 +1376,8 @@ def server_logic(input, output, session):
         curr_agg = curr_agg[curr_agg["acad_pos"] <= current_acad_pos]
         curr_agg["cumulative"] = curr_agg[metric_col].cumsum()
 
-        # Prior year for comparison
-        prior_df = df[df["term_year"] == current_ty - 1].copy()
+        # Prior year — full year, no period cap
+        prior_df = trend_base[trend_base["term_year"] == current_ty - 1].copy()
         prior_agg = None
         if not prior_df.empty:
             prior_agg = (

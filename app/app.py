@@ -400,49 +400,6 @@ PROGRAM_TREND_METRICS = {
     "total_net_deposits": "Net Deposits",
 }
 
-page_programs = ui.nav_panel(
-    "Programs",
-    ui.tags.div(
-        # Program filter bar
-        ui.tags.div(
-            ui.input_selectize(
-                "program_name_filter", "Program",
-                choices=[],
-                multiple=True,
-                options={"placeholder": "All"},
-            ),
-            class_="page-filter-bar",
-        ),
-        # Program trending vs goal
-        ui.tags.div(
-            ui.tags.div(
-                ui.tags.span("Program trending vs. goal", class_="card-heading"),
-                _pill_dropdown("program_trend_metric", PROGRAM_TREND_METRICS, "total_inquiries"),
-                class_="card-header-row",
-            ),
-            ui.output_ui("program_trend_chart"),
-            class_="chart-card",
-        ),
-        # Top programs bar chart
-        ui.tags.div(
-            ui.tags.div(
-                ui.tags.span("Top programs", class_="card-heading"),
-                _pill_dropdown("program_metric", PROGRAM_TREND_METRICS, "total_inquiries"),
-                class_="card-header-row",
-            ),
-            ui.output_ui("programs_bar_chart"),
-            class_="chart-card",
-        ),
-        # Program detail table
-        ui.tags.h2("Program detail", class_="section-heading"),
-        ui.tags.div(
-            ui.output_ui("program_detail_table"),
-            class_="carnegie-table-card",
-        ),
-        style=_CW,
-    ),
-)
-
 
 # --- Page 4: Geography ---
 
@@ -493,6 +450,7 @@ page_geography = ui.nav_panel(
 
 _dig_min, _dig_max = get_digital_date_range()
 
+
 def _month_options(min_dt, max_dt):
     """Return list of (value, label) for every month in [min_dt, max_dt]."""
     opts = []
@@ -506,6 +464,133 @@ def _month_options(min_dt, max_dt):
         else:
             cur = cur.replace(month=cur.month + 1)
     return opts
+
+
+def _programs_filters():
+    """Filter bar for the Programs page."""
+    import calendar
+    today = date.today()
+    # Default: Jul of prior year → current month of current year
+    prog_start = date(today.year - 1, 7, 1)
+    prog_end = date(today.year, today.month, 1)
+    prog_start_val = prog_start.strftime("%Y-%m-%d")
+    prog_end_val = prog_end.strftime("%Y-%m-%d")
+
+    month_opts = _month_options(_dig_min.date(), _dig_max.date())
+
+    def _month_select(select_id, default_val):
+        options = [
+            ui.tags.option(
+                label,
+                value=val,
+                selected=(val == default_val),
+            )
+            for val, label in month_opts
+        ]
+        return ui.tags.div(
+            ui.tags.select(
+                *options,
+                id=select_id,
+                class_="ios-month-select",
+                onchange=(
+                    "var s=document.getElementById('prog_month_start').value;"
+                    "var e=document.getElementById('prog_month_end').value;"
+                    "var ep=e.split('-'); var ey=+ep[0]; var em=+ep[1];"
+                    "var lastDay=new Date(ey, em, 0).getDate();"
+                    "var endStr=ep[0]+'-'+ep[1]+'-'+lastDay.toString().padStart(2,'0');"
+                    "Shiny.setInputValue('prog_period',[s, endStr],{priority:'event'});"
+                ),
+            ),
+            class_="ios-month-wrap",
+        )
+
+    return ui.tags.div(
+        ui.tags.div(
+            ui.tags.span("Period", class_="ios-month-label"),
+            ui.tags.div(
+                _month_select("prog_month_start", prog_start_val),
+                ui.tags.span("→", class_="ios-month-sep"),
+                _month_select("prog_month_end", prog_end_val),
+                class_="ios-month-row",
+            ),
+            class_="inline-filter ios-month-filter",
+        ),
+        ui.tags.div(
+            ui.input_selectize(
+                "program_name_filter", "Program",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            class_="inline-filter",
+        ),
+        ui.tags.div(
+            ui.input_selectize(
+                "prog_student_type", "Student Type",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            class_="inline-filter",
+        ),
+        ui.tags.div(
+            ui.input_selectize(
+                "prog_lead_source", "Lead Source",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            class_="inline-filter",
+        ),
+        ui.tags.div(
+            ui.input_date_range(
+                "prog_period", None,
+                start=prog_start,
+                end=prog_end,
+                min=_dig_min.date(),
+                max=_dig_max.date(),
+            ),
+            style="display:none;",
+        ),
+        class_="page-filter-bar",
+        style="flex-wrap:wrap; gap:12px;",
+    )
+
+
+page_programs = ui.nav_panel(
+    "Programs",
+    ui.tags.div(
+        # Program filter bar
+        _programs_filters(),
+        # Program trending vs goal
+        ui.tags.div(
+            ui.tags.div(
+                ui.tags.span("Program trending vs. goal", class_="card-heading"),
+                _pill_dropdown("program_trend_metric", PROGRAM_TREND_METRICS, "total_inquiries"),
+                class_="card-header-row",
+            ),
+            ui.output_ui("program_trend_chart"),
+            class_="chart-card",
+        ),
+        # Top programs bar chart
+        ui.tags.div(
+            ui.tags.div(
+                ui.tags.span("Top programs", class_="card-heading"),
+                _pill_dropdown("program_metric", PROGRAM_TREND_METRICS, "total_inquiries"),
+                class_="card-header-row",
+            ),
+            ui.output_ui("programs_bar_chart"),
+            class_="chart-card",
+        ),
+        # Program detail table
+        ui.tags.h2("Program detail", class_="section-heading"),
+        ui.tags.div(
+            ui.output_ui("program_detail_table"),
+            class_="carnegie-table-card",
+        ),
+        style=_CW,
+    ),
+)
 
 
 def _digital_filters():
