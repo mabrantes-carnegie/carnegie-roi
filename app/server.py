@@ -672,13 +672,13 @@ def server_logic(input, output, session):
 
         # SVG layout
         # Left area: funnel trapezoids
-        # Right margin: conversion rate pills (outside the funnel)
+        # Right margin: YoY badges per stage
         FUNNEL_W = 105      # width of funnel area
-        RIGHT_MARGIN = 48   # space for pills on right
+        RIGHT_MARGIN = 48   # space for YoY pills on right
         W = FUNNEL_W + RIGHT_MARGIN
         STEP_H = 18
-        GAP_H = 0           # no gap — continuous funnel, pills float on border
-        TOTAL_H = n * STEP_H + 2
+        GAP_H = 0
+        TOTAL_H = n * STEP_H + 20  # extra space for melt below last stage
         MIN_W_PCT = 0.30
         MAX_W_PCT = 1.0
 
@@ -737,68 +737,99 @@ def server_logic(input, output, session):
                 f'{fmt_number(val)}</text>'
             )
 
-            # Melt Rate inline — to the right of last block
+            # YoY badge — centred on each stage block, to the right
+            prior_stage_val = prior.get(key, 0)
+            center_y = y + STEP_H / 2
+            pill_w = 32
+            pill_h = 9
+            pill_x = FUNNEL_W + 4
+
+            if prior_stage_val > 0:
+                yoy_pct = (val - prior_stage_val) / prior_stage_val * 100
+                arrow = "\u25b2" if yoy_pct >= 0 else "\u25bc"
+                badge_text = f"{arrow} {abs(yoy_pct):.0f}%"
+                if yoy_pct >= 0:
+                    rc = "#132B23"
+                elif yoy_pct >= -5:
+                    rc = "#C99D44"
+                else:
+                    rc = "#560422"
+            else:
+                rc = "#9B9893"
+                badge_text = "\u2014"
+
+            svg_parts.append(
+                f'<rect x="{pill_x:.1f}" y="{center_y - pill_h/2:.1f}" '
+                f'width="{pill_w}" height="{pill_h}" rx="4" '
+                f'fill="white" stroke="{rc}" stroke-width="0.8"/>'
+            )
+            svg_parts.append(
+                f'<text x="{pill_x + pill_w/2:.1f}" y="{center_y:.1f}" '
+                f'dominant-baseline="middle" text-anchor="middle" '
+                f'font-family="Manrope,sans-serif" font-size="6" font-weight="700" '
+                f'fill="{rc}">{badge_text}</text>'
+            )
+
+            # Melt Rate — below the Net Deposits badge
             if i == n - 1:
                 deposits = kpis.get("total_deposits", 0)
                 net_deposits = kpis.get("total_net_deposits", 0)
                 if deposits > 0:
                     melt = (1 - net_deposits / deposits) * 100
                     melt_color = "#132B23" if melt < 3 else "#C99D44" if melt <= 5 else "#560422"
-                    pill_x = FUNNEL_W + 6
-                    pill_y = y + STEP_H / 2
+                    melt_cx = pill_x + pill_w / 2
+                    melt_label_y = center_y + pill_h / 2 + 5
+                    melt_val_y = melt_label_y + 7
                     svg_parts.append(
-                        f'<text x="{pill_x}" y="{pill_y - 5:.1f}" '
-                        f'dominant-baseline="middle" text-anchor="start" '
+                        f'<text x="{melt_cx:.1f}" y="{melt_label_y:.1f}" '
+                        f'dominant-baseline="middle" text-anchor="middle" '
                         f'font-family="Manrope,sans-serif" font-size="5" font-weight="600" '
                         f'fill="#9B9893">Melt</text>'
                     )
                     svg_parts.append(
-                        f'<text x="{pill_x}" y="{pill_y + 4:.1f}" '
-                        f'dominant-baseline="middle" text-anchor="start" '
+                        f'<text x="{melt_cx:.1f}" y="{melt_val_y:.1f}" '
+                        f'dominant-baseline="middle" text-anchor="middle" '
                         f'font-family="Manrope,sans-serif" font-size="6.5" font-weight="700" '
                         f'fill="{melt_color}">{melt:.1f}%</text>'
                     )
 
-            # Conversion rate pill — on right edge, centred on the border between blocks
-            if i < n - 1:
-                curr_rate = (vals[i + 1] / val * 100) if val > 0 else None
-                prior_val = prior.get(key, 0)
-                prior_rate = (prior.get(stages[i + 1][1], 0) / prior_val * 100) if prior_val > 0 else None
-
-                border_y = y + STEP_H  # exact border between block i and i+1
-                # Right edge of block i at its bottom
-                right_edge = bot_x + bot_w
-
-                if curr_rate is not None:
-                    if prior_rate is None:
-                        rc = "#9B9893"
-                    elif curr_rate >= prior_rate:
-                        rc = "#132B23"
-                    elif curr_rate >= prior_rate - 5:
-                        rc = "#C99D44"
-                    else:
-                        rc = "#560422"
-
-                    rate_text = f"{curr_rate:.1f}%"
-                    pill_w = 28
-                    pill_h = 9
-                    px = right_edge + 4
-                    py = border_y
-
-                    svg_parts.append(
-                        f'<rect x="{px:.1f}" y="{py - pill_h/2:.1f}" '
-                        f'width="{pill_w}" height="{pill_h}" rx="4" '
-                        f'fill="white" stroke="{rc}" stroke-width="0.8"/>'
-                    )
-                    svg_parts.append(
-                        f'<text x="{px + pill_w/2:.1f}" y="{py:.1f}" '
-                        f'dominant-baseline="middle" text-anchor="middle" '
-                        f'font-family="Manrope,sans-serif" font-size="6" font-weight="700" '
-                        f'fill="{rc}">{rate_text}</text>'
-                    )
-
         svg_parts.append('</svg>')
-        return ui.tags.div(ui.HTML("".join(svg_parts)), class_="fg-panel")
+
+        legend_html = (
+            '<div style="display:flex;align-items:center;gap:12px;justify-content:center;'
+            'margin-top:8px;flex-wrap:wrap;">'
+            '<span style="font-family:Manrope,sans-serif;font-size:10px;color:#9B9893;'
+            'font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-right:4px;">'
+            '&#9650;/&#9660; vs. prior year:</span>'
+            # Green
+            '<span style="display:inline-flex;align-items:center;gap:5px;">'
+            '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;'
+            'border:1.5px solid #132B23;background:white;"></span>'
+            '<span style="font-family:Manrope,sans-serif;font-size:10px;color:#6b7280;">'
+            'Growing</span>'
+            '</span>'
+            # Yellow
+            '<span style="display:inline-flex;align-items:center;gap:5px;">'
+            '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;'
+            'border:1.5px solid #C99D44;background:white;"></span>'
+            '<span style="font-family:Manrope,sans-serif;font-size:10px;color:#6b7280;">'
+            'Up to 5% decline</span>'
+            '</span>'
+            # Red
+            '<span style="display:inline-flex;align-items:center;gap:5px;">'
+            '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;'
+            'border:1.5px solid #560422;background:white;"></span>'
+            '<span style="font-family:Manrope,sans-serif;font-size:10px;color:#6b7280;">'
+            'More than 5% decline</span>'
+            '</span>'
+            '</div>'
+        )
+
+        return ui.tags.div(
+            ui.HTML("".join(svg_parts)),
+            ui.HTML(legend_html),
+            class_="fg-panel",
+        )
 
     # --- Goal context text (shown below YoY badge on each KPI card) ---
 
