@@ -1462,7 +1462,8 @@ def server_logic(input, output, session):
             "Enrolled", "% Enrolled", "Inq→Enroll Rate",
             "Deposits", "Net Deposits",
         ]
-        return _plain_table(display[cols], paginated=True)
+        heatmap_cols = ["Inquiries", "App Starts", "App Submits", "Enrolled", "Deposits", "Net Deposits"]
+        return _heatmap_table(display[cols], heatmap_cols, paginated=True)
 
     # --- Geography Map + Top States (Q6 state data) ---
 
