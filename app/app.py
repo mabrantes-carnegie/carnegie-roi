@@ -738,7 +738,7 @@ _dig_overview_content = ui.tags.div(
     # Row A: Trending + Key Interaction Categories
     ui.tags.div(
         ui.tags.div(
-            ui.tags.span("Trending performance", class_="card-heading"),
+            ui.tags.span("Trending Performance", class_="card-heading"),
             ui.output_ui("dig_trending_chart"),
             class_="chart-card",
             style="flex:3;",
@@ -754,22 +754,22 @@ _dig_overview_content = ui.tags.div(
     # Row B: Engagement & spend (narrow=42fr) + Cost Per Total Conversion (wide=58fr)
     ui.tags.div(
         ui.tags.div(
-            ui.tags.span("Engagement & spend", class_="card-heading"),
+            ui.tags.span("Engagement & Spend", class_="card-heading"),
             ui.tags.div(
                 _dig_metric_card("Budget", "budget"),
                 _dig_metric_card("Cost per Click", "cpc"),
-                _dig_metric_card("Direct Conversions", "direct_conv"),
-                _dig_metric_card("Cost per Direct Conv.", "cpdc"),
+                _dig_metric_card("Direct Key Interactions", "direct_conv"),
+                _dig_metric_card("Cost per Direct Key Int.", "cpdc"),
                 _dig_metric_card("In-Platform Leads", "ipl"),
                 _dig_metric_card("Cost per In-Plat. Lead", "cpipl"),
-                _dig_metric_card("View-through Conv.", "vtc"),
-                _dig_metric_card("Cost per Total Conv.", "cptc"),
+                _dig_metric_card("View-through Int.", "vtc"),
+                _dig_metric_card("Cost per Total Key Int.", "cptc"),
                 class_="dig-metric-grid",
             ),
             class_="chart-card",
         ),
         ui.tags.div(
-            ui.tags.span("Cost Per Total Conversion", class_="card-heading"),
+            ui.tags.span("Cost Per Total Key Interaction", class_="card-heading"),
             ui.output_ui("dig_cost_per_total_conv"),
             class_="chart-card",
         ),
@@ -779,25 +779,25 @@ _dig_overview_content = ui.tags.div(
     # Strategy section
     ui.tags.div(
         ui.tags.div(
-            ui.tags.span("Performance by strategy", class_="card-heading"),
+            ui.tags.span("Performance By Strategy", class_="card-heading"),
             ui.output_ui("dig_strategy_bar"),
             class_="chart-card",
         ),
         ui.tags.div(
-            ui.tags.span("Strategy trend", class_="card-heading"),
+            ui.tags.span("Strategy Trend", class_="card-heading"),
             ui.output_ui("dig_strategy_trend"),
             class_="chart-card",
         ),
         class_="main-content-row",
         style="grid-template-columns: 42fr 58fr;",
     ),
-    ui.tags.h2("Performance by subgroup", class_="section-heading"),
+    ui.tags.h2("Performance By Subgroup", class_="section-heading"),
     ui.tags.div(ui.output_ui("dig_subgroup_table"), class_="carnegie-table-card"),
-    ui.tags.h2("Performance by strategy", class_="section-heading"),
+    ui.tags.h2("Performance By Strategy", class_="section-heading"),
     ui.tags.div(ui.output_ui("dig_strategy_table"), class_="carnegie-table-card"),
-    ui.tags.h2("Interactions by month & year", class_="section-heading"),
+    ui.tags.h2("Interactions By Month & Year", class_="section-heading"),
     ui.tags.div(ui.output_ui("dig_interactions_by_month"), class_="carnegie-table-card"),
-    ui.tags.h2("Interactions by strategy & month", class_="section-heading"),
+    ui.tags.h2("Interactions By Strategy & Month", class_="section-heading"),
     ui.tags.div(ui.output_ui("dig_interactions_by_strategy_month"), class_="carnegie-table-card"),
 )
 
@@ -816,28 +816,28 @@ _dig_overview_yoy_content = ui.tags.div(
         _dig_kpi_card("Impressions", "impressions_yoy", "#EA332D"),
         _dig_kpi_card("Clicks", "clicks_yoy", "#021326"),
         _dig_kpi_card("CTR", "ctr_yoy", "#C99D44"),
-        _dig_kpi_card("Total Conversions", "total_conv_yoy", "#021326"),
-        _dig_kpi_card("Conversion Rate", "conv_rate_yoy", "#C99D44"),
+        _dig_kpi_card("Total Key Interactions", "total_conv_yoy", "#021326"),
+        _dig_kpi_card("Key Interaction Rate", "conv_rate_yoy", "#C99D44"),
         class_="funnel-strip",
     ),
     ui.tags.div(
         ui.tags.div(
-            ui.tags.span("Trending performance (YoY)", class_="card-heading"),
+            ui.tags.span("Trending Performance (YoY)", class_="card-heading"),
             ui.output_ui("dig_trending_chart_yoy"),
             class_="chart-card",
             style="flex:3;",
         ),
         ui.tags.div(
-            ui.tags.span("Engagement & spend", class_="card-heading"),
+            ui.tags.span("Engagement & Spend", class_="card-heading"),
             ui.tags.div(
                 _dig_metric_card("Budget", "budget_yoy"),
                 _dig_metric_card("Cost per Click", "cpc_yoy"),
-                _dig_metric_card("Direct Conversions", "direct_conv_yoy"),
-                _dig_metric_card("Cost per Direct Conv.", "cpdc_yoy"),
+                _dig_metric_card("Direct Key Interactions", "direct_conv_yoy"),
+                _dig_metric_card("Cost per Direct Key Int.", "cpdc_yoy"),
                 _dig_metric_card("In-Platform Leads", "ipl_yoy"),
                 _dig_metric_card("Cost per In-Plat. Lead", "cpipl_yoy"),
-                _dig_metric_card("View-through Conv.", "vtc_yoy"),
-                _dig_metric_card("Cost per Total Conv.", "cptc_yoy"),
+                _dig_metric_card("View-through Int.", "vtc_yoy"),
+                _dig_metric_card("Cost per Total Key Int.", "cptc_yoy"),
                 class_="dig-metric-grid",
             ),
             class_="chart-card",
@@ -847,25 +847,25 @@ _dig_overview_yoy_content = ui.tags.div(
     ),
     ui.tags.div(
         ui.tags.div(
-            ui.tags.span("Performance by strategy", class_="card-heading"),
+            ui.tags.span("Performance By Strategy", class_="card-heading"),
             ui.output_ui("dig_strategy_bar_yoy"),
             class_="chart-card",
             style="flex:1;",
         ),
         ui.tags.div(
-            ui.tags.span("Strategy trend", class_="card-heading"),
+            ui.tags.span("Strategy Trend", class_="card-heading"),
             ui.output_ui("dig_strategy_trend_yoy"),
             class_="chart-card",
             style="flex:1;",
         ),
         class_="main-content-row",
     ),
-    ui.tags.h2("Performance by subgroup", class_="section-heading"),
+    ui.tags.h2("Performance By Subgroup", class_="section-heading"),
     ui.tags.div(
         ui.output_ui("dig_subgroup_table_yoy"),
         class_="carnegie-table-card",
     ),
-    ui.tags.h2("Performance by strategy", class_="section-heading"),
+    ui.tags.h2("Performance By Strategy", class_="section-heading"),
     ui.tags.div(
         ui.output_ui("dig_strategy_table_yoy"),
         class_="carnegie-table-card",
@@ -917,7 +917,7 @@ page_digital = ui.nav_menu(
                 _dig_kpi_card("Other", "cat_other", "#8B1A1A"),
                 class_="funnel-strip",
             ),
-            ui.tags.h2("Key interaction category trending", class_="section-heading"),
+            ui.tags.h2("Key Interaction Category Trending", class_="section-heading"),
             ui.tags.div(
                 ui.tags.div(
                     ui.output_ui("dig_cat_trend_chart"),
@@ -934,24 +934,24 @@ page_digital = ui.nav_menu(
             ),
             ui.tags.div(
                 ui.tags.div(
-                    ui.tags.span("Key interactions by category & strategy", class_="card-heading"),
+                    ui.tags.span("Key Interactions By Category & Strategy", class_="card-heading"),
                     ui.output_ui("dig_cat_strategy_chart"),
                     class_="chart-card",
                     style="flex:5;",
                 ),
                 ui.tags.div(
-                    ui.tags.span("Breakdown by interaction category & name", class_="card-heading"),
+                    ui.tags.span("Breakdown By Interaction Category & Name", class_="card-heading"),
                     ui.output_ui("dig_interaction_breakdown_table"),
                     class_="carnegie-table-card",
                     style="flex:7;",
                 ),
                 class_="main-content-row",
             ),
-            ui.tags.h2("Key interactions by campaign name", class_="section-heading"),
+            ui.tags.h2("Key Interactions By Campaign Name", class_="section-heading"),
             ui.tags.div(ui.output_ui("dig_interactions_campaign_table"), class_="carnegie-table-card"),
-            ui.tags.h2("Key interactions by month", class_="section-heading"),
+            ui.tags.h2("Key Interactions By Month", class_="section-heading"),
             ui.tags.div(ui.output_ui("dig_interactions_month_table"), class_="carnegie-table-card"),
-            ui.tags.h2("Key interactions by campaign & interaction name", class_="section-heading"),
+            ui.tags.h2("Key Interactions By Campaign & Interaction Name", class_="section-heading"),
             ui.tags.div(ui.output_ui("dig_interactions_detail_table"), class_="carnegie-table-card"),
         )),
     ),
@@ -1045,7 +1045,7 @@ navbar_title = ui.tags.div(
         style="width: 139px; vertical-align: middle; margin-right: 16px;",
     ),
     # Title
-    ui.tags.span("ROI Report", class_="navbar-title-text"),
+    ui.tags.span("ROI Report - Central Washington University", class_="navbar-title-text"),
     style="display: flex; align-items: center;",
 )
 

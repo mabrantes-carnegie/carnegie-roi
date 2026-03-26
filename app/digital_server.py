@@ -737,10 +737,10 @@ def digital_server(input, output, session):
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             x=curr_daily["day"], y=curr_daily["total_interactions"],
-            mode="lines+markers", name="Total Conversions",
+            mode="lines+markers", name="Total Key Interactions",
             line=dict(color="#EA332D", width=2),
             marker=dict(color="#EA332D", size=4),
-            hovertemplate="%{x|%b %e}<br>Total Conversions: %{y:,.0f}<extra></extra>",
+            hovertemplate="%{x|%b %e}<br>Total Key Interactions: %{y:,.0f}<extra></extra>",
         ))
 
         if not df_prior.empty:
@@ -757,10 +757,10 @@ def digital_server(input, output, session):
             ).fillna(0)
             fig.add_trace(go.Scatter(
                 x=merged["day"], y=merged["total_interactions"],
-                mode="lines+markers", name="Total Conversions (previous year)",
+                mode="lines+markers", name="Total Key Interactions (previous year)",
                 line=dict(color="#C99D44", width=1.8, dash="dash"),
                 marker=dict(color="#C99D44", size=3),
-                hovertemplate="%{x|%b %e}<br>Total Conversions (prev): %{y:,.0f}<extra></extra>",
+                hovertemplate="%{x|%b %e}<br>Total Key Interactions (prev): %{y:,.0f}<extra></extra>",
             ))
 
         layout = _base_layout(320)
@@ -793,7 +793,7 @@ def digital_server(input, output, session):
             x=agg["interaction_category"],
             y=agg["total_interactions"],
             marker_color=[colors[i % len(colors)] for i in range(len(agg))],
-            hovertemplate="%{x}<br>Total Conversions: %{y:,.0f}<extra></extra>",
+            hovertemplate="%{x}<br>Total Key Interactions: %{y:,.0f}<extra></extra>",
             showlegend=False,
             text=[f"{v:,.0f}" for v in agg["total_interactions"]],
             textposition="inside",
@@ -843,7 +843,7 @@ def digital_server(input, output, session):
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             x=curr_daily["day"], y=curr_daily["cptc"],
-            mode="lines+markers", name="Cost Per Total Conversion",
+            mode="lines+markers", name="Cost Per Total Key Interaction",
             line=dict(color="#EA332D", width=2),
             marker=dict(color="#EA332D", size=4),
             hovertemplate="%{x|%b %e}<br>Cost/Conv: $%{y:,.2f}<extra></extra>",
@@ -864,7 +864,7 @@ def digital_server(input, output, session):
             )
             fig.add_trace(go.Scatter(
                 x=merged["day"], y=merged["cptc"],
-                mode="lines+markers", name="Cost Per Total Conversion (previous month)",
+                mode="lines+markers", name="Cost Per Total Key Interaction (previous month)",
                 line=dict(color="#C99D44", width=1.8, dash="dash"),
                 marker=dict(color="#C99D44", size=3),
                 hovertemplate="%{x|%b %e}<br>Cost/Conv (prev): $%{y:,.2f}<extra></extra>",
