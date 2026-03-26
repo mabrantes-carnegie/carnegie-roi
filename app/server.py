@@ -1277,10 +1277,11 @@ def server_logic(input, output, session):
         except Exception:
             metric_col = "total_inquiries"
         df = _apply_global_filters(Q6.copy())
-        df = df[df["program_name"].notna() & (df["program_name"].str.strip() != "")].copy()
-        df["program_display"] = df["program_name"].apply(_clean_program_name)
+        df["program_display"] = df["program_name"].apply(
+            lambda x: _clean_program_name(x) if (x and str(x).strip()) else None
+        )
 
-        # Apply program name filter if set
+        # Apply program name filter if set (blank programs never appear in filter options)
         sel = input.program_name_filter()
         if sel and len(sel) > 0:
             df = df[df["program_display"].isin(sel)]
