@@ -502,11 +502,18 @@ def _month_options(min_dt, max_dt):
 
 def _digital_filters():
     """Shared filter bar for digital performance page."""
-    # Default: academic year 01/07/2025 → 30/06/2026
-    prev_month_start = date(2025, 7, 1)
+    import calendar
+    # Default: previous month (first day → last day)
+    today = date.today()
+    if today.month == 1:
+        prev_month_start = date(today.year - 1, 12, 1)
+    else:
+        prev_month_start = date(today.year, today.month - 1, 1)
     prev_month_val = prev_month_start.strftime("%Y-%m-%d")
-    default_end_val = "2026-06-01"
-    prev_month_end = date(2026, 6, 30)
+    prev_month_end = prev_month_start.replace(
+        day=calendar.monthrange(prev_month_start.year, prev_month_start.month)[1]
+    )
+    default_end_val = prev_month_val
 
     month_opts = _month_options(_dig_min.date(), _dig_max.date())
 
@@ -951,11 +958,54 @@ app_ui = ui.page_navbar(
             ui.tags.script("""
 (function() {
   var DIG_TABS = ['Overview','Overview YoY','Interactions','Geography','Creative','Insights'];
+
+  // Academic year default for Overview YoY
+  var YOY_START = '2025-07-01';
+  var YOY_END   = '2026-06-30';
+
+  // Previous-month default (matches Python server default)
+  function _prevMonthRange() {
+    var d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);
+    var y = d.getFullYear(), m = d.getMonth(); // 0-based
+    var start = y + '-' + String(m+1).padStart(2,'0') + '-01';
+    var lastDay = new Date(y, m+1, 0).getDate();
+    var end   = y + '-' + String(m+1).padStart(2,'0') + '-' + String(lastDay).padStart(2,'0');
+    // also the YYYY-MM-DD value used by the month selects (first of month)
+    return {start: start, end: end, startSel: start, endSel: start};
+  }
+
+  function _setDigPeriod(startStr, endStr, startSel, endSel) {
+    // Update hidden Shiny input
+    Shiny.setInputValue('dig_period', [startStr, endStr], {priority:'event'});
+    // Update the visible month dropdowns
+    var ms = document.getElementById('dig_month_start');
+    var me = document.getElementById('dig_month_end');
+    if (ms) ms.value = startSel;
+    if (me) me.value = endSel;
+  }
+
+  var _prevTab = null;
+
   function updateDigFilters(tabVal) {
     var bar = document.getElementById('dig-global-filters');
     if (!bar) return;
     bar.style.display = DIG_TABS.indexOf(tabVal) !== -1 ? '' : 'none';
+
+    if (tabVal === 'Overview YoY' && _prevTab !== 'Overview YoY') {
+      setTimeout(function() {
+        _setDigPeriod(YOY_START, YOY_END, YOY_START, '2026-06-01');
+      }, 50);
+    } else if (_prevTab === 'Overview YoY' && tabVal !== 'Overview YoY') {
+      var r = _prevMonthRange();
+      setTimeout(function() {
+        _setDigPeriod(r.start, r.end, r.startSel, r.startSel);
+      }, 50);
+    }
+    _prevTab = tabVal;
   }
+
   $(document).on('shiny:inputchanged', function(e) {
     if (e.name === 'nav') updateDigFilters(e.value);
   });

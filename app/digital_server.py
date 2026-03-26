@@ -783,8 +783,8 @@ def digital_server(input, output, session):
     @render.text
     def dig_ctr_yoy():
         df = _dig_q8()
-        v = _safe_div(df["clicks"].sum(), df["impressions"].sum()) * 100
-        return f"{v:.2f}%" if v is not None else "—"
+        v = _safe_div(df["clicks"].sum(), df["impressions"].sum())
+        return f"{v * 100:.2f}%" if v is not None else "—"
 
     @render.ui
     def dig_ctr_yoy_delta():
@@ -810,8 +810,8 @@ def digital_server(input, output, session):
     def dig_conv_rate_yoy():
         df = _dig_q8()
         total_conv = df["direct_conversions"].sum() + df["view_through_conversions"].sum() + df["in_platform_leads"].sum()
-        v = _safe_div(total_conv, df["clicks"].sum()) * 100
-        return f"{v:.2f}%" if v is not None else "—"
+        v = _safe_div(total_conv, df["clicks"].sum())
+        return f"{v * 100:.2f}%" if v is not None else "—"
 
     @render.ui
     def dig_conv_rate_yoy_delta():
