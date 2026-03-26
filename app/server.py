@@ -922,8 +922,6 @@ def server_logic(input, output, session):
         shapes = []
         all_vals = curr_vals + prior_vals
         y_max = max(v for v in all_vals if v > 0) if any(v > 0 for v in all_vals) else 1
-        label_y = y_max * 1.28
-        line_y  = y_max * 1.18
         # In grouped bar mode with 2 traces, bar centers are at x ± 0.2
         bar_half = 0.2
         for i, (cv, pv) in enumerate(zip(curr_vals, prior_vals)):
@@ -931,6 +929,10 @@ def server_logic(input, output, session):
                 pct = (cv - pv) / pv * 100
                 arrow = "▲" if pct >= 0 else "▼"
                 color = "#132B23" if pct >= 0 else "#560422"
+                # Per-group heights: bracket sits just above the taller bar
+                group_top = max(cv, pv)
+                line_y  = group_top + y_max * 0.06
+                label_y = group_top + y_max * 0.13
                 annotations.append(dict(
                     x=i, y=label_y, xref="x", yref="y",
                     text=f"<b>{arrow} {abs(pct):.1f}%</b>",
