@@ -1292,8 +1292,23 @@ def server_logic(input, output, session):
         current_ty = int(input.term_year())
         metric_label = PRIMARY_LABELS.get(metric_col, metric_col)
 
-        # Goal for this metric (institution-level flat target)
-        goal_value = GOALS.get(metric_col)
+        # Goal — pro-rated by program selection
+        # Count distinct named programs in the full (unfiltered-by-program) dataset
+        goal_total = GOALS.get(metric_col)
+        if goal_total:
+            all_named = _apply_global_filters(Q6.copy())
+            n_programs_total = all_named[
+                all_named["program_name"].notna() & (all_named["program_name"].str.strip() != "")
+            ]["program_name"].apply(_clean_program_name).nunique()
+            goal_per_program = goal_total / n_programs_total if n_programs_total > 0 else goal_total
+
+            sel_programs = input.program_name_filter()
+            if sel_programs and len(sel_programs) > 0:
+                goal_value = round(goal_per_program * len(sel_programs))
+            else:
+                goal_value = goal_total
+        else:
+            goal_value = None
 
         # Build monthly cumulative series for current year — grouped across all programs
         curr_df = df[df["term_year"] == current_ty].copy()
