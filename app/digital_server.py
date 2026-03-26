@@ -765,6 +765,64 @@ def digital_server(input, output, session):
     # ══════════════════════════════════════════════════════════
 
     @render.text
+    def dig_impressions_yoy():
+        return fmt_number(_dig_q8()["impressions"].sum())
+
+    @render.ui
+    def dig_impressions_delta_yoy():
+        return _fmt_delta(_dig_q8()["impressions"].sum(), _dig_q8_yoy()["impressions"].sum())
+
+    @render.text
+    def dig_clicks_yoy():
+        return fmt_number(_dig_q8()["clicks"].sum())
+
+    @render.ui
+    def dig_clicks_delta_yoy():
+        return _fmt_delta(_dig_q8()["clicks"].sum(), _dig_q8_yoy()["clicks"].sum())
+
+    @render.text
+    def dig_ctr_yoy():
+        df = _dig_q8()
+        v = _safe_div(df["clicks"].sum(), df["impressions"].sum()) * 100
+        return f"{v:.2f}%" if v is not None else "—"
+
+    @render.ui
+    def dig_ctr_delta_yoy():
+        df_c, df_p = _dig_q8(), _dig_q8_yoy()
+        curr = _safe_div(df_c["clicks"].sum(), df_c["impressions"].sum())
+        prev = _safe_div(df_p["clicks"].sum(), df_p["impressions"].sum())
+        return _fmt_delta(curr, prev)
+
+    @render.text
+    def dig_total_conv_yoy():
+        df = _dig_q8()
+        v = df["direct_conversions"].sum() + df["view_through_conversions"].sum() + df["in_platform_leads"].sum()
+        return fmt_number(v)
+
+    @render.ui
+    def dig_total_conv_delta_yoy():
+        df_c, df_p = _dig_q8(), _dig_q8_yoy()
+        curr = df_c["direct_conversions"].sum() + df_c["view_through_conversions"].sum() + df_c["in_platform_leads"].sum()
+        prev = df_p["direct_conversions"].sum() + df_p["view_through_conversions"].sum() + df_p["in_platform_leads"].sum()
+        return _fmt_delta(curr, prev)
+
+    @render.text
+    def dig_conv_rate_yoy():
+        df = _dig_q8()
+        total_conv = df["direct_conversions"].sum() + df["view_through_conversions"].sum() + df["in_platform_leads"].sum()
+        v = _safe_div(total_conv, df["clicks"].sum()) * 100
+        return f"{v:.2f}%" if v is not None else "—"
+
+    @render.ui
+    def dig_conv_rate_delta_yoy():
+        df_c, df_p = _dig_q8(), _dig_q8_yoy()
+        tc_c = df_c["direct_conversions"].sum() + df_c["view_through_conversions"].sum() + df_c["in_platform_leads"].sum()
+        tc_p = df_p["direct_conversions"].sum() + df_p["view_through_conversions"].sum() + df_p["in_platform_leads"].sum()
+        curr = _safe_div(tc_c, df_c["clicks"].sum())
+        prev = _safe_div(tc_p, df_p["clicks"].sum())
+        return _fmt_delta(curr, prev)
+
+    @render.text
     def dig_key_interactions_yoy():
         v = _dig_q8()["total_interactions"].sum()
         return f"{v:,.1f}"

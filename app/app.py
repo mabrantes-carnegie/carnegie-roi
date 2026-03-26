@@ -719,11 +719,11 @@ def _dig_page(content_div):
 # ── Overview YoY tab content (mirrors Overview, _yoy output IDs) ──────────
 _dig_overview_yoy_content = ui.tags.div(
     ui.tags.div(
-        _dig_kpi_card("Key Interactions", "key_interactions_yoy", "#EA332D"),
-        _dig_kpi_card("Cost per Interaction", "cpi_yoy", "#021326"),
-        _dig_kpi_card("Inquiry Interactions", "inquiry_int_yoy", "#C99D44"),
-        _dig_kpi_card("Visit Interactions", "visit_int_yoy", "#E8B9A4"),
-        _dig_kpi_card("Apply Interactions", "apply_int_yoy", "#8B1A1A"),
+        _dig_kpi_card("Impressions", "impressions_yoy", "#EA332D"),
+        _dig_kpi_card("Clicks", "clicks_yoy", "#021326"),
+        _dig_kpi_card("CTR", "ctr_yoy", "#C99D44"),
+        _dig_kpi_card("Total Conversions", "total_conv_yoy", "#021326"),
+        _dig_kpi_card("Conversion Rate", "conv_rate_yoy", "#C99D44"),
         class_="funnel-strip",
     ),
     ui.tags.div(
