@@ -1262,12 +1262,8 @@ def server_logic(input, output, session):
         df = filtered_main()
         df = df[df["program_name"].notna() & (df["program_name"].str.strip() != "")].copy()
         df["program_display"] = df["program_name"].apply(_clean_program_name)
-        totals = (
-            df.groupby("program_display")["total_inquiries"]
-            .sum()
-            .sort_values(ascending=False)
-        )
-        opts = [p for p in totals.index.tolist() if p != "Not Specified"]
+        programs = df["program_display"].dropna().unique().tolist()
+        opts = sorted([p for p in programs if p != "Not Specified"])
         ui.update_selectize("program_name_filter", choices=opts, selected=[])
 
     @render.ui
