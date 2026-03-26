@@ -363,9 +363,12 @@ page_funnel = ui.nav_panel(
                 _pill_dropdown(
                     "source_trend_metric",
                     {
-                        "total_inquiries": "Inquiries",
+                        "total_inquiries":    "Inquiries",
+                        "total_app_starts":   "App Starts",
+                        "total_app_submits":  "App Submits",
+                        "total_admits":       "Admits",
+                        "total_deposits":     "Deposits",
                         "total_net_deposits": "Net Deposits",
-                        "total_admits": "Admits",
                     },
                     "total_inquiries",
                 ),
