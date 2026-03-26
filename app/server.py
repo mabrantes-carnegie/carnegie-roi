@@ -689,7 +689,7 @@ def server_logic(input, output, session):
 
         svg_parts = [
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {TOTAL_H}" '
-            f'width="{W}" height="{TOTAL_H}" style="display:block;margin:0 auto;">'
+            f'width="100%" style="display:block;margin:0 auto;max-width:{W*2}px;">'
         ]
         svg_parts.append(
             '<defs>'
