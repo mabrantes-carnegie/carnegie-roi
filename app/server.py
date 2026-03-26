@@ -1377,7 +1377,7 @@ def server_logic(input, output, session):
             x=curr[metric],
             y=curr["program_display"],
             orientation="h",
-            marker_color="#C99D44",
+            marker_color="#EA332D",
             text=[f"{int(v):,}" for v in curr[metric]],
             textposition="outside",
             textfont=dict(family="Manrope, sans-serif", size=10, color=CARNEGIE_NAVY),
