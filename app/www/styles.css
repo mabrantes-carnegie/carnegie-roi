@@ -464,10 +464,10 @@ body > div.container-fluid {
     border: 1px solid var(--carnegie-gray-border);
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-card);
-    padding: 16px 18px;
+    padding: 12px 16px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
 }
 
 .funnel-label {
@@ -479,9 +479,16 @@ body > div.container-fluid {
     color: var(--carnegie-gray-text);
 }
 
+.funnel-value-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .funnel-value {
     font-family: 'Manrope', sans-serif;
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 700;
     color: var(--carnegie-navy);
     line-height: 1.1;

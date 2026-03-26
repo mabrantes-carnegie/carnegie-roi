@@ -175,11 +175,14 @@ _COST_METRICS = [
 
 
 def _funnel_kpi_card(label: str, key: str, border_color: str = "#EA332D"):
-    """Compact funnel KPI card with value, YoY delta, goal text, and progress bar."""
+    """Compact funnel KPI card with value, YoY delta (inline), goal text, and progress bar."""
     return ui.tags.div(
         ui.tags.div(label, class_="funnel-label"),
-        ui.tags.div(ui.output_text(f"kpi_{key}"), class_="funnel-value"),
-        ui.output_ui(f"yoy_{key}"),
+        ui.tags.div(
+            ui.tags.div(ui.output_text(f"kpi_{key}"), class_="funnel-value"),
+            ui.output_ui(f"yoy_{key}"),
+            class_="funnel-value-row",
+        ),
         ui.output_ui(f"goal_text_{key}"),
         ui.output_ui(f"progress_{key}"),
         class_="funnel-card",
