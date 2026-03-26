@@ -902,18 +902,18 @@ def server_logic(input, output, session):
 
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            x=labels, y=curr_vals, name=curr_label,
-            marker_color="#EA332D",
-            text=[f"{v:,}" for v in curr_vals], textposition="outside",
-            textfont=dict(family="Manrope, sans-serif", size=11),
-            hovertemplate="<b>%{x}</b><br>" + curr_label + ": %{y:,}<extra></extra>",
-        ))
-        fig.add_trace(go.Bar(
             x=labels, y=prior_vals, name=prior_label,
             marker_color="#FFDBD9",
             text=[f"{v:,}" for v in prior_vals], textposition="outside",
             textfont=dict(family="Manrope, sans-serif", size=11),
             hovertemplate="<b>%{x}</b><br>" + prior_label + ": %{y:,}<extra></extra>",
+        ))
+        fig.add_trace(go.Bar(
+            x=labels, y=curr_vals, name=curr_label,
+            marker_color="#EA332D",
+            text=[f"{v:,}" for v in curr_vals], textposition="outside",
+            textfont=dict(family="Manrope, sans-serif", size=11),
+            hovertemplate="<b>%{x}</b><br>" + curr_label + ": %{y:,}<extra></extra>",
         ))
 
         # YoY % annotations + bracket connectors above each bar group
