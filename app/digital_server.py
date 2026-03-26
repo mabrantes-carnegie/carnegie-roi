@@ -976,29 +976,29 @@ def digital_server(input, output, session):
         if df_curr.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        curr_daily = (
-            df_curr.groupby("day")["total_interactions"].sum()
-            .reset_index().sort_values("day")
+        # Group by month
+        df_curr["month"] = df_curr["day"].dt.to_period("M")
+        curr_monthly = (
+            df_curr.groupby("month")["impressions"].sum()
+            .reset_index().sort_values("month")
         )
+        curr_monthly["label"] = curr_monthly["month"].dt.strftime("%b %y")
+
         period = input.dig_period()
         if period and len(period) == 2:
-            start_dt, end_dt = pd.Timestamp(period[0]), pd.Timestamp(period[1])
+            start_dt = pd.Timestamp(period[0])
+            curr_year = start_dt.year
+            prior_year = curr_year - 1
         else:
-            start_dt, end_dt = curr_daily["day"].min(), curr_daily["day"].max()
+            curr_year = df_curr["day"].dt.year.max()
+            prior_year = curr_year - 1
 
-        all_days = pd.DataFrame({"day": pd.date_range(start_dt, end_dt, freq="D")})
-        curr_daily = all_days.merge(curr_daily, on="day", how="left").fillna(0)
-        curr_daily["label"] = curr_daily["day"].dt.day.astype(str)
-
-        # Build prior year label for legend
-        prior_year = start_dt.year - 1
-        curr_year  = start_dt.year
-        curr_legend = f"Total Conversions {curr_year}"
-        prior_legend = f"Total Conversions {prior_year}"
+        curr_legend = f"Impressions {curr_year}"
+        prior_legend = f"Impressions {prior_year}"
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(
-            x=curr_daily["label"], y=curr_daily["total_interactions"],
+            x=curr_monthly["label"], y=curr_monthly["impressions"],
             mode="lines+markers", name=curr_legend,
             line=dict(color="#EA332D", width=2),
             marker=dict(color="#EA332D", size=4),
@@ -1006,13 +1006,14 @@ def digital_server(input, output, session):
         ))
 
         if not df_prior.empty:
-            prior_daily = (
-                df_prior.groupby("day")["total_interactions"].sum()
-                .reset_index().sort_values("day")
+            df_prior["month"] = df_prior["day"].dt.to_period("M")
+            prior_monthly = (
+                df_prior.groupby("month")["impressions"].sum()
+                .reset_index().sort_values("month")
             )
-            prior_daily["label"] = prior_daily["day"].dt.day.astype(str)
+            prior_monthly["label"] = prior_monthly["month"].dt.strftime("%b %y")
             fig.add_trace(go.Scatter(
-                x=prior_daily["label"], y=prior_daily["total_interactions"],
+                x=prior_monthly["label"], y=prior_monthly["impressions"],
                 mode="lines+markers", name=prior_legend,
                 line=dict(color="#C99D44", width=1.8, dash="dash"),
                 marker=dict(color="#C99D44", size=3),
@@ -1021,8 +1022,8 @@ def digital_server(input, output, session):
 
         layout = _base_layout(320)
         layout["xaxis"] = dict(
-            tickvals=curr_daily["label"].tolist(),
-            ticktext=curr_daily["label"].tolist(),
+            tickvals=curr_monthly["label"].tolist(),
+            ticktext=curr_monthly["label"].tolist(),
             tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
             showgrid=False, title="", tickangle=0,
         )
