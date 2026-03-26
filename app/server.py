@@ -1150,7 +1150,7 @@ def server_logic(input, output, session):
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=x_labels, y=bd["admit_rate"], name="Admit Rate",
-            marker=dict(color="#021326", line=dict(width=0)),
+            marker=dict(color="#EA332D", line=dict(width=0)),
             text=[f"{v:.0f}%" for v in bd["admit_rate"]],
             textposition="outside",
             textfont=dict(family="Manrope", size=10, color="#021326"),
@@ -1159,10 +1159,10 @@ def server_logic(input, output, session):
         ))
         fig.add_trace(go.Bar(
             x=x_labels, y=bd["yield_rate"], name="Yield Rate",
-            marker=dict(color=CHART_COLORS[1], line=dict(width=0)),
+            marker=dict(color="#FFDBD9", line=dict(width=0)),
             text=[f"{v:.0f}%" for v in bd["yield_rate"]],
             textposition="outside",
-            textfont=dict(family="Manrope", size=10, color=CHART_COLORS[1]),
+            textfont=dict(family="Manrope", size=10, color="#021326"),
             cliponaxis=False,
             hovertemplate="<b>%{x}</b><br>Yield Rate: %{y:.1f}%<extra></extra>",
         ))
