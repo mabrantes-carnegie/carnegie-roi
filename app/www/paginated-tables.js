@@ -7,7 +7,7 @@
 (function () {
   "use strict";
 
-  var PAGE_SIZE_OPTIONS = [25, 50, 100];
+  var PAGE_SIZE_OPTIONS = [10, 25, 50];
 
   function buildPaginator(table) {
     if (table._paginatorInit) return;
