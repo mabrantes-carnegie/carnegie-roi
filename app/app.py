@@ -461,6 +461,10 @@ page_geography = ui.nav_panel(
                 class_="card-header-row",
             ),
             ui.output_ui("geo_map_section"),
+            ui.tags.p(
+                "* \"Unknown\" represents students who did not fill in the State or City field in a form or registration.",
+                style="text-align:right; font-size:0.75rem; color:#6B7280; margin:4px 0 0 0;",
+            ),
             class_="chart-card",
         ),
         ui.tags.h2("State / City detail", class_="section-heading"),
