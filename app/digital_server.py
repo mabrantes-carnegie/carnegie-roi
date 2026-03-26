@@ -1007,15 +1007,19 @@ def digital_server(input, output, session):
             ).reset_index(drop=True)
             prior_monthly["month_pos"] = prior_monthly.index
             # Align prior months to current month positions on x-axis
+            prior_monthly["prior_label"] = prior_monthly["month"].dt.strftime("%b %y")
             merged = curr_monthly[["month_dt", "month_pos"]].merge(
-                prior_monthly[["month_pos", "impressions"]], on="month_pos", how="left"
-            ).fillna(0)
+                prior_monthly[["month_pos", "impressions", "prior_label"]], on="month_pos", how="left"
+            )
+            merged["impressions"] = merged["impressions"].fillna(0)
+            merged["prior_label"] = merged["prior_label"].fillna("")
             fig.add_trace(go.Scatter(
                 x=merged["month_dt"], y=merged["impressions"],
+                customdata=merged["prior_label"],
                 mode="lines+markers", name="Total Impressions (previous year)",
                 line=dict(color="#C99D44", width=1.8, dash="dash"),
                 marker=dict(color="#C99D44", size=3),
-                hovertemplate="%{x|%b %y}<br>Total Impressions (prev): %{y:,.0f}<extra></extra>",
+                hovertemplate="%{customdata}<br>Total Impressions (prev): %{y:,.0f}<extra></extra>",
             ))
 
         layout = _base_layout(320)
