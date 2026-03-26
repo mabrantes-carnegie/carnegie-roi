@@ -19,15 +19,32 @@
     return cell ? (cell.textContent || cell.innerText || "").trim() : "";
   }
 
-  function compareValues(a, b, asc) {
+  function compareValues(a, b, asc, colIsNumeric) {
     var na = parseNum(a), nb = parseNum(b);
     var result;
-    if (!isNaN(na) && !isNaN(nb)) {
+    if (colIsNumeric) {
+      // Treat NaN/non-numeric as -Infinity so they sort to the bottom
+      var va = isNaN(na) ? -Infinity : na;
+      var vb = isNaN(nb) ? -Infinity : nb;
+      result = va - vb;
+    } else if (!isNaN(na) && !isNaN(nb)) {
       result = na - nb;
     } else {
       result = a.toLowerCase().localeCompare(b.toLowerCase());
     }
     return asc ? result : -result;
+  }
+
+  function colIsNumeric(rows, idx) {
+    // Column is numeric if >50% of non-empty cells parse as a number
+    var total = 0, nums = 0;
+    rows.forEach(function (r) {
+      var v = getCellValue(r, idx);
+      if (v === "" || v === "—" || v === "N/A") return;
+      total++;
+      if (!isNaN(parseNum(v))) nums++;
+    });
+    return total > 0 && nums / total > 0.5;
   }
 
   function initTable(table) {
@@ -54,8 +71,9 @@
         var tbody = table.querySelector("tbody");
         if (!tbody) return;
         var rows = Array.from(tbody.querySelectorAll("tr"));
+        var isNum = colIsNumeric(rows, idx);
         rows.sort(function (a, b) {
-          return compareValues(getCellValue(a, idx), getCellValue(b, idx), asc);
+          return compareValues(getCellValue(a, idx), getCellValue(b, idx), asc, isNum);
         });
         rows.forEach(function (r) { tbody.appendChild(r); });
       });
