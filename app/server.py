@@ -927,37 +927,22 @@ def server_logic(input, output, session):
             if pv and pv != 0:
                 pct = (cv - pv) / pv * 100
                 arrow = "▲" if pct >= 0 else "▼"
-                color = "#132B23" if pct >= 0 else "#560422"
+                font_color  = "#132B23" if pct >= 0 else "#560422"
+                bg_color    = "#D1FAE5" if pct >= 0 else "#FFE4E6"
+                border_color = "#6EE7B7" if pct >= 0 else "#FECDD3"
                 # Per-group heights: bracket sits just above the taller bar
                 group_top = max(cv, pv)
-                line_y  = group_top + y_max * 0.10
                 label_y = group_top + y_max * 0.18
                 annotations.append(dict(
                     x=i, y=label_y, xref="x", yref="y",
                     text=f"<b>{arrow} {abs(pct):.1f}%</b>",
                     showarrow=False,
-                    font=dict(family="Manrope, sans-serif", size=12, color=color),
+                    font=dict(family="Manrope, sans-serif", size=11, color=font_color),
                     xanchor="center",
-                ))
-                line_color = "#9B9893"
-                lw = 1
-                # Left vertical leg (curr bar center → line_y)
-                shapes.append(dict(
-                    type="line", xref="x", yref="y",
-                    x0=i - bar_half, y0=cv, x1=i - bar_half, y1=line_y,
-                    line=dict(color=line_color, width=lw, dash="dot"),
-                ))
-                # Right vertical leg (prior bar center → line_y)
-                shapes.append(dict(
-                    type="line", xref="x", yref="y",
-                    x0=i + bar_half, y0=pv, x1=i + bar_half, y1=line_y,
-                    line=dict(color=line_color, width=lw, dash="dot"),
-                ))
-                # Horizontal connector
-                shapes.append(dict(
-                    type="line", xref="x", yref="y",
-                    x0=i - bar_half, y0=line_y, x1=i + bar_half, y1=line_y,
-                    line=dict(color=line_color, width=lw, dash="dot"),
+                    bgcolor=bg_color,
+                    bordercolor=border_color,
+                    borderwidth=1,
+                    borderpad=4,
                 ))
 
         # "Same period" note — bottom-left, below the legend
@@ -978,7 +963,6 @@ def server_logic(input, output, session):
         layout["barmode"] = "group"
         layout["bargap"] = 0.35
         layout["annotations"] = annotations
-        layout["shapes"] = shapes
         layout["yaxis"] = dict(
             tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
             gridcolor="#F0EEEA", gridwidth=0.8,
