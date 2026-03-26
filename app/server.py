@@ -651,54 +651,143 @@ def server_logic(input, output, session):
         prior = prior_kpis()
 
         stages = [
-            ("Inquiries", "total_inquiries"),
-            ("App Starts", "total_app_starts"),
-            ("App Submits", "total_app_submits"),
-            ("Admits", "total_admits"),
-            ("Deposits", "total_deposits"),
+            ("Inquiries",    "total_inquiries"),
+            ("App Starts",   "total_app_starts"),
+            ("App Submits",  "total_app_submits"),
+            ("Admits",       "total_admits"),
+            ("Deposits",     "total_deposits"),
             ("Net Deposits", "total_net_deposits"),
         ]
 
         if all(kpis.get(k, 0) == 0 for _, k in stages):
             return ui.tags.div("No data.", class_="empty-state")
 
-        items = []
+        n = len(stages)
+        vals = [kpis.get(k, 0) for _, k in stages]
+        max_val = max(v for v in vals if v > 0) or 1
+
+        # SVG dimensions
+        W = 260
+        STEP_H = 44        # height of each trapezoid block
+        GAP_H = 18         # height of connector gap between blocks
+        TOTAL_H = n * STEP_H + (n - 1) * GAP_H + 4
+        MIN_W_PCT = 0.28   # narrowest block as fraction of W
+        MAX_W_PCT = 1.0
+
+        # Color palette: Carnegie Red gradient light → dark
+        colors = [
+            "#F4A09B", "#EF7A74", "#EA554E",
+            "#D93C36", "#C42E28", "#A82420",
+        ]
+
+        svg_parts = [
+            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {TOTAL_H}" '
+            f'width="100%" style="display:block;max-width:{W}px;margin:0 auto;">'
+        ]
+
+        # Drop shadow filter
+        svg_parts.append(
+            '<defs>'
+            '<filter id="fgshadow" x="-10%" y="-10%" width="120%" height="130%">'
+            '<feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000018"/>'
+            '</filter>'
+            '</defs>'
+        )
+
         for i, (label, key) in enumerate(stages):
-            val = kpis.get(key, 0)
-            items.append(ui.tags.div(
-                ui.tags.span(label, class_="fg-stage-label"),
-                ui.tags.span(fmt_number(val), class_="fg-stage-value"),
-                class_="fg-stage",
-            ))
-            if i < len(stages) - 1:
-                next_key = stages[i + 1][1]
-                curr_rate = (kpis.get(next_key, 0) / val * 100) if val > 0 else None
+            val = vals[i]
+            ratio = (val / max_val) ** 0.55  # power scale so small stages still visible
+            w_pct = MIN_W_PCT + ratio * (MAX_W_PCT - MIN_W_PCT)
+
+            # Next stage width for bottom edge of trapezoid
+            if i < n - 1:
+                next_val = vals[i + 1]
+                next_ratio = (next_val / max_val) ** 0.55
+                next_w_pct = MIN_W_PCT + next_ratio * (MAX_W_PCT - MIN_W_PCT)
+            else:
+                next_w_pct = w_pct * 0.88  # last stage tapers slightly
+
+            top_w = w_pct * W
+            bot_w = next_w_pct * W
+            top_x = (W - top_w) / 2
+            bot_x = (W - bot_w) / 2
+            y = i * (STEP_H + GAP_H)
+
+            # Trapezoid points
+            pts = f"{top_x},{y} {top_x+top_w},{y} {bot_x+bot_w},{y+STEP_H} {bot_x},{y+STEP_H}"
+            color = colors[i]
+
+            svg_parts.append(
+                f'<polygon points="{pts}" fill="{color}" rx="4" filter="url(#fgshadow)"/>'
+            )
+
+            # Label (left-aligned inside block)
+            text_y = y + STEP_H / 2
+            label_x = top_x + 12
+            val_x = top_x + top_w - 12
+
+            svg_parts.append(
+                f'<text x="{label_x:.1f}" y="{text_y:.1f}" '
+                f'dominant-baseline="middle" text-anchor="start" '
+                f'font-family="Manrope,sans-serif" font-size="11" font-weight="600" '
+                f'fill="rgba(255,255,255,0.92)" letter-spacing="0.03em">'
+                f'{label}</text>'
+            )
+            svg_parts.append(
+                f'<text x="{val_x:.1f}" y="{text_y:.1f}" '
+                f'dominant-baseline="middle" text-anchor="end" '
+                f'font-family="Manrope,sans-serif" font-size="13" font-weight="700" '
+                f'fill="#ffffff">'
+                f'{fmt_number(val)}</text>'
+            )
+
+            # Connector with conversion rate
+            if i < n - 1:
+                curr_rate = (vals[i + 1] / val * 100) if val > 0 else None
                 prior_val = prior.get(key, 0)
-                prior_rate = (prior.get(next_key, 0) / prior_val * 100) if prior_val > 0 else None
+                prior_rate = (prior.get(stages[i + 1][1], 0) / prior_val * 100) if prior_val > 0 else None
+
+                conn_y_top = y + STEP_H
+                conn_y_bot = conn_y_top + GAP_H
+                conn_mid_y = conn_y_top + GAP_H / 2
+
+                # Thin connector line
+                cx = W / 2
+                svg_parts.append(
+                    f'<line x1="{cx}" y1="{conn_y_top}" x2="{cx}" y2="{conn_y_bot}" '
+                    f'stroke="#D0CBC5" stroke-width="1" stroke-dasharray="2,2"/>'
+                )
 
                 if curr_rate is not None:
                     if prior_rate is None:
-                        rate_cls = ""
+                        rate_color = "#9B9893"
                     elif curr_rate >= prior_rate:
-                        rate_cls = "fg-rate--good"
+                        rate_color = "#22A06B"
                     elif curr_rate >= prior_rate - 5:
-                        rate_cls = "fg-rate--warn"
+                        rate_color = "#C99D44"
                     else:
-                        rate_cls = "fg-rate--bad"
-                    label_text = "retain" if i == len(stages) - 2 else "convert"
-                    items.append(ui.tags.div(
-                        ui.tags.span("\u2193", class_="fg-arrow"),
-                        ui.tags.span(f"{curr_rate:.1f}% {label_text}", class_=f"fg-rate {rate_cls}"),
-                        class_="fg-conversion",
-                    ))
-                else:
-                    items.append(ui.tags.div(
-                        ui.tags.span("\u2193", class_="fg-arrow"),
-                        ui.tags.span("\u2014", class_="fg-rate"),
-                        class_="fg-conversion",
-                    ))
+                        rate_color = "#EA332D"
 
-        # Melt rate
+                    rate_text = f"{curr_rate:.1f}%"
+                    # Pill background
+                    pill_w = 46
+                    pill_h = 14
+                    svg_parts.append(
+                        f'<rect x="{cx - pill_w/2:.1f}" y="{conn_mid_y - pill_h/2:.1f}" '
+                        f'width="{pill_w}" height="{pill_h}" rx="7" '
+                        f'fill="white" stroke="{rate_color}" stroke-width="1"/>'
+                    )
+                    svg_parts.append(
+                        f'<text x="{cx}" y="{conn_mid_y:.1f}" '
+                        f'dominant-baseline="middle" text-anchor="middle" '
+                        f'font-family="Manrope,sans-serif" font-size="9" font-weight="700" '
+                        f'fill="{rate_color}">{rate_text}</text>'
+                    )
+
+        svg_parts.append('</svg>')
+        svg_html = "".join(svg_parts)
+
+        # Melt rate footer
         deposits = kpis.get("total_deposits", 0)
         net_deposits = kpis.get("total_net_deposits", 0)
         if deposits > 0:
@@ -711,7 +800,11 @@ def server_logic(input, output, session):
         else:
             melt_el = ui.tags.div()
 
-        return ui.tags.div(*items, melt_el, class_="fg-panel")
+        return ui.tags.div(
+            ui.HTML(svg_html),
+            melt_el,
+            class_="fg-panel",
+        )
 
     # --- Goal context text (shown below YoY badge on each KPI card) ---
 

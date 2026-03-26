@@ -1327,7 +1327,7 @@ table.sortable-table thead th[data-sort="desc"]::after {
     display: flex;
     flex-direction: column;
     gap: 0;
-    padding: 4px 0;
+    padding: 4px 8px 0;
 }
 
 .fg-stage {
