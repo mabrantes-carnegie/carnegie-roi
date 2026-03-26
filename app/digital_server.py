@@ -1781,12 +1781,12 @@ def digital_server(input, output, session):
         months_12 = pd.period_range(end=latest, periods=12, freq="M")
         month_labels = {str(m): m.to_timestamp().strftime("%b %y") for m in months_12}
 
-        agg = df_full.groupby(["interaction_category", "month"])["total_interactions"].sum().reset_index()
+        agg = df_full.groupby(["interaction_category", "conversion_name", "month"])["total_interactions"].sum().reset_index()
         agg["ym"] = agg["month"].astype(str)
         agg = agg[agg["ym"].isin(month_labels)]
 
         wide = agg.pivot_table(
-            index="interaction_category",
+            index=["interaction_category", "conversion_name"],
             columns="ym", values="total_interactions", aggfunc="sum", fill_value=0,
         ).reset_index()
         wide.columns.name = None
@@ -1802,13 +1802,17 @@ def digital_server(input, output, session):
         wide = wide.sort_values("Grand Total", ascending=False)
 
         # Rename month columns to "Feb 26" format
-        wide = wide.rename(columns={**month_labels, "interaction_category": "Category"})
+        wide = wide.rename(columns={
+            **month_labels,
+            "interaction_category": "Category",
+            "conversion_name": "Conversion Name",
+        })
         display_month_cols = [month_labels[m] for m in month_cols]
         heatmap_cols = display_month_cols + ["Grand Total"]
         for c in heatmap_cols:
             wide[c] = wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
 
-        col_order = ["Category"] + display_month_cols + ["Grand Total"]
+        col_order = ["Category", "Conversion Name"] + display_month_cols + ["Grand Total"]
         return _heatmap_table(wide[[c for c in col_order if c in wide.columns]], heatmap_cols)
 
     # --- Interactions detail table ---
