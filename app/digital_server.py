@@ -1579,22 +1579,44 @@ def digital_server(input, output, session):
             return ui.tags.div("No data available.", class_="empty-state")
 
         cats = ["RFI/Lead Gen", "Visit/Event", "Apply", "Enroll/Deposit", "Other"]
-        monthly = df.groupby([df["day"].dt.to_period("M"), "interaction_category"])["total_interactions"].sum().reset_index()
-        monthly["day"] = monthly["day"].dt.to_timestamp()
-        monthly["label"] = monthly["day"].dt.strftime("%b %Y")
+
+        period = input.dig_period()
+        if period and len(period) == 2:
+            start_dt = pd.Timestamp(period[0])
+            end_dt   = pd.Timestamp(period[1])
+        else:
+            start_dt = df["day"].min()
+            end_dt   = df["day"].max()
+
+        all_days = pd.date_range(start_dt, end_dt, freq="D")
+        odd_days = [d for d in all_days if d.day % 2 == 1]
+        tickvals = odd_days
+        ticktext = [d.strftime("%b ") + str(d.day) for d in odd_days]
 
         fig = go.Figure()
         for i, cat in enumerate(cats):
-            sub = monthly[monthly["interaction_category"] == cat]
-            if sub.empty:
-                continue
+            sub = (
+                df[df["interaction_category"] == cat]
+                .groupby("day")["total_interactions"].sum()
+                .reset_index()
+            )
+            spine = pd.DataFrame({"day": all_days})
+            sub = spine.merge(sub, on="day", how="left").fillna(0)
             fig.add_trace(go.Scatter(
-                x=sub["label"], y=sub["total_interactions"],
+                x=sub["day"], y=sub["total_interactions"],
                 mode="lines+markers", name=cat,
                 line=dict(color=STRATEGY_COLORS[i % len(STRATEGY_COLORS)], width=2),
                 marker=dict(size=4),
+                hovertemplate=f"<b>{cat}</b><br>%{{x|%b %e}}<br>Interactions: %{{y:,.0f}}<extra></extra>",
             ))
-        fig.update_layout(**_base_layout(340))
+
+        layout = _base_layout(340)
+        layout["xaxis"] = dict(
+            tickvals=tickvals, ticktext=ticktext,
+            tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
+            showgrid=False, title="", tickangle=0,
+        )
+        fig.update_layout(**layout)
         return _plotly_html(fig)
 
     # --- Category × Strategy chart ---
