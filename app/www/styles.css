@@ -536,6 +536,22 @@ body > div.container-fluid {
     border-color: #c8c3bc;
 }
 
+.collapsible-row {
+    overflow: hidden;
+    max-height: 0;
+    margin-bottom: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: max-height 0.25s ease, opacity 0.2s ease, margin-bottom 0.25s ease;
+}
+
+.collapsible-row.collapsible-row--open {
+    max-height: 200px;
+    opacity: 1;
+    pointer-events: auto;
+    margin-bottom: 8px;
+}
+
 .collapsible-btn-chevron {
     font-size: 14px;
     font-weight: 400;

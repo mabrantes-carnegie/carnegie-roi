@@ -241,8 +241,8 @@ page_overview = ui.nav_panel(
                 class_="collapsible-section-btn",
                 onclick=(
                     "var row=document.getElementById('conv-rates-row');"
-                    "var open=row.style.display!=='none'&&row.style.display!=='';"
-                    "row.style.display=open?'none':'flex';"
+                    "var open=row.classList.contains('collapsible-row--open');"
+                    "row.classList.toggle('collapsible-row--open',!open);"
                     "this.querySelector('.collapsible-btn-label').textContent=open?'Show Conversion Rates':'Hide Conversion Rates';"
                     "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
                 ),
@@ -261,8 +261,7 @@ page_overview = ui.nav_panel(
             ),
             ui.output_ui("melt_rate_secondary"),
             id="conv-rates-row",
-            class_="secondary-row",
-            style="display:none;",
+            class_="secondary-row collapsible-row",
         ),
 
         # Section 3b: Cost Metrics collapsible row
@@ -273,39 +272,13 @@ page_overview = ui.nav_panel(
                 class_="collapsible-section-btn",
                 onclick=(
                     "var row=document.getElementById('cost-metrics-row');"
-                    "var open=row.style.display!=='none'&&row.style.display!=='';"
-                    "row.style.display=open?'none':'flex';"
+                    "var open=row.classList.contains('collapsible-row--open');"
+                    "row.classList.toggle('collapsible-row--open',!open);"
                     "this.querySelector('.collapsible-btn-label').textContent=open?'Show Cost Metrics':'Hide Cost Metrics';"
                     "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
                 ),
             ),
             class_="collapsible-section-header",
-        ),
-        ui.tags.div(
-            ui.tags.div(
-                ui.tags.div("Cost per Net Deposit", class_="secondary-label"),
-                ui.tags.div(ui.output_text("kpi_cost_per_net_deposit"), class_="secondary-value"),
-                ui.tags.div(
-                    ui.output_ui("yoy_cost_per_net_deposit"),
-                    ui.tags.a(
-                        "View all costs \u2197",
-                        href="#",
-                        class_="cost-expand-link",
-                        onclick=(
-                            "var p=document.getElementById('cost-expand-inner');"
-                            "if(!p)return false;"
-                            "p.style.display=p.style.display==='none'?'flex':'none';"
-                            "this.textContent=p.style.display==='none'?'View all costs \u2197':'Hide costs \u2197';"
-                            "return false;"
-                        ),
-                    ),
-                    class_="cost-badge-footer",
-                ),
-                class_="secondary-badge",
-            ),
-            id="cost-metrics-row",
-            class_="secondary-row",
-            style="display:none;",
         ),
         ui.output_ui("cost_detail_panel"),
 
@@ -1013,7 +986,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=27"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=28"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(src="paginated-tables.js"),

@@ -386,13 +386,14 @@ def server_logic(input, output, session):
 
     @render.ui
     def cost_detail_panel():
-        """Single render for all expanded cost metrics — avoids lazy-render spinner issue."""
+        """All cost metrics in a single collapsible row."""
         _costs = [
-            ("Cost/Inquiry",    "total_inquiries"),
-            ("Cost/App Start",  "total_app_starts"),
-            ("Cost/App Submit", "total_app_submits"),
-            ("Cost/Admit",      "total_admits"),
-            ("Cost/Deposit",    "total_deposits"),
+            ("Cost/Net Deposit", "total_net_deposits"),
+            ("Cost/Inquiry",     "total_inquiries"),
+            ("Cost/App Start",   "total_app_starts"),
+            ("Cost/App Submit",  "total_app_submits"),
+            ("Cost/Admit",       "total_admits"),
+            ("Cost/Deposit",     "total_deposits"),
         ]
         total_spend = filtered_q2()["total_cost"].sum()
         prior_spend = prior_q2()["total_cost"].sum()
@@ -425,9 +426,8 @@ def server_logic(input, output, session):
 
         return ui.tags.div(
             *badges,
-            id="cost-expand-inner",
-            class_="secondary-row",
-            style="display:none;",
+            id="cost-metrics-row",
+            class_="secondary-row collapsible-row",
             title="Cost metrics reflect Carnegie campaign spend divided by total funnel volume.",
         )
 
