@@ -1244,19 +1244,52 @@ def digital_server(input, output, session):
 
     @render.ui
     def dig_interactions_by_strategy_month():
-        df = _dig_q8()
+        # Bypass date filter — always show last 12 months available in data
+        df = Q8.copy()
+        grp = input.dig_group()
+        if grp and len(grp) > 0:
+            df = df[df["group_name"].isin(grp)]
+        sub = input.dig_subgroup()
+        if sub and len(sub) > 0:
+            df = df[df["subgroup_name"].isin(sub)]
+        prod = input.dig_product()
+        if prod and len(prod) > 0:
+            df = df[df["product_name"].isin(prod)]
+        camp = input.dig_campaign()
+        if camp and len(camp) > 0:
+            df = df[df["campaign_name"].isin(camp)]
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
         df = df.copy()
-        df["ym"] = df["day"].dt.strftime("%Y-%m")
-        pivot = df.groupby(["product_name", "ym"])["total_interactions"].sum().reset_index()
-        pivot_wide = pivot.pivot(index="product_name", columns="ym", values="total_interactions").fillna(0)
-        pivot_wide = pivot_wide[sorted(pivot_wide.columns)]
+        df["ym"] = df["day"].dt.to_period("M")
+
+        # Determine last 12 months present in the data
+        all_months = sorted(df["ym"].unique())
+        months_to_show = all_months[-12:]
+
+        df = df[df["ym"].isin(months_to_show)]
+
+        # Build display label: "Nov 25", "Jan 26"
+        def _label(period):
+            return period.strftime("%b %y")  # e.g. "Nov 25"
+
+        df["month_label"] = df["ym"].apply(_label)
+        label_order = [_label(m) for m in months_to_show]
+
+        pivot = df.groupby(["product_name", "month_label"])["total_interactions"].sum().reset_index()
+        pivot_wide = pivot.pivot(index="product_name", columns="month_label", values="total_interactions").fillna(0)
+
+        # Ensure all 12 months are columns in order
+        for lbl in label_order:
+            if lbl not in pivot_wide.columns:
+                pivot_wide[lbl] = 0
+        pivot_wide = pivot_wide[label_order]
+
         pivot_wide["Grand Total"] = pivot_wide.sum(axis=1)
         pivot_wide = pivot_wide.sort_values("Grand Total", ascending=False).reset_index()
         pivot_wide = pivot_wide.rename(columns={"product_name": "Strategy"})
-        heatmap_cols = [c for c in pivot_wide.columns if c != "Strategy"]
+        heatmap_cols = label_order + ["Grand Total"]
         for c in heatmap_cols:
             pivot_wide[c] = pivot_wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
         return _heatmap_table(pivot_wide, heatmap_cols)
