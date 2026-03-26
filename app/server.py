@@ -13,7 +13,7 @@ from metrics import (
     compute_geo_detail,
 )
 from formatters import fmt_number, fmt_pct, fmt_currency, fmt_yoy
-from digital_server import digital_server, _plain_table
+from digital_server import digital_server, _plain_table, _heatmap_table
 
 # ── Carnegie brand colors for Plotly ─────────────────────────
 
@@ -1548,7 +1548,8 @@ def server_logic(input, output, session):
         })
         show_cols = ["State", "City", "Inquiries", "App Starts",
                      "App Submits", "Deposits", "Net Deposits"]
-        return _plain_table(display[show_cols], paginated=True)
+        heatmap_cols = [c for c in show_cols if c not in ("State", "City")]
+        return _heatmap_table(display[show_cols], heatmap_cols, paginated=True)
 
     # ══════════════════════════════════════════════════════════
     # PAGE 4: DIGITAL PERFORMANCE

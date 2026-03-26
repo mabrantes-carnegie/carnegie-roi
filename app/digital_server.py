@@ -235,7 +235,7 @@ def _plain_table(df: "pd.DataFrame", paginated: bool = False) -> "ui.HTML":
     return ui.HTML(html)
 
 
-def _heatmap_table(df: "pd.DataFrame", heatmap_cols: list) -> "ui.HTML":
+def _heatmap_table(df: "pd.DataFrame", heatmap_cols: list, paginated: bool = False) -> "ui.HTML":
     """Render a DataFrame as an HTML table with gold heatmap on specified columns."""
     r, g, b = _hex_to_rgb(_HEATMAP_COLOR)
 
@@ -297,9 +297,10 @@ def _heatmap_table(df: "pd.DataFrame", heatmap_cols: list) -> "ui.HTML":
         headers.append(f'<th style="{s}">{col}</th>')
 
     total_row = _build_total_row(df, td_first, td_base)
+    tbl_class = "sortable-table paginated-table" if paginated else "sortable-table"
     html = (
         '<div style="overflow-x:auto;">'
-        '<table class="sortable-table" style="width:100%;border-collapse:collapse;">'
+        f'<table class="{tbl_class}" style="width:100%;border-collapse:collapse;">'
         "<thead><tr>" + "".join(headers) + "</tr></thead>"
         "<tbody>" + "".join(rows_html) + "</tbody>"
         "<tfoot>" + total_row + "</tfoot>"
@@ -2023,7 +2024,9 @@ def digital_server(input, output, session):
         })
         show = ["Region", "Impressions", "Clicks", "CTR", "Direct Conv.",
                 "View-through", "Total Conversions"]
-        return _plain_table(agg[[c for c in show if c in agg.columns]], paginated=True)
+        display = agg[[c for c in show if c in agg.columns]]
+        heatmap_cols = [c for c in display.columns if c != "Region"]
+        return _heatmap_table(display, heatmap_cols, paginated=True)
 
     # ══════════════════════════════════════════════════════════
     # TAB 4: CREATIVE
