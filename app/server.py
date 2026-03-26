@@ -1355,7 +1355,7 @@ def server_logic(input, output, session):
             .sum()
             .reset_index()
             .sort_values(metric, ascending=False)
-            .head(15)
+            .head(10)
         )
 
         # Prior year for YoY colouring
