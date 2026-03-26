@@ -927,22 +927,29 @@ def server_logic(input, output, session):
             if pv and pv != 0:
                 pct = (cv - pv) / pv * 100
                 arrow = "▲" if pct >= 0 else "▼"
-                font_color  = "#132B23" if pct >= 0 else "#560422"
-                bg_color    = "#D1FAE5" if pct >= 0 else "#FFE4E6"
-                border_color = "#6EE7B7" if pct >= 0 else "#FECDD3"
-                # Per-group heights: bracket sits just above the taller bar
+                font_color = "#132B23" if pct >= 0 else "#560422"
+                bg_color   = "#D1FAE5" if pct >= 0 else "#FFE4E6"
+                # Per-group heights: badge sits just above the taller bar
                 group_top = max(cv, pv)
                 label_y = group_top + y_max * 0.18
+                # Pill background via rounded rect shape
+                pad_x = 0.18
+                pad_y = y_max * 0.055
+                shapes.append(dict(
+                    type="rect", xref="x", yref="y",
+                    x0=i - pad_x, y0=label_y - pad_y,
+                    x1=i + pad_x, y1=label_y + pad_y,
+                    fillcolor=bg_color,
+                    line=dict(width=0),
+                    layer="below",
+                    rounding=0.8,
+                ))
                 annotations.append(dict(
                     x=i, y=label_y, xref="x", yref="y",
                     text=f"<b>{arrow} {abs(pct):.1f}%</b>",
                     showarrow=False,
                     font=dict(family="Manrope, sans-serif", size=11, color=font_color),
-                    xanchor="center",
-                    bgcolor=bg_color,
-                    bordercolor=bg_color,
-                    borderwidth=0,
-                    borderpad=6,
+                    xanchor="center", yanchor="middle",
                 ))
 
         # "Same period" note — bottom-left, below the legend
@@ -963,6 +970,7 @@ def server_logic(input, output, session):
         layout["barmode"] = "group"
         layout["bargap"] = 0.35
         layout["annotations"] = annotations
+        layout["shapes"] = shapes
         layout["yaxis"] = dict(
             tickfont=dict(family="Manrope, sans-serif", size=10.5, color="#9B9893"),
             gridcolor="#F0EEEA", gridwidth=0.8,
