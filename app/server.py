@@ -1324,6 +1324,16 @@ def server_logic(input, output, session):
 
         fig = go.Figure()
 
+        # Current year line — first so it appears first in legend
+        fig.add_trace(go.Scatter(
+            x=curr_agg["month_label"], y=curr_agg["cumulative"],
+            mode="lines+markers",
+            name=curr_label,
+            line=dict(color="#EA332D", width=2.5),
+            marker=dict(color="#EA332D", size=7),
+            hovertemplate=f"<b>%{{x}} {curr_label}</b><br>{metric_label}: %{{y:,.0f}}<extra></extra>",
+        ))
+
         # Prior year line
         if prior_agg is not None and not prior_agg.empty:
             fig.add_trace(go.Scatter(
@@ -1334,16 +1344,6 @@ def server_logic(input, output, session):
                 marker=dict(color=CHART_COLORS[1], size=5),
                 hovertemplate=f"<b>%{{x}} {prior_label}</b><br>{metric_label}: %{{y:,.0f}}<extra></extra>",
             ))
-
-        # Current year line
-        fig.add_trace(go.Scatter(
-            x=curr_agg["month_label"], y=curr_agg["cumulative"],
-            mode="lines+markers",
-            name=curr_label,
-            line=dict(color=CHART_COLORS[0], width=2.5),
-            marker=dict(color=CHART_COLORS[0], size=7),
-            hovertemplate=f"<b>%{{x}} {curr_label}</b><br>{metric_label}: %{{y:,.0f}}<extra></extra>",
-        ))
 
         # Goal line — horizontal at goal_value across all 12 academic months
         if goal_value:
