@@ -932,17 +932,26 @@ def server_logic(input, output, session):
                 # Per-group heights: badge sits just above the taller bar
                 group_top = max(cv, pv)
                 label_y = group_top + y_max * 0.18
-                # Pill background via rounded rect shape
+                # Pill background via SVG path with rounded corners
                 pad_x = 0.18
                 pad_y = y_max * 0.055
+                r_x = pad_x * 0.45   # corner radius in x (data units)
+                r_y = pad_y * 0.55   # corner radius in y (data units)
+                x0, x1 = i - pad_x, i + pad_x
+                y0b, y1b = label_y - pad_y, label_y + pad_y
+                svg = (
+                    f"M {x0+r_x},{y0b} "
+                    f"L {x1-r_x},{y0b} Q {x1},{y0b} {x1},{y0b+r_y} "
+                    f"L {x1},{y1b-r_y} Q {x1},{y1b} {x1-r_x},{y1b} "
+                    f"L {x0+r_x},{y1b} Q {x0},{y1b} {x0},{y1b-r_y} "
+                    f"L {x0},{y0b+r_y} Q {x0},{y0b} {x0+r_x},{y0b} Z"
+                )
                 shapes.append(dict(
-                    type="rect", xref="x", yref="y",
-                    x0=i - pad_x, y0=label_y - pad_y,
-                    x1=i + pad_x, y1=label_y + pad_y,
+                    type="path", xref="x", yref="y",
+                    path=svg,
                     fillcolor=bg_color,
                     line=dict(width=0),
                     layer="below",
-                    rounding=0.8,
                 ))
                 annotations.append(dict(
                     x=i, y=label_y, xref="x", yref="y",
