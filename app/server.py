@@ -931,8 +931,8 @@ def server_logic(input, output, session):
                 color = "#132B23" if pct >= 0 else "#560422"
                 # Per-group heights: bracket sits just above the taller bar
                 group_top = max(cv, pv)
-                line_y  = group_top + y_max * 0.06
-                label_y = group_top + y_max * 0.13
+                line_y  = group_top + y_max * 0.10
+                label_y = group_top + y_max * 0.18
                 annotations.append(dict(
                     x=i, y=label_y, xref="x", yref="y",
                     text=f"<b>{arrow} {abs(pct):.1f}%</b>",
