@@ -748,12 +748,7 @@ def server_logic(input, output, session):
                 yoy_pct = (val - prior_stage_val) / prior_stage_val * 100
                 arrow = "\u25b2" if yoy_pct >= 0 else "\u25bc"
                 badge_text = f"{arrow} {abs(yoy_pct):.0f}%"
-                if yoy_pct >= 0:
-                    rc = "#132B23"
-                elif yoy_pct >= -5:
-                    rc = "#C99D44"
-                else:
-                    rc = "#560422"
+                rc = "#132B23" if yoy_pct >= 0 else "#560422"
             else:
                 rc = "#9B9893"
                 badge_text = "\u2014"
@@ -766,7 +761,7 @@ def server_logic(input, output, session):
             svg_parts.append(
                 f'<text x="{pill_x + pill_w/2:.1f}" y="{center_y:.1f}" '
                 f'dominant-baseline="middle" text-anchor="middle" '
-                f'font-family="Manrope,sans-serif" font-size="6" font-weight="700" '
+                f'font-family="Manrope,sans-serif" font-size="5.4" font-weight="700" '
                 f'fill="{rc}">{badge_text}</text>'
             )
 
@@ -808,19 +803,12 @@ def server_logic(input, output, session):
             '<span style="font-family:Manrope,sans-serif;font-size:10px;color:#6b7280;">'
             'Growing</span>'
             '</span>'
-            # Yellow
-            '<span style="display:inline-flex;align-items:center;gap:5px;">'
-            '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;'
-            'border:1.5px solid #C99D44;background:white;"></span>'
-            '<span style="font-family:Manrope,sans-serif;font-size:10px;color:#6b7280;">'
-            'Up to 5% decline</span>'
-            '</span>'
             # Red
             '<span style="display:inline-flex;align-items:center;gap:5px;">'
             '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;'
             'border:1.5px solid #560422;background:white;"></span>'
             '<span style="font-family:Manrope,sans-serif;font-size:10px;color:#6b7280;">'
-            'More than 5% decline</span>'
+            'Declining</span>'
             '</span>'
             '</div>'
         )
