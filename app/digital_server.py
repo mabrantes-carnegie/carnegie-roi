@@ -1234,6 +1234,7 @@ def digital_server(input, output, session):
         pivot_wide = pivot_wide[month_order]
         pivot_wide["Grand Total"] = pivot_wide.sum(axis=1)
         pivot_wide = pivot_wide.reset_index().rename(columns={"year": "Year"})
+        pivot_wide = pivot_wide.sort_values("Year", ascending=False)
         heatmap_cols = month_order + ["Grand Total"]
         for c in heatmap_cols:
             pivot_wide[c] = pivot_wide[c].apply(lambda v: f"{round(v):,}")
