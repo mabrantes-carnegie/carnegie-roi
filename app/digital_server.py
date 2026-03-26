@@ -972,28 +972,51 @@ def digital_server(input, output, session):
     @render.ui
     def dig_trending_chart_yoy():
         df_curr = _dig_q8()
+        df_prior = _dig_q8_yoy()
         if df_curr.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        # Group by month, show impressions only (no prior year line on YoY page)
+        # Group current period by month
         df_curr = df_curr.copy()
         df_curr["month"] = df_curr["day"].dt.to_period("M")
         curr_monthly = (
             df_curr.groupby("month")["impressions"].sum()
             .reset_index().sort_values("month")
         )
-        # Convert period back to timestamp for proper x-axis date handling
         curr_monthly["month_dt"] = curr_monthly["month"].dt.to_timestamp()
         curr_monthly["label"] = curr_monthly["month_dt"].dt.strftime("%b %y")
+        # month position index (0, 1, 2, …) for aligning prior year
+        curr_monthly = curr_monthly.reset_index(drop=True)
+        curr_monthly["month_pos"] = curr_monthly.index
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             x=curr_monthly["month_dt"], y=curr_monthly["impressions"],
-            mode="lines+markers", name="Impressions",
+            mode="lines+markers", name="Total Impressions",
             line=dict(color="#EA332D", width=2),
-            marker=dict(color="#EA332D", size=5),
-            hovertemplate="%{x|%b %y}<br>Impressions: %{y:,.0f}<extra></extra>",
+            marker=dict(color="#EA332D", size=4),
+            hovertemplate="%{x|%b %y}<br>Total Impressions: %{y:,.0f}<extra></extra>",
         ))
+
+        if not df_prior.empty:
+            df_prior = df_prior.copy()
+            df_prior["month"] = df_prior["day"].dt.to_period("M")
+            prior_monthly = (
+                df_prior.groupby("month")["impressions"].sum()
+                .reset_index().sort_values("month")
+            ).reset_index(drop=True)
+            prior_monthly["month_pos"] = prior_monthly.index
+            # Align prior months to current month positions on x-axis
+            merged = curr_monthly[["month_dt", "month_pos"]].merge(
+                prior_monthly[["month_pos", "impressions"]], on="month_pos", how="left"
+            ).fillna(0)
+            fig.add_trace(go.Scatter(
+                x=merged["month_dt"], y=merged["impressions"],
+                mode="lines+markers", name="Total Impressions (previous year)",
+                line=dict(color="#C99D44", width=1.8, dash="dash"),
+                marker=dict(color="#C99D44", size=3),
+                hovertemplate="%{x|%b %y}<br>Total Impressions (prev): %{y:,.0f}<extra></extra>",
+            ))
 
         layout = _base_layout(320)
         layout["xaxis"] = dict(
@@ -1001,10 +1024,6 @@ def digital_server(input, output, session):
             ticktext=curr_monthly["label"].tolist(),
             tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
             showgrid=False, title="", tickangle=0,
-        )
-        layout["legend"] = dict(
-            orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5,
-            font=dict(family="Manrope, sans-serif", size=11, color="#57595B"),
         )
         fig.update_layout(**layout)
         return _plotly_html(fig)
