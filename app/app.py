@@ -959,9 +959,8 @@ app_ui = ui.page_navbar(
 (function() {
   var DIG_TABS = ['Overview','Overview YoY','Interactions','Geography','Creative','Insights'];
 
-  // Academic year default for Overview YoY
+  // Academic year default for Overview YoY: start Jul 2025, end = last available month
   var YOY_START = '2025-07-01';
-  var YOY_END   = '2026-06-30';
 
   // Previous-month default (matches Python server default)
   function _prevMonthRange() {
@@ -995,7 +994,14 @@ app_ui = ui.page_navbar(
 
     if (tabVal === 'Overview YoY' && _prevTab !== 'Overview YoY') {
       setTimeout(function() {
-        _setDigPeriod(YOY_START, YOY_END, YOY_START, '2026-06-01');
+        // End = last option available in the end select (last month with data)
+        var me = document.getElementById('dig_month_end');
+        var lastOpt = me ? me.options[me.options.length - 1] : null;
+        var endSel = lastOpt ? lastOpt.value : YOY_START;
+        // Compute last day of that month for the period end
+        var ep = endSel.split('-'); var ey = +ep[0]; var em = +ep[1];
+        var endStr = ep[0] + '-' + ep[1] + '-' + String(new Date(ey, em, 0).getDate()).padStart(2,'0');
+        _setDigPeriod(YOY_START, endStr, YOY_START, endSel);
       }, 50);
     } else if (_prevTab === 'Overview YoY' && tabVal !== 'Overview YoY') {
       var r = _prevMonthRange();
