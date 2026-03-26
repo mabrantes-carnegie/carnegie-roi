@@ -1066,35 +1066,33 @@ def digital_server(input, output, session):
         top5 = df.groupby("product_name")["impressions"].sum().nlargest(5).index.tolist()
         df_top = df[df["product_name"].isin(top5)].copy()
 
-        period = input.dig_period()
-        if period and len(period) == 2:
-            start_dt = pd.Timestamp(period[0])
-            end_dt   = pd.Timestamp(period[1])
-        else:
-            start_dt = df_top["day"].min()
-            end_dt   = df_top["day"].max()
-
-        all_days = pd.date_range(start_dt, end_dt, freq="D")
-        odd_days = [d for d in all_days if d.day % 2 == 1]
-        tickvals = odd_days
-        ticktext = [d.strftime("%b ") + str(d.day) for d in odd_days]
+        # Group by month for YoY page
+        df_top["month"] = df_top["day"].dt.to_period("M")
+        all_months = sorted(df_top["month"].unique())
+        all_months_dt = [m.to_timestamp() for m in all_months]
+        ticktext = [m.strftime("%b %y") for m in all_months_dt]
 
         fig = go.Figure()
         for i, prod in enumerate(top5):
-            sub = df_top[df_top["product_name"] == prod].groupby("day")["impressions"].sum().reset_index()
-            spine = pd.DataFrame({"day": all_days})
-            sub = spine.merge(sub, on="day", how="left").fillna(0)
+            sub = (
+                df_top[df_top["product_name"] == prod]
+                .groupby("month")["impressions"].sum()
+                .reset_index()
+            )
+            sub["month_dt"] = sub["month"].dt.to_timestamp()
+            spine = pd.DataFrame({"month_dt": all_months_dt})
+            sub = spine.merge(sub[["month_dt", "impressions"]], on="month_dt", how="left").fillna(0)
             fig.add_trace(go.Scatter(
-                x=sub["day"], y=sub["impressions"],
+                x=sub["month_dt"], y=sub["impressions"],
                 mode="lines+markers", name=prod,
                 line=dict(color=_STRATEGY_TREND_COLORS[i % len(_STRATEGY_TREND_COLORS)], width=2),
                 marker=dict(color=_STRATEGY_TREND_COLORS[i % len(_STRATEGY_TREND_COLORS)], size=4),
-                hovertemplate=f"<b>{prod}</b><br>%{{x|%b %e}}<br>Impressions: %{{y:,.0f}}<extra></extra>",
+                hovertemplate=f"<b>{prod}</b><br>%{{x|%b %y}}<br>Impressions: %{{y:,.0f}}<extra></extra>",
             ))
 
         layout = _base_layout(320)
         layout["xaxis"] = dict(
-            tickvals=tickvals, ticktext=ticktext,
+            tickvals=all_months_dt, ticktext=ticktext,
             tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
             showgrid=False, title="", tickangle=0,
         )
