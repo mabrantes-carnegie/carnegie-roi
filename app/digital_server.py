@@ -36,6 +36,42 @@ def _hex_to_rgb(h):
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
 
+def _parse_num_for_total(v):
+    """Parse a formatted cell value to float for totalling; returns None if not numeric."""
+    if isinstance(v, (int, float)):
+        return float(v)
+    try:
+        s = str(v).replace(",", "").replace("%", "").replace("+", "").strip()
+        if s in ("", "—", "N/A"):
+            return None
+        return float(s)
+    except Exception:
+        return None
+
+
+def _build_total_row(df: "pd.DataFrame", td_first: str, td_base: str) -> str:
+    """Return a <tr> HTML string with column sums; non-numeric columns show '—'."""
+    cells = []
+    for ci, col in enumerate(df.columns):
+        style = (td_first if ci == 0 else td_base) + "font-weight:700;border-top:2px solid #e5e1dc;"
+        if ci == 0:
+            cells.append(f'<td style="{style}">Total</td>')
+        else:
+            nums = [_parse_num_for_total(v) for v in df[col]]
+            nums = [n for n in nums if n is not None]
+            if nums:
+                total = sum(nums)
+                # Detect if column looks like a percentage (most values contain %)
+                pct_count = sum(1 for v in df[col] if isinstance(v, str) and "%" in v)
+                if pct_count > len(df) * 0.5:
+                    cells.append(f'<td style="{style}">{total:.2f}%</td>')
+                else:
+                    cells.append(f'<td style="{style}">{round(total):,}</td>')
+            else:
+                cells.append(f'<td style="{style}">—</td>')
+    return "<tr>" + "".join(cells) + "</tr>"
+
+
 def _plain_table(df: "pd.DataFrame") -> "ui.HTML":
     """Render a DataFrame as a plain sortable HTML table (no heatmap)."""
     th_style = (
@@ -63,11 +99,13 @@ def _plain_table(df: "pd.DataFrame") -> "ui.HTML":
             cells.append(f'<td style="{style}">{row[col]}</td>')
         rows_html.append("<tr>" + "".join(cells) + "</tr>")
 
+    total_row = _build_total_row(df, td_first, td_base)
     html = (
         '<div style="overflow-x:auto;">'
         '<table class="sortable-table" style="width:100%;border-collapse:collapse;">'
         "<thead><tr>" + "".join(headers) + "</tr></thead>"
         "<tbody>" + "".join(rows_html) + "</tbody>"
+        "<tfoot>" + total_row + "</tfoot>"
         "</table></div>"
     )
     return ui.HTML(html)
@@ -134,11 +172,13 @@ def _heatmap_table(df: "pd.DataFrame", heatmap_cols: list) -> "ui.HTML":
         s = th_first_style if ci == 0 else th_style
         headers.append(f'<th style="{s}">{col}</th>')
 
+    total_row = _build_total_row(df, td_first, td_base)
     html = (
         '<div style="overflow-x:auto;">'
         '<table class="sortable-table" style="width:100%;border-collapse:collapse;">'
         "<thead><tr>" + "".join(headers) + "</tr></thead>"
         "<tbody>" + "".join(rows_html) + "</tbody>"
+        "<tfoot>" + total_row + "</tfoot>"
         "</table></div>"
     )
     return ui.HTML(html)
