@@ -77,6 +77,99 @@ def _build_total_row(df: "pd.DataFrame", td_first: str, td_base: str) -> str:
     return "<tr>" + "".join(cells) + "</tr>"
 
 
+def _yoy_delta_table(
+    rows: list,          # list of dicts: {label, metrics: {col: (value_str, delta_str)}}
+    label_col: str,      # header for the first column
+    metric_cols: list,   # ordered list of metric names
+) -> "ui.HTML":
+    """
+    Render a YoY comparison table: for each metric column show the value then
+    a narrow Δ% column with a green/red/grey badge.
+    rows: list of dicts with keys 'label' and 'metrics' (dict col -> (val, delta)).
+    """
+    import math
+
+    th = (
+        "padding:8px 10px;font-family:Manrope,sans-serif;font-size:11px;"
+        "font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;"
+        "border-bottom:1px solid #e5e1dc;text-align:right;white-space:nowrap;cursor:pointer;"
+    )
+    th_first = th.replace("text-align:right;", "text-align:left;")
+    th_delta = th + "padding-left:2px;padding-right:10px;"
+    td = (
+        "padding:7px 10px;font-family:Manrope,sans-serif;font-size:13px;"
+        "color:#021326;border-bottom:1px solid #f0eeea;text-align:right;"
+    )
+    td_first = td.replace("text-align:right;", "text-align:left;")
+    td_delta = td + "padding-left:2px;padding-right:10px;"
+
+    def _delta_badge(d):
+        if not d or d in ("N/A", "—", ""):
+            return f'<span style="font-size:11px;color:#9B9893;">—</span>'
+        try:
+            num = float(d.replace("%", "").replace("+", ""))
+        except Exception:
+            return f'<span style="font-size:11px;color:#9B9893;">{d}</span>'
+        if math.isnan(num):
+            return f'<span style="font-size:11px;color:#9B9893;">—</span>'
+        color = "#1a7a4a" if num > 0 else ("#b91c1c" if num < 0 else "#57595B")
+        bg    = "#e6f4ed" if num > 0 else ("#fde8e8" if num < 0 else "#f3f3f3")
+        sign  = "+" if num > 0 else ""
+        return (
+            f'<span style="font-size:11px;font-family:Manrope,sans-serif;font-weight:600;'
+            f'color:{color};background:{bg};border-radius:4px;padding:2px 5px;">'
+            f'{sign}{num:.1f}%</span>'
+        )
+
+    # Headers
+    header_cells = [f'<th style="{th_first}">{label_col}</th>']
+    for col in metric_cols:
+        header_cells.append(f'<th style="{th}">{col}</th>')
+        header_cells.append(f'<th style="{th_delta}">Δ%</th>')
+
+    # Data rows
+    rows_html = []
+    for r in rows:
+        cells = [f'<td style="{td_first}">{r["label"]}</td>']
+        for col in metric_cols:
+            val, delta = r["metrics"].get(col, ("—", ""))
+            cells.append(f'<td style="{td}">{val}</td>')
+            cells.append(f'<td style="{td_delta}">{_delta_badge(delta)}</td>')
+        rows_html.append("<tr>" + "".join(cells) + "</tr>")
+
+    # Total row — sum value cols, skip delta cols
+    total_cells = [f'<td style="{td_first}font-weight:700;border-top:2px solid #e5e1dc;">Total</td>']
+    for col in metric_cols:
+        vals = [r["metrics"].get(col, ("—", ""))[0] for r in rows]
+        nums = []
+        is_pct = False
+        for v in vals:
+            s = str(v).replace(",", "").replace("%", "").replace("+", "").strip()
+            if "%" in str(v):
+                is_pct = True
+            try:
+                nums.append(float(s))
+            except Exception:
+                pass
+        bold = "font-weight:700;border-top:2px solid #e5e1dc;"
+        if is_pct or not nums:
+            total_cells.append(f'<td style="{td}{bold}">—</td>')
+        else:
+            total_cells.append(f'<td style="{td}{bold}">{round(sum(nums)):,}</td>')
+        total_cells.append(f'<td style="{td_delta}{bold}">—</td>')
+    rows_html_total = "<tr>" + "".join(total_cells) + "</tr>"
+
+    html = (
+        '<div style="overflow-x:auto;">'
+        '<table class="sortable-table" style="width:100%;border-collapse:collapse;">'
+        "<thead><tr>" + "".join(header_cells) + "</tr></thead>"
+        "<tbody>" + "".join(rows_html) + "</tbody>"
+        "<tfoot>" + rows_html_total + "</tfoot>"
+        "</table></div>"
+    )
+    return ui.HTML(html)
+
+
 def _plain_table(df: "pd.DataFrame") -> "ui.HTML":
     """Render a DataFrame as a plain sortable HTML table (no heatmap)."""
     th_style = (
@@ -1105,54 +1198,15 @@ def digital_server(input, output, session):
         df_p = _dig_q8_yoy()
         if df_c.empty:
             return ui.tags.div("No data available.", class_="empty-state")
-        metrics = ["impressions", "clicks", "direct_conversions",
-                   "view_through_conversions", "in_platform_leads", "total_interactions"]
-        curr = df_c.groupby("subgroup_name")[metrics].sum().reset_index()
-        curr["CTR"] = (curr["clicks"] / curr["impressions"].replace(0, float("nan")) * 100).round(2)
-        if not df_p.empty:
-            prev = df_p.groupby("subgroup_name")[metrics].sum().reset_index()
-            for m in metrics:
-                prev_map = prev.set_index("subgroup_name")[m]
-                curr[f"{m}_delta"] = curr.apply(
-                    lambda r: _pct_change(r[m], prev_map.get(r["subgroup_name"], 0)), axis=1
-                )
-        else:
-            for m in metrics:
-                curr[f"{m}_delta"] = "N/A"
-        for c in metrics:
-            curr[c] = curr[c].round(0).astype(int)
-        display = curr.sort_values("impressions", ascending=False)
-        cols = {"subgroup_name": "Subgroup", "impressions": "Impressions",
-                "clicks": "Clicks", "CTR": "CTR %",
-                "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
-                "in_platform_leads": "In-Platform Leads", "total_interactions": "Total Interactions"}
-        display = display.rename(columns=cols)
-        heatmap_cols = ["Impressions", "Clicks", "CTR %", "Direct Conv.",
-                        "View-through", "In-Platform Leads", "Total Interactions"]
-        return _heatmap_table(display[[c for c in cols.values() if c in display.columns]], heatmap_cols)
+        return _build_yoy_comparison_table(df_c, df_p, group_col="subgroup_name", label_col="Subgroup")
 
     @render.ui
     def dig_strategy_table_yoy():
         df_c = _dig_q8()
+        df_p = _dig_q8_yoy()
         if df_c.empty:
             return ui.tags.div("No data available.", class_="empty-state")
-        metrics = ["impressions", "clicks", "direct_conversions",
-                   "view_through_conversions", "in_platform_leads", "total_interactions"]
-        curr = df_c.groupby("product_name")[metrics].sum().reset_index()
-        curr["CTR"] = (curr["clicks"] / curr["impressions"].replace(0, float("nan")) * 100).round(2)
-        for c in metrics:
-            curr[c] = curr[c].round(0).astype(int)
-        display = curr.sort_values("impressions", ascending=False).rename(columns={
-            "product_name": "Strategy", "impressions": "Impressions",
-            "clicks": "Clicks", "CTR": "CTR %",
-            "direct_conversions": "Direct Conv.", "view_through_conversions": "View-through",
-            "in_platform_leads": "In-Platform Leads", "total_interactions": "Total Interactions",
-        })
-        show = ["Strategy", "Impressions", "Clicks", "CTR %", "Direct Conv.",
-                "View-through", "In-Platform Leads", "Total Interactions"]
-        heatmap_cols = ["Impressions", "Clicks", "CTR %", "Direct Conv.",
-                        "View-through", "In-Platform Leads", "Total Interactions"]
-        return _heatmap_table(display[[c for c in show if c in display.columns]], heatmap_cols)
+        return _build_yoy_comparison_table(df_c, df_p, group_col="product_name", label_col="Strategy")
 
     @render.ui
     def dig_interactions_by_month_yoy():
@@ -1855,6 +1909,75 @@ def _pct_change(curr, prev):
         return "N/A"
     pct = (curr - prev) / abs(prev) * 100
     return f"{pct:+.1f}%"
+
+
+def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str) -> "ui.HTML":
+    """
+    Build a YoY table with interleaved metric + Δ% columns.
+    Columns: Impressions, Clicks, CTR, Direct Conversion, View-through Conversion,
+             In-Platform Leads, Total Conversions, Conversion Rate.
+    """
+    raw_metrics = [
+        "impressions", "clicks", "direct_conversions",
+        "view_through_conversions", "in_platform_leads", "total_interactions",
+    ]
+    col_labels = [
+        "Impressions", "Clicks", "CTR",
+        "Direct Conversion", "View-through Conv.", "In-Platform Leads",
+        "Total Conversions", "Conversion Rate",
+    ]
+
+    curr = df_c.groupby(group_col)[raw_metrics].sum().reset_index()
+    prev_map = {}
+    if not df_p.empty:
+        prev = df_p.groupby(group_col)[raw_metrics].sum().reset_index()
+        prev_map = prev.set_index(group_col).to_dict(orient="index")
+
+    def _fmt_int(v):
+        try:
+            return f"{round(v):,}"
+        except Exception:
+            return "—"
+
+    def _fmt_pct(v):
+        if v is None or (isinstance(v, float) and (v != v)):
+            return "—"
+        return f"{v:.2f}%"
+
+    def _safe_div_local(a, b):
+        return a / b if b and b != 0 else None
+
+    rows = []
+    for _, r in curr.sort_values("impressions", ascending=False).iterrows():
+        grp = r[group_col]
+        p = prev_map.get(grp, {})
+
+        ctr_curr = _safe_div_local(r["clicks"], r["impressions"])
+        ctr_prev = _safe_div_local(p.get("clicks", 0), p.get("impressions", 0)) if p else None
+        conv_rate_curr = _safe_div_local(
+            r["direct_conversions"] + r["view_through_conversions"] + r["in_platform_leads"],
+            r["clicks"],
+        )
+        conv_rate_prev = _safe_div_local(
+            p.get("direct_conversions", 0) + p.get("view_through_conversions", 0) + p.get("in_platform_leads", 0),
+            p.get("clicks", 0),
+        ) if p else None
+
+        metrics_data = {
+            "Impressions":         (_fmt_int(r["impressions"]),         _pct_change(r["impressions"], p.get("impressions", 0)) if p else "N/A"),
+            "Clicks":              (_fmt_int(r["clicks"]),              _pct_change(r["clicks"], p.get("clicks", 0)) if p else "N/A"),
+            "CTR":                 (_fmt_pct(ctr_curr * 100 if ctr_curr is not None else None),
+                                    _pct_change(ctr_curr, ctr_prev) if (ctr_curr is not None and ctr_prev is not None) else "N/A"),
+            "Direct Conversion":   (_fmt_int(r["direct_conversions"]),  _pct_change(r["direct_conversions"], p.get("direct_conversions", 0)) if p else "N/A"),
+            "View-through Conv.":  (_fmt_int(r["view_through_conversions"]), _pct_change(r["view_through_conversions"], p.get("view_through_conversions", 0)) if p else "N/A"),
+            "In-Platform Leads":   (_fmt_int(r["in_platform_leads"]),   _pct_change(r["in_platform_leads"], p.get("in_platform_leads", 0)) if p else "N/A"),
+            "Total Conversions":   (_fmt_int(r["total_interactions"]),  _pct_change(r["total_interactions"], p.get("total_interactions", 0)) if p else "N/A"),
+            "Conversion Rate":     (_fmt_pct(conv_rate_curr * 100 if conv_rate_curr is not None else None),
+                                    _pct_change(conv_rate_curr, conv_rate_prev) if (conv_rate_curr is not None and conv_rate_prev is not None) else "N/A"),
+        }
+        rows.append({"label": grp, "metrics": metrics_data})
+
+    return _yoy_delta_table(rows, label_col=label_col, metric_cols=col_labels)
 
 
 def _df_to_html(df, title):
