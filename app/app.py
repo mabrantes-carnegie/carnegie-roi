@@ -977,6 +977,7 @@ app_ui = ui.page_navbar(
             ui.tags.link(rel="stylesheet", href="styles.css?v=22"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
+            ui.tags.script(src="paginated-tables.js"),
             ui.tags.script(
                 "document.addEventListener('click',function(){"
                 "document.querySelectorAll('.pill-dropdown-menu').forEach(function(m){"

@@ -1548,7 +1548,7 @@ def server_logic(input, output, session):
         })
         show_cols = ["State", "City", "Inquiries", "App Starts",
                      "App Submits", "Deposits", "Net Deposits"]
-        return _plain_table(display[show_cols])
+        return _plain_table(display[show_cols], paginated=True)
 
     # ══════════════════════════════════════════════════════════
     # PAGE 4: DIGITAL PERFORMANCE
