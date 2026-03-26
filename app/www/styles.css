@@ -1152,6 +1152,8 @@ table.sortable-table thead th[data-sort="desc"]::after {
     align-items: end;
     gap: 16px;
     margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--carnegie-gray-border);
     flex-wrap: wrap;
 }
 
