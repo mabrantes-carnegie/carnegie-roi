@@ -1619,6 +1619,40 @@ def digital_server(input, output, session):
         fig.update_layout(**layout)
         return _plotly_html(fig)
 
+    # --- Key Interaction Breakdown bar chart (Interactions page) ---
+
+    @render.ui
+    def dig_cat_breakdown_chart():
+        df = _dig_q9_filtered()
+        if df.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+
+        cats_order = ["RFI/Lead Gen", "Visit/Event", "Apply", "Enroll/Deposit", "Other"]
+        agg = df.groupby("interaction_category")["total_interactions"].sum().reset_index()
+        agg = agg[agg["interaction_category"].isin(cats_order)].copy()
+        agg["_order"] = agg["interaction_category"].map({c: i for i, c in enumerate(cats_order)})
+        agg = agg.sort_values("_order")
+
+        colors = ["#021326", "#A4B9D3", "#C99D44", "#6B8F71", "#8B7355"]
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=agg["interaction_category"],
+            y=agg["total_interactions"],
+            marker_color=[colors[i % len(colors)] for i in range(len(agg))],
+            hovertemplate="%{x}<br>Total Interactions: %{y:,.0f}<extra></extra>",
+            showlegend=False,
+            text=[f"{v:,.0f}" for v in agg["total_interactions"]],
+            textposition="inside",
+            textfont=dict(family="Manrope, sans-serif", size=11, color="#ffffff"),
+        ))
+        layout = _base_layout(320)
+        layout["margin"] = dict(l=16, r=16, t=8, b=40)
+        layout["xaxis"]["tickfont"] = dict(family="Manrope, sans-serif", size=10, color="#9B9893")
+        layout["xaxis"]["tickangle"] = 0
+        layout["yaxis"]["visible"] = False
+        fig.update_layout(**layout)
+        return _plotly_html(fig)
+
     # --- Category × Strategy chart ---
 
     @render.ui

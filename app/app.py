@@ -825,7 +825,20 @@ page_digital = ui.nav_menu(
                 class_="funnel-strip",
             ),
             ui.tags.h2("Key interaction category trending", class_="section-heading"),
-            ui.tags.div(ui.output_ui("dig_cat_trend_chart"), class_="chart-card"),
+            ui.tags.div(
+                ui.tags.div(
+                    ui.output_ui("dig_cat_trend_chart"),
+                    class_="chart-card",
+                    style="flex:3;",
+                ),
+                ui.tags.div(
+                    ui.tags.span("Key Interaction Breakdown", class_="card-heading"),
+                    ui.output_ui("dig_cat_breakdown_chart"),
+                    class_="chart-card",
+                    style="flex:2;",
+                ),
+                class_="main-content-row",
+            ),
             ui.tags.h2("Key interactions by category & strategy", class_="section-heading"),
             ui.tags.div(ui.output_ui("dig_cat_strategy_chart"), class_="chart-card"),
             ui.tags.h2("Breakdown by interaction category & name", class_="section-heading"),
