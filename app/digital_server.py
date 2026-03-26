@@ -1762,26 +1762,54 @@ def digital_server(input, output, session):
 
     @render.ui
     def dig_interactions_month_table():
-        df = _dig_q9_filtered()
-        if df.empty:
+        # Use full unfiltered data for the 12-month spine; apply only category/name filters
+        df_full = _dig_q9()
+        cat = input.dig_interaction_cat()
+        if cat and len(cat) > 0:
+            df_full = df_full[df_full["interaction_category"].isin(cat)]
+        cn = input.dig_conversion_name()
+        if cn and len(cn) > 0:
+            df_full = df_full[df_full["conversion_name"].isin(cn)]
+        if df_full.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        df = df.copy()
-        df["ym"] = df["day"].dt.strftime("%Y-%m")
-        pivot = df.groupby(["interaction_category", "conversion_name", "ym"])["total_interactions"].sum().reset_index()
-        wide = pivot.pivot_table(
-            index=["interaction_category", "conversion_name"],
+        df_full = df_full.copy()
+        df_full["month"] = df_full["day"].dt.to_period("M")
+
+        # Last 12 months ending at the latest month in the data
+        latest = df_full["month"].max()
+        months_12 = pd.period_range(end=latest, periods=12, freq="M")
+        month_labels = {str(m): m.to_timestamp().strftime("%b %y") for m in months_12}
+
+        agg = df_full.groupby(["interaction_category", "month"])["total_interactions"].sum().reset_index()
+        agg["ym"] = agg["month"].astype(str)
+        agg = agg[agg["ym"].isin(month_labels)]
+
+        wide = agg.pivot_table(
+            index="interaction_category",
             columns="ym", values="total_interactions", aggfunc="sum", fill_value=0,
         ).reset_index()
         wide.columns.name = None
-        num_cols = [c for c in wide.columns if c not in ["interaction_category", "conversion_name"]]
-        wide["Grand Total"] = wide[num_cols].sum(axis=1)
+
+        # Ensure all 12 months are present as columns
+        for ym in month_labels:
+            if ym not in wide.columns:
+                wide[ym] = 0
+
+        # Sort columns chronologically
+        month_cols = sorted(month_labels.keys())
+        wide["Grand Total"] = wide[month_cols].sum(axis=1)
         wide = wide.sort_values("Grand Total", ascending=False)
-        wide = wide.rename(columns={"interaction_category": "Category", "conversion_name": "Conversion Name"})
-        heatmap_cols = num_cols + ["Grand Total"]
+
+        # Rename month columns to "Feb 26" format
+        wide = wide.rename(columns={**month_labels, "interaction_category": "Category"})
+        display_month_cols = [month_labels[m] for m in month_cols]
+        heatmap_cols = display_month_cols + ["Grand Total"]
         for c in heatmap_cols:
             wide[c] = wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
-        return _heatmap_table(wide, heatmap_cols)
+
+        col_order = ["Category"] + display_month_cols + ["Grand Total"]
+        return _heatmap_table(wide[[c for c in col_order if c in wide.columns]], heatmap_cols)
 
     # --- Interactions detail table ---
 
