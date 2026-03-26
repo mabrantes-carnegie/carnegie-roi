@@ -1672,10 +1672,13 @@ def digital_server(input, output, session):
             fig.add_trace(go.Bar(
                 x=sub["interaction_category"], y=sub["total_interactions"],
                 name=prod, marker_color=STRATEGY_COLORS[i % len(STRATEGY_COLORS)],
+                hovertemplate=f"<b>{prod}</b><br>%{{x}}<br>Interactions: %{{y:,.0f}}<extra></extra>",
             ))
         layout = _base_layout(380)
-        layout["barmode"] = "group"
-        layout["bargap"] = 0.25
+        layout["barmode"] = "stack"
+        layout["bargap"] = 0.3
+        layout["xaxis"]["tickfont"] = dict(family="Manrope, sans-serif", size=10, color="#9B9893")
+        layout["xaxis"]["tickangle"] = 0
         fig.update_layout(**layout)
         return _plotly_html(fig)
 
@@ -1683,23 +1686,43 @@ def digital_server(input, output, session):
 
     @render.ui
     def dig_interaction_breakdown_table():
-        df = _dig_q9_filtered()
-        if df.empty:
+        df_c = _dig_q9_filtered()
+        if df_c.empty:
             return ui.tags.div("No data available.", class_="empty-state")
+        df_p = _dig_q9_filtered_prior()
 
-        agg = df.groupby(["interaction_category", "conversion_name"]).agg(
+        agg_c = df_c.groupby(["interaction_category", "conversion_name"]).agg(
             direct=("direct_conversions", "sum"),
             vt=("view_through_conversions", "sum"),
             total=("total_interactions", "sum"),
-        ).reset_index().sort_values("total", ascending=False)
+        ).reset_index()
 
-        agg = agg.rename(columns={
-            "interaction_category": "Category", "conversion_name": "Conversion Type",
-            "direct": "Direct Conv.", "vt": "View-through", "total": "Total Interactions",
-        })
-        for c in ["Direct Conv.", "View-through", "Total Interactions"]:
-            agg[c] = agg[c].apply(lambda v: f"{round(v):,}")
-        return _plain_table(agg)
+        agg_p = df_p.groupby(["interaction_category", "conversion_name"]).agg(
+            direct=("direct_conversions", "sum"),
+            vt=("view_through_conversions", "sum"),
+            total=("total_interactions", "sum"),
+        ).reset_index() if not df_p.empty else pd.DataFrame(
+            columns=["interaction_category", "conversion_name", "direct", "vt", "total"]
+        )
+
+        merged = agg_c.merge(
+            agg_p, on=["interaction_category", "conversion_name"],
+            how="left", suffixes=("", "_p")
+        ).fillna(0).sort_values("total", ascending=False)
+
+        metric_cols = ["Direct Interaction", "View-through Interaction", "Total Interaction"]
+        rows = []
+        for _, r in merged.iterrows():
+            label = f"{r['interaction_category']} — {r['conversion_name']}"
+            rows.append({
+                "label": label,
+                "metrics": {
+                    "Direct Interaction":       (f"{round(r['direct']):,}",  _pct_change(r["direct"],  r.get("direct_p",  0))),
+                    "View-through Interaction": (f"{round(r['vt']):,}",      _pct_change(r["vt"],      r.get("vt_p",      0))),
+                    "Total Interaction":        (f"{round(r['total']):,}",   _pct_change(r["total"],   r.get("total_p",   0))),
+                },
+            })
+        return _yoy_delta_table(rows, "Category — Interaction Name", metric_cols)
 
     # --- Interactions by campaign name ---
 
