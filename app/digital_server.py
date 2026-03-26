@@ -1929,8 +1929,8 @@ def digital_server(input, output, session):
             locationmode="USA-states",
             z=map_df["value"],
             colorscale=[
-                [0, "#FFFFFF"], [0.3, "#C8D6E5"],
-                [0.6, "#6B8FB5"], [1, "#021326"],
+                [0, "#FFFFFF"], [0.3, "#FADADB"],
+                [0.6, "#F08080"], [1, "#EA332D"],
             ],
             hovertemplate=f"<b>%{{location}}</b><br>{metric_short}: %{{z:,}}<extra></extra>",
             colorbar=dict(
