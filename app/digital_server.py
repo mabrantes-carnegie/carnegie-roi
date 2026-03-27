@@ -1572,6 +1572,55 @@ def digital_server(input, output, session):
         pv = p[p["interaction_category"] == "Other"]["total_interactions"].sum() if not p.empty else 0
         return _fmt_delta(c, pv)
 
+    # --- Cost Metrics panel (Interactions page) ---
+
+    @render.ui
+    def dig_int_cost_panel():
+        """Cost-per-category metrics for the Interactions page collapsible row."""
+        budget_c = _dig_q8()["budget"].sum()
+        budget_p = _dig_q8_prior()["budget"].sum()
+
+        q9_c = _dig_q9()
+        q9_p = _dig_q9_prior()
+
+        _costs = [
+            ("Cost per RFI / Lead Gen", "RFI/Lead Gen"),
+            ("Cost per Visit / Events", "Visit/Event"),
+            ("Cost per Key Interaction", None),
+        ]
+
+        badges = []
+        for label, cat in _costs:
+            if cat:
+                curr_int = q9_c[q9_c["interaction_category"] == cat]["total_interactions"].sum()
+                prev_int = q9_p[q9_p["interaction_category"] == cat]["total_interactions"].sum() if not q9_p.empty else 0
+            else:
+                curr_int = q9_c["total_interactions"].sum()
+                prev_int = q9_p["total_interactions"].sum() if not q9_p.empty else 0
+
+            curr_val = _safe_div(budget_c, curr_int)
+            prev_val = _safe_div(budget_p, prev_int)
+
+            value_str = fmt_currency(curr_val) if curr_val is not None else "\u2014"
+            yoy_el = _fmt_delta(curr_val, prev_val, invert=True)
+
+            badges.append(ui.tags.div(
+                ui.tags.div(label, class_="secondary-label"),
+                ui.tags.div(
+                    ui.tags.div(value_str, class_="secondary-value"),
+                    yoy_el,
+                    class_="secondary-value-row",
+                ),
+                class_="secondary-badge dig-metric-badge",
+            ))
+
+        return ui.tags.div(
+            *badges,
+            id="int-cost-metrics-row",
+            class_="secondary-row collapsible-row",
+            title="Cost metrics use total campaign budget divided by category interaction volume.",
+        )
+
     # --- Category trend chart ---
 
     @render.ui
@@ -2187,29 +2236,312 @@ def digital_server(input, output, session):
             df = df[df["note_type"].isin(nt)]
         return df
 
-    @render.ui
-    def dig_perf_notes_table():
+    # ── Helpers for Insights card rendering ──
+
+    def _insight_card(row, show_campaign=False):
+        """Build a single insight card from a DataFrame row."""
+        note_type = row.get("note_type", "")
+        is_milestone = str(row.get("is_milestone", "")).strip().lower() == "yes"
+        date_str = row["day"].strftime("%b %d, %Y") if pd.notna(row.get("day")) else ""
+        notes = str(row.get("notes", "")).strip()
+        campaign = str(row.get("campaign_name", "")).strip()
+
+        # Build headline: first sentence or first 100 chars
+        headline = notes.split(". ")[0].split(".\n")[0]
+        if len(headline) > 100:
+            headline = headline[:97] + "..."
+        if headline and not headline.endswith("."):
+            headline += "."
+
+        # Preview = remainder after headline, truncated
+        remainder = notes[len(headline.rstrip(".")):].strip().lstrip(".").strip()
+        preview = remainder[:200] + "..." if len(remainder) > 200 else remainder
+
+        # Unique id for expand/collapse
+        card_id = f"ic_{hash(str(row.get('day','')) + notes[:30]) & 0xFFFFFFFF:08x}"
+
+        # ── Section 1: Header (metadata row) ──
+        type_colors = {
+            "Performance": ("#021326", "#e8e6e0"),
+            "Performance with Recommendation": ("#7c3aed", "#ede9fe"),
+            "Optimization": ("#0369a1", "#e0f2fe"),
+            "Campaign Launch": ("#047857", "#d1fae5"),
+            "Budget": ("#b45309", "#fef3c7"),
+            "Key Dates": ("#be185d", "#fce7f3"),
+        }
+        bg, fg = type_colors.get(note_type, ("#6b7280", "#f3f4f6"))[::-1]
+
+        meta_items = [
+            ui.tags.span(
+                note_type.upper(), class_="insight-type-badge",
+                style=(
+                    f"background:{bg};color:{fg};"
+                    "display:inline-block;padding:3px 11px;border-radius:9999px;"
+                    "font-family:Manrope,sans-serif;font-size:10px;font-weight:700;"
+                    "letter-spacing:0.06em;text-transform:uppercase;line-height:1.5;white-space:nowrap;"
+                ),
+            ),
+        ]
+        if is_milestone:
+            meta_items.append(
+                ui.tags.span(
+                    "\u2605 MILESTONE", class_="insight-milestone-badge",
+                    style=(
+                        "display:inline-block;padding:3px 11px;border-radius:9999px;"
+                        "font-family:Manrope,sans-serif;font-size:10px;font-weight:700;"
+                        "letter-spacing:0.04em;background:#fef3c7;color:#92400e;"
+                        "line-height:1.5;white-space:nowrap;"
+                    ),
+                )
+            )
+        meta_items.append(ui.tags.span(
+            date_str, class_="insight-date",
+            style="font-family:Manrope,sans-serif;font-size:12px;font-weight:500;color:#6b7280;margin-left:auto;white-space:nowrap;",
+        ))
+
+        header = ui.tags.div(
+            *meta_items,
+            class_="insight-card-header",
+            style=(
+                "display:flex;align-items:center;gap:10px;flex-wrap:wrap;"
+                "padding:16px 24px 12px;border-bottom:1px solid #edeae6;"
+                "background:#fcfbf9;border-radius:14px 14px 0 0;"
+            ),
+        )
+
+        # ── Section 2: Body (content area) ──
+        body_children = []
+        if show_campaign and campaign:
+            body_children.append(ui.tags.div(
+                ui.tags.span("Campaign:", class_="insight-campaign-label",
+                             style="font-weight:700;color:#6b7280;text-transform:uppercase;font-size:10px;letter-spacing:0.05em;"),
+                ui.tags.span(campaign, class_="insight-campaign-name",
+                             style="font-weight:600;color:#021326;font-size:13px;"),
+                class_="insight-campaign-row",
+                style="display:flex;align-items:center;gap:6px;margin-bottom:12px;padding:8px 12px;background:#f5f3ef;border:1px solid #edeae6;border-radius:8px;",
+            ))
+        body_children.append(ui.tags.div(
+            headline, class_="insight-headline",
+            style="font-size:15px;font-weight:700;color:#021326;line-height:1.5;margin-bottom:6px;",
+        ))
+        if preview:
+            body_children.append(ui.tags.div(
+                preview, class_="insight-preview",
+                style="font-size:13.5px;color:#56534e;line-height:1.65;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;",
+            ))
+
+        body = ui.tags.div(
+            *body_children,
+            class_="insight-card-body",
+            style="padding:18px 24px 14px;",
+        )
+
+        # ── Section 3: Footer (only if there's more text beyond the headline) ──
+        has_more = bool(remainder.strip())
+
+        sections = [header, body]
+
+        if has_more:
+            toggle_js = (
+                f"var b=document.getElementById('{card_id}');"
+                "var link=this;"
+                "if(b.style.display==='none'){"
+                "  b.style.display='block';"
+                "  link.textContent='\\u25BE Hide full analysis';"
+                "}else{"
+                "  b.style.display='none';"
+                "  link.textContent='\\u25B8 View full analysis';"
+                "}"
+            )
+
+            footer = ui.tags.div(
+                ui.tags.a(
+                    "\u25B8 View full analysis",
+                    href="javascript:void(0)",
+                    onclick=toggle_js,
+                    class_="insight-expand-link",
+                    style="font-size:12px;font-weight:600;color:#FA3320;text-decoration:none;",
+                ),
+                ui.tags.div(
+                    ui.tags.div(notes, class_="insight-full-text",
+                                style="font-size:13.5px;color:#021326;line-height:1.75;white-space:pre-wrap;word-break:break-word;"),
+                    id=card_id,
+                    class_="insight-expand-body",
+                    style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #edeae6;",
+                ),
+                class_="insight-card-footer",
+                style=(
+                    "padding:12px 24px 14px;background:#faf9f7;"
+                    "border-top:1px solid #edeae6;border-radius:0 0 14px 14px;"
+                ),
+            )
+            sections.append(footer)
+
+        return ui.tags.div(
+            *sections,
+            class_="insight-card",
+            style=(
+                "background:#ffffff;border:1px solid #d9d5cf;"
+                "border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,0.05);"
+                "overflow:hidden;margin-bottom:0;padding:0;"
+            ),
+        )
+
+    @reactive.calc
+    def _insights_view_data():
+        """Return filtered data for the active insights view."""
         df = _dig_notes()
-        df = df[df["note_type"].isin(["Performance", "Performance with Recommendation"])]
-        if df.empty:
-            return ui.tags.div("No data available.", class_="empty-state")
-        df = df.sort_values("day", ascending=False).copy()
-        df["Date"] = df["day"].dt.strftime("%b %d, %Y")
-        display = df[["Date", "notes"]].rename(columns={"notes": "Performance Insight Notes"})
-        return _plain_table(display)
+        view = input.insights_view()
+        if view == "performance":
+            df = df[df["note_type"].isin([
+                "Performance", "Performance with Recommendation",
+                "Campaign Launch", "Budget", "Key Dates",
+            ])]
+        else:
+            df = df[df["note_type"].isin(["Optimization", "Campaign Launch"])]
+        # Text search filter
+        search = str(input.insights_search()).strip().lower()
+        if search:
+            mask = pd.Series(False, index=df.index)
+            for col in ["notes", "campaign_name", "note_type"]:
+                if col in df.columns:
+                    mask = mask | df[col].fillna("").str.lower().str.contains(search, regex=False)
+            df = df[mask]
+        return df.sort_values("day", ascending=False).reset_index(drop=True)
+
+    # Reset page to 1 when view or filters change
+    @reactive.effect
+    @reactive.event(input.insights_view, input.dig_milestone_only, input.dig_note_type,
+                    input.dig_period, input.insights_search)
+    def _insights_reset_page():
+        try:
+            from shiny.session import session_context
+        except Exception:
+            pass
+        # Push page back to 1 on the client
+        ui.insert_ui(
+            ui.tags.script("Shiny.setInputValue('insights_page', 1);"),
+            selector="body", where="beforeEnd",
+        )
+
+    @reactive.calc
+    def _insights_per_page():
+        try:
+            v = input.insights_per_page()
+            return max(1, int(v))
+        except Exception:
+            return 10
+
+    @reactive.calc
+    def _insights_current_page():
+        try:
+            v = input.insights_page()
+            return max(1, int(v))
+        except Exception:
+            return 1
 
     @render.ui
-    def dig_optim_table():
-        df = _dig_notes()
-        df = df[df["note_type"] == "Optimization"]
+    def insights_search_count():
+        search = str(input.insights_search()).strip()
+        if not search:
+            return None
+        total = len(_insights_view_data())
+        label = "note" if total == 1 else "notes"
+        return ui.tags.span(
+            f"{total} {label} found",
+            style=(
+                "display:inline-block;"
+                "padding:3px 10px;border-radius:9999px;"
+                "background:#edeae6;color:#56534e;"
+                "font-family:Manrope,sans-serif;font-size:11px;font-weight:600;"
+                "white-space:nowrap;"
+            ),
+        )
+
+    @render.ui
+    def insights_card_list():
+        df = _insights_view_data()
         if df.empty:
-            return ui.tags.div("No data available.", class_="empty-state")
-        df = df.sort_values("day", ascending=False).copy()
-        df["Date"] = df["day"].dt.strftime("%b %d, %Y")
-        display = df[["Date", "campaign_name", "notes"]].rename(columns={
-            "campaign_name": "Campaign", "notes": "Optimization Notes",
-        })
-        return _plain_table(display)
+            return ui.tags.div("No insights available for the selected filters.",
+                               class_="empty-state")
+        per_page = _insights_per_page()
+        page = _insights_current_page()
+        total = len(df)
+        max_page = max(1, -(-total // per_page))  # ceil division
+        page = min(page, max_page)
+        start = (page - 1) * per_page
+        end = min(start + per_page, total)
+        page_df = df.iloc[start:end]
+
+        show_campaign = input.insights_view() == "optimization"
+        cards = [_insight_card(row, show_campaign=show_campaign)
+                 for _, row in page_df.iterrows()]
+        return ui.tags.div(
+            *cards, class_="insight-card-list",
+            style="display:flex;flex-direction:column;gap:16px;margin-bottom:28px;",
+        )
+
+    @render.ui
+    def insights_pag_range():
+        df = _insights_view_data()
+        total = len(df)
+        if total == 0:
+            return ui.tags.span("No results", class_="insight-pag-text")
+        per_page = _insights_per_page()
+        page = min(_insights_current_page(), max(1, -(-total // per_page)))
+        start = (page - 1) * per_page + 1
+        end = min(page * per_page, total)
+        return ui.tags.span(f"{start}\u2013{end} of {total}", class_="insight-pag-text")
+
+    @render.ui
+    def insights_pag_buttons():
+        df = _insights_view_data()
+        total = len(df)
+        per_page = _insights_per_page()
+        max_page = max(1, -(-total // per_page))
+        page = min(_insights_current_page(), max_page)
+
+        if max_page <= 1:
+            return ui.tags.span()
+
+        def _page_btn(label, target, disabled=False, active=False):
+            cls = "insight-pag-btn"
+            if active:
+                cls += " insight-pag-btn--active"
+            if disabled:
+                cls += " insight-pag-btn--disabled"
+            return ui.tags.button(
+                label,
+                class_=cls,
+                disabled="disabled" if disabled else None,
+                onclick=f"Shiny.setInputValue('insights_page', {target});" if not disabled else None,
+            )
+
+        buttons = []
+        # Prev
+        buttons.append(_page_btn("\u2039", page - 1, disabled=(page <= 1)))
+
+        # Page numbers — show up to 5 centered around current
+        if max_page <= 7:
+            pages = range(1, max_page + 1)
+        else:
+            if page <= 3:
+                pages = list(range(1, 6)) + ["...", max_page]
+            elif page >= max_page - 2:
+                pages = [1, "..."] + list(range(max_page - 4, max_page + 1))
+            else:
+                pages = [1, "..."] + list(range(page - 1, page + 2)) + ["...", max_page]
+
+        for p in pages:
+            if p == "...":
+                buttons.append(ui.tags.span("\u2026", class_="insight-pag-ellipsis"))
+            else:
+                buttons.append(_page_btn(str(p), p, active=(p == page)))
+
+        # Next
+        buttons.append(_page_btn("\u203A", page + 1, disabled=(page >= max_page)))
+
+        return ui.tags.div(*buttons, class_="insight-pag-btns")
 
 
 def _pct_change(curr, prev):

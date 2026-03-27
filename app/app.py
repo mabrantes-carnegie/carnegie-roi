@@ -889,6 +889,7 @@ page_digital = ui.nav_menu(
     ui.nav_panel(
         "Interactions",
         _dig_page(ui.tags.div(
+            ui.tags.h2("Interaction Filters", class_="section-heading"),
             ui.tags.div(
                 ui.tags.div(
                     ui.input_selectize(
@@ -917,6 +918,23 @@ page_digital = ui.nav_menu(
                 _dig_kpi_card("Other", "cat_other", "#8B1A1A"),
                 class_="funnel-strip",
             ),
+            # Cost Metrics collapsible row
+            ui.tags.div(
+                ui.tags.button(
+                    ui.tags.span("Show Cost Metrics", class_="collapsible-btn-label"),
+                    ui.tags.span("\u203a", class_="collapsible-btn-chevron"),
+                    class_="collapsible-section-btn",
+                    onclick=(
+                        "var row=document.getElementById('int-cost-metrics-row');"
+                        "var open=row.classList.contains('collapsible-row--open');"
+                        "row.classList.toggle('collapsible-row--open',!open);"
+                        "this.querySelector('.collapsible-btn-label').textContent=open?'Show Cost Metrics':'Hide Cost Metrics';"
+                        "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
+                    ),
+                ),
+                class_="collapsible-section-header",
+            ),
+            ui.output_ui("dig_int_cost_panel"),
             ui.tags.h2("Key Interaction Category Trending", class_="section-heading"),
             ui.tags.div(
                 ui.tags.div(
@@ -999,10 +1017,25 @@ page_digital = ui.nav_menu(
     ui.nav_panel(
         "Insights",
         _dig_page(ui.tags.div(
+            # ── Segmented view switcher ──
+            ui.tags.div(
+                ui.input_radio_buttons(
+                    "insights_view", None,
+                    choices={
+                        "performance": "Performance Insights & Analysis",
+                        "optimization": "Campaign Optimization History",
+                    },
+                    selected="performance",
+                    inline=True,
+                ),
+                class_="insight-segmented",
+            ),
+            # ── Shared filters ──
             ui.tags.div(
                 ui.tags.div(
                     ui.input_switch("dig_milestone_only", "Milestones only", value=False),
                     class_="inline-filter",
+                    style="padding-top:28px;",
                 ),
                 ui.tags.div(
                     ui.input_selectize(
@@ -1014,13 +1047,56 @@ page_digital = ui.nav_menu(
                     ),
                     class_="inline-filter",
                 ),
+                ui.tags.div(
+                    ui.input_text(
+                        "insights_search", "Search",
+                        placeholder="Search using keywords",
+                    ),
+                    class_="inline-filter",
+                ),
+                ui.tags.div(
+                    ui.output_ui("insights_search_count"),
+                    style="align-self:flex-end; padding-bottom:10px;",
+                ),
                 class_="page-filter-bar",
-                style="flex-wrap:wrap; gap:12px;",
+                style="flex-wrap:wrap; gap:12px; align-items:flex-start;",
             ),
-            ui.tags.h2("Performance insights & analysis", class_="section-heading"),
-            ui.tags.div(ui.output_ui("dig_perf_notes_table"), class_="carnegie-table-card"),
-            ui.tags.h2("Campaign optimization history", class_="section-heading"),
-            ui.tags.div(ui.output_ui("dig_optim_table"), class_="carnegie-table-card"),
+            # ── Card list ──
+            ui.output_ui("insights_card_list"),
+            # ── Pagination ──
+            ui.tags.div(
+                ui.tags.div(
+                    ui.tags.label("Cards per page", class_="insight-pag-label"),
+                    ui.tags.select(
+                        ui.tags.option("10", value="10", selected="selected"),
+                        ui.tags.option("25", value="25"),
+                        ui.tags.option("50", value="50"),
+                        class_="insight-pag-select",
+                        id="insights_per_page",
+                        onchange=(
+                            "Shiny.setInputValue('insights_per_page', parseInt(this.value));"
+                            "Shiny.setInputValue('insights_page', 1);"
+                        ),
+                    ),
+                    class_="insight-pag-group",
+                ),
+                ui.tags.div(
+                    ui.output_ui("insights_pag_range"),
+                    class_="insight-pag-range",
+                ),
+                ui.tags.div(
+                    ui.output_ui("insights_pag_buttons"),
+                    class_="insight-pag-nav",
+                ),
+                class_="insight-pag-bar",
+            ),
+            # Initialize pagination inputs on first render
+            ui.tags.script(
+                "$(function(){"
+                "  Shiny.setInputValue('insights_page', 1);"
+                "  Shiny.setInputValue('insights_per_page', 10);"
+                "});"
+            ),
         )),
     ),
 )
@@ -1063,7 +1139,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=30"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=33"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(src="paginated-tables.js?v=2"),
