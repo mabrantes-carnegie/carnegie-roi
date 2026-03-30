@@ -1004,27 +1004,11 @@ page_digital = ui.nav_menu(
         _dig_page(ui.tags.div(
             # ── KPI summary strip ──
             ui.tags.div(
-                ui.tags.div(
-                    ui.tags.div("Total Creatives", class_="crv-kpi-label"),
-                    ui.tags.div(ui.output_text("crv_kpi_total"), class_="crv-kpi-value"),
-                    class_="crv-kpi-card",
-                ),
-                ui.tags.div(
-                    ui.tags.div("Impressions", class_="crv-kpi-label"),
-                    ui.tags.div(ui.output_text("crv_kpi_impressions"), class_="crv-kpi-value"),
-                    class_="crv-kpi-card",
-                ),
-                ui.tags.div(
-                    ui.tags.div("Avg. CTR", class_="crv-kpi-label"),
-                    ui.tags.div(ui.output_text("crv_kpi_ctr"), class_="crv-kpi-value"),
-                    class_="crv-kpi-card",
-                ),
-                ui.tags.div(
-                    ui.tags.div("Total Conversions", class_="crv-kpi-label"),
-                    ui.tags.div(ui.output_text("crv_kpi_conversions"), class_="crv-kpi-value"),
-                    class_="crv-kpi-card",
-                ),
-                class_="crv-kpi-strip",
+                _dig_kpi_card("Total Creatives", "crv_total", "#EA332D"),
+                _dig_kpi_card("Impressions", "crv_impressions", "#021326"),
+                _dig_kpi_card("Avg. CTR", "crv_ctr", "#C99D44"),
+                _dig_kpi_card("Total Conversions", "crv_conversions", "#021326"),
+                class_="funnel-strip",
             ),
             # ── Page-specific filters ──
             ui.tags.div(
@@ -1038,30 +1022,6 @@ page_digital = ui.nav_menu(
                 ui.tags.div(
                     ui.output_ui("crv_search_count"),
                     style="align-self:flex-end; padding-bottom:10px;",
-                ),
-                ui.tags.div(
-                    ui.input_selectize(
-                        "crv_group", "Campaign Group",
-                        choices=[], multiple=True,
-                        options={"placeholder": "All"},
-                    ),
-                    class_="inline-filter",
-                ),
-                ui.tags.div(
-                    ui.input_selectize(
-                        "crv_subgroup", "Campaign Subgroup",
-                        choices=[], multiple=True,
-                        options={"placeholder": "All"},
-                    ),
-                    class_="inline-filter",
-                ),
-                ui.tags.div(
-                    ui.input_selectize(
-                        "dig_platform_campaign", "Platform Campaign",
-                        choices=[], multiple=True,
-                        options={"placeholder": "All"},
-                    ),
-                    class_="inline-filter",
                 ),
                 class_="page-filter-bar",
                 style="flex-wrap:wrap; gap:12px; align-items:flex-start;",
@@ -1300,7 +1260,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=39"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=41"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(src="paginated-tables.js?v=2"),

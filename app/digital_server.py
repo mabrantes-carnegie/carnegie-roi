@@ -2115,24 +2115,42 @@ def digital_server(input, output, session):
         return _apply_dig_filters_monthly(Q11_CREATIVE.copy())
 
     @reactive.calc
-    def _crv_agg():
-        """Aggregate creative data at the creative-level grain and apply page filters."""
-        df = _crv_base()
-        # Page-specific dropdown filters
-        pc = input.dig_platform_campaign()
-        if pc and len(pc) > 0:
-            df = df[df["platform_campaign_name"].isin(pc)]
-        grp = input.crv_group()
-        if grp and len(grp) > 0:
+    def _crv_base_prior():
+        """Prior period for creative data — shift date range back by same duration."""
+        df = Q11_CREATIVE.copy()
+        period = input.dig_period()
+        if period and len(period) == 2:
+            start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
+            duration = end - start
+            prior_end = start - pd.Timedelta(days=1)
+            prior_start = prior_end - duration
+            df["_month_start"] = pd.to_datetime(
+                df["event_year"].astype(str) + "-" + df["event_month"].astype(str).str.zfill(2) + "-01"
+            )
+            df = df[(df["_month_start"] >= prior_start.replace(day=1)) &
+                    (df["_month_start"] <= prior_end)]
+            df = df.drop(columns=["_month_start"])
+        else:
+            df = df.iloc[0:0]
+        # Apply same global filters
+        grp = input.dig_group()
+        if grp and len(grp) > 0 and "group_name" in df.columns:
             df = df[df["group_name"].isin(grp)]
-        sub = input.crv_subgroup()
-        if sub and len(sub) > 0:
+        sub = input.dig_subgroup()
+        if sub and len(sub) > 0 and "subgroup_name" in df.columns:
             df = df[df["subgroup_name"].isin(sub)]
+        prod = input.dig_product()
+        if prod and len(prod) > 0 and "product_name" in df.columns:
+            df = df[df["product_name"].isin(prod)]
+        camp = input.dig_campaign()
+        if camp and len(camp) > 0 and "campaign_name" in df.columns:
+            df = df[df["campaign_name"].isin(camp)]
+        return df
 
+    def _crv_aggregate(df):
+        """Aggregate a creative DataFrame to creative-level grain."""
         if df.empty:
             return df
-
-        # Aggregate to creative level
         grp_cols = ["campaign_name", "ad_group", "product_name",
                     "platform_campaign_name", "group_name", "subgroup_name"]
         str_agg = {c: "first" for c in ["creative", "ad_description", "image_url",
@@ -2142,7 +2160,6 @@ def digital_server(input, output, session):
                                        "total_conversions"] if c in df.columns}
         valid_grp = [c for c in grp_cols if c in df.columns]
         agged = df.groupby(valid_grp, as_index=False).agg({**str_agg, **num_agg})
-        # Computed metrics
         if "impressions" in agged.columns and "clicks" in agged.columns:
             agged["ctr"] = (agged["clicks"] / agged["impressions"].replace(0, float("nan")) * 100).round(2)
         else:
@@ -2153,6 +2170,11 @@ def digital_server(input, output, session):
             agged["conv_rate"] = 0.0
         agged = agged.sort_values("impressions", ascending=False).reset_index(drop=True)
         return agged
+
+    @reactive.calc
+    def _crv_agg():
+        """Aggregate creative data at the creative-level grain."""
+        return _crv_aggregate(_crv_base())
 
     @reactive.calc
     def _crv_filtered():
@@ -2181,45 +2203,32 @@ def digital_server(input, output, session):
         df = df.sort_values(sort_col, ascending=ascending, na_position="last").reset_index(drop=True)
         return df
 
-    # ── Filter choice updaters ──
-
-    @reactive.effect
-    def _update_platform_campaign():
-        df = _crv_base()
-        pcs = sorted([p for p in df["platform_campaign_name"].unique() if p])
-        ui.update_selectize("dig_platform_campaign", choices=pcs, selected=[])
-
-    @reactive.effect
-    def _update_crv_group():
-        df = _crv_base()
-        vals = sorted([v for v in df["group_name"].unique() if v])
-        ui.update_selectize("crv_group", choices=vals, selected=[])
-
-    @reactive.effect
-    def _update_crv_subgroup():
-        df = _crv_base()
-        vals = sorted([v for v in df["subgroup_name"].unique() if v])
-        ui.update_selectize("crv_subgroup", choices=vals, selected=[])
-
-    # ── KPI renders ──
+    # ── KPI renders (funnel-card pattern) ──
 
     @render.text
-    def crv_kpi_total():
-        return f"{len(_crv_filtered()):,}"
+    def dig_crv_total():
+        return f"{len(_crv_agg()):,}"
+
+    @render.ui
+    def dig_crv_total_delta():
+        curr = len(_crv_aggregate(_crv_base()))
+        prev = len(_crv_aggregate(_crv_base_prior()))
+        return _fmt_delta(curr, prev)
 
     @render.text
-    def crv_kpi_impressions():
-        df = _crv_filtered()
-        v = df["impressions"].sum() if not df.empty and "impressions" in df.columns else 0
-        if v >= 1_000_000:
-            return f"{v/1_000_000:,.1f}M"
-        if v >= 1_000:
-            return f"{v/1_000:,.1f}K"
-        return f"{v:,.0f}"
+    def dig_crv_impressions():
+        df = _crv_agg()
+        return fmt_number(df["impressions"].sum() if not df.empty else 0)
+
+    @render.ui
+    def dig_crv_impressions_delta():
+        curr = _crv_base()["impressions"].sum() if not _crv_base().empty else 0
+        prev = _crv_base_prior()["impressions"].sum() if not _crv_base_prior().empty else 0
+        return _fmt_delta(curr, prev)
 
     @render.text
-    def crv_kpi_ctr():
-        df = _crv_filtered()
+    def dig_crv_ctr():
+        df = _crv_agg()
         if df.empty or "impressions" not in df.columns:
             return "0.00%"
         impr = df["impressions"].sum()
@@ -2227,15 +2236,28 @@ def digital_server(input, output, session):
         ctr = (clicks / impr * 100) if impr > 0 else 0
         return f"{ctr:.2f}%"
 
+    @render.ui
+    def dig_crv_ctr_delta():
+        c = _crv_base()
+        p = _crv_base_prior()
+        c_impr = c["impressions"].sum() if not c.empty else 0
+        c_clicks = c["clicks"].sum() if not c.empty else 0
+        p_impr = p["impressions"].sum() if not p.empty else 0
+        p_clicks = p["clicks"].sum() if not p.empty else 0
+        curr = (c_clicks / c_impr * 100) if c_impr > 0 else None
+        prev = (p_clicks / p_impr * 100) if p_impr > 0 else None
+        return _fmt_delta(curr, prev)
+
     @render.text
-    def crv_kpi_conversions():
-        df = _crv_filtered()
-        v = df["total_conversions"].sum() if not df.empty and "total_conversions" in df.columns else 0
-        if v >= 1_000_000:
-            return f"{v/1_000_000:,.1f}M"
-        if v >= 1_000:
-            return f"{v/1_000:,.1f}K"
-        return f"{v:,.0f}"
+    def dig_crv_conversions():
+        df = _crv_agg()
+        return fmt_number(df["total_conversions"].sum() if not df.empty else 0)
+
+    @render.ui
+    def dig_crv_conversions_delta():
+        curr = _crv_base()["total_conversions"].sum() if not _crv_base().empty else 0
+        prev = _crv_base_prior()["total_conversions"].sum() if not _crv_base_prior().empty else 0
+        return _fmt_delta(curr, prev)
 
     # ── Search count badge ──
 
@@ -2348,7 +2370,7 @@ def digital_server(input, output, session):
             _metric_cell("CTR", f"{ctr:.2f}%" if pd.notna(ctr) else "—"),
             _metric_cell("Total Conv.", _fmt_metric(total_conv)),
             _metric_cell("Conv. Rate", f"{conv_rate:.2f}%" if pd.notna(conv_rate) else "—"),
-            class_="crv-metric-grid crv-metric-grid--summary",
+            class_="crv-metric-grid",
         )
 
         # Details toggle button
@@ -2368,44 +2390,16 @@ def digital_server(input, output, session):
         )
 
         # ══════════════════════════════════════
-        # EXPANDED PANEL
+        # EXPANDED PANEL  (3-column layout)
         # ══════════════════════════════════════
 
-        # ── Left column: larger image + metadata ──
-        large_image = ui.tags.div(_thumb("crv-card-img-lg"), class_="crv-expand-image")
-
-        def _meta_row(label, value, is_link=False):
-            if not value:
-                return None
-            if is_link and value.startswith("http"):
-                val_el = ui.tags.a(
-                    value if len(value) <= 60 else value[:57] + "...",
-                    href=value, target="_blank", class_="crv-meta-link",
-                    title=value,
-                )
-            else:
-                val_el = ui.tags.span(value, class_="crv-expand-meta-val")
-            return ui.tags.div(
-                ui.tags.span(label, class_="crv-expand-meta-key"),
-                val_el,
-                class_="crv-expand-meta-row",
-            )
-
-        meta_rows = [r for r in [
-            _meta_row("Tactic", tactic),
-            _meta_row("Platform Campaign", platform_campaign),
-            _meta_row("Ad Group", ad_group),
-            _meta_row("Image URL", image_url, is_link=True),
-            _meta_row("Landing Page", ad_url, is_link=True),
-        ] if r is not None]
-
-        left_col = ui.tags.div(
-            large_image,
-            ui.tags.div(*meta_rows, class_="crv-expand-meta") if meta_rows else "",
-            class_="crv-expand-left",
+        # ── Col 1: Creative preview ──
+        col_image = ui.tags.div(
+            ui.tags.div(_thumb("crv-card-img-lg"), class_="crv-expand-image"),
+            class_="crv-expand-col-img",
         )
 
-        # ── Right column: grouped metrics + insight chips ──
+        # ── Col 2: Performance metrics + insight chips ──
         def _detail_metric(label, value):
             return ui.tags.div(
                 ui.tags.div(label, class_="crv-dm-label"),
@@ -2436,7 +2430,7 @@ def digital_server(input, output, session):
             class_="crv-dm-group",
         )
 
-        # ── Insight chips ──
+        # Insight chips
         chips = []
         ctr_val = ctr if pd.notna(ctr) else 0
         conv_rate_val = conv_rate if pd.notna(conv_rate) else 0
@@ -2468,21 +2462,47 @@ def digital_server(input, output, session):
         if total_val == 0 and impr_val > 0:
             chips.append(("warning", "No conversions recorded"))
 
-        chip_els = []
-        for tone, text in chips:
-            chip_els.append(ui.tags.span(text, class_=f"crv-chip crv-chip--{tone}"))
-
+        chip_els = [ui.tags.span(text, class_=f"crv-chip crv-chip--{tone}") for tone, text in chips]
         chip_section = ui.tags.div(*chip_els, class_="crv-chip-row") if chip_els else ""
 
-        right_col = ui.tags.div(
-            reach_group,
-            conv_group,
-            chip_section,
-            class_="crv-expand-right",
+        col_metrics = ui.tags.div(
+            reach_group, conv_group, chip_section,
+            class_="crv-expand-col-metrics",
         )
 
+        # ── Col 3: Metadata card ──
+        def _meta_row(label, value, is_link=False):
+            if not value:
+                return None
+            if is_link and value.startswith("http"):
+                val_el = ui.tags.a(
+                    value if len(value) <= 50 else value[:47] + "...",
+                    href=value, target="_blank", class_="crv-meta-link",
+                    title=value,
+                )
+            else:
+                val_el = ui.tags.span(value, class_="crv-expand-meta-val")
+            return ui.tags.div(
+                ui.tags.span(label, class_="crv-expand-meta-key"),
+                val_el,
+                class_="crv-expand-meta-row",
+            )
+
+        meta_rows = [r for r in [
+            _meta_row("Tactic", tactic),
+            _meta_row("Platform Campaign", platform_campaign),
+            _meta_row("Image URL", image_url, is_link=True),
+            _meta_row("Landing Page", ad_url, is_link=True),
+        ] if r is not None]
+
+        col_meta = ui.tags.div(
+            ui.tags.div("Details", class_="crv-expand-meta-title"),
+            *meta_rows,
+            class_="crv-expand-col-meta",
+        ) if meta_rows else ""
+
         expanded_panel = ui.tags.div(
-            left_col, right_col,
+            col_image, col_metrics, col_meta,
             class_="crv-expand-panel",
             id=card_id,
             style="display:none;",
@@ -2520,8 +2540,7 @@ def digital_server(input, output, session):
     # ── Pagination helpers ──
 
     @reactive.effect
-    @reactive.event(input.crv_search, input.crv_group, input.crv_subgroup,
-                    input.dig_platform_campaign, input.dig_period,
+    @reactive.event(input.crv_search, input.dig_period,
                     input.dig_group, input.dig_subgroup, input.dig_product, input.dig_campaign)
     def _crv_reset_page():
         ui.insert_ui(
