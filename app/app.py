@@ -1002,15 +1002,176 @@ page_digital = ui.nav_menu(
     ui.nav_panel(
         "Creative",
         _dig_page(ui.tags.div(
+            # ── KPI summary strip ──
             ui.tags.div(
-                ui.input_selectize(
-                    "dig_platform_campaign", "Platform Campaign",
-                    choices=[], multiple=True,
-                    options={"placeholder": "All"},
+                ui.tags.div(
+                    ui.tags.div("Total Creatives", class_="crv-kpi-label"),
+                    ui.tags.div(ui.output_text("crv_kpi_total"), class_="crv-kpi-value"),
+                    class_="crv-kpi-card",
+                ),
+                ui.tags.div(
+                    ui.tags.div("Impressions", class_="crv-kpi-label"),
+                    ui.tags.div(ui.output_text("crv_kpi_impressions"), class_="crv-kpi-value"),
+                    class_="crv-kpi-card",
+                ),
+                ui.tags.div(
+                    ui.tags.div("Avg. CTR", class_="crv-kpi-label"),
+                    ui.tags.div(ui.output_text("crv_kpi_ctr"), class_="crv-kpi-value"),
+                    class_="crv-kpi-card",
+                ),
+                ui.tags.div(
+                    ui.tags.div("Total Conversions", class_="crv-kpi-label"),
+                    ui.tags.div(ui.output_text("crv_kpi_conversions"), class_="crv-kpi-value"),
+                    class_="crv-kpi-card",
+                ),
+                class_="crv-kpi-strip",
+            ),
+            # ── Page-specific filters ──
+            ui.tags.div(
+                ui.tags.div(
+                    ui.input_text(
+                        "crv_search", "Search",
+                        placeholder="Search using keywords",
+                    ),
+                    class_="inline-filter",
+                ),
+                ui.tags.div(
+                    ui.output_ui("crv_search_count"),
+                    style="align-self:flex-end; padding-bottom:10px;",
+                ),
+                ui.tags.div(
+                    ui.input_selectize(
+                        "crv_group", "Campaign Group",
+                        choices=[], multiple=True,
+                        options={"placeholder": "All"},
+                    ),
+                    class_="inline-filter",
+                ),
+                ui.tags.div(
+                    ui.input_selectize(
+                        "crv_subgroup", "Campaign Subgroup",
+                        choices=[], multiple=True,
+                        options={"placeholder": "All"},
+                    ),
+                    class_="inline-filter",
+                ),
+                ui.tags.div(
+                    ui.input_selectize(
+                        "dig_platform_campaign", "Platform Campaign",
+                        choices=[], multiple=True,
+                        options={"placeholder": "All"},
+                    ),
+                    class_="inline-filter",
                 ),
                 class_="page-filter-bar",
+                style="flex-wrap:wrap; gap:12px; align-items:flex-start;",
             ),
-            ui.output_ui("dig_creative_sections"),
+            # ── Sort by row ──
+            ui.tags.div(
+                # Hidden Shiny input to hold sort value
+                ui.tags.div(
+                    ui.input_radio_buttons(
+                        "crv_sort", None,
+                        choices={
+                            "impressions": "Impressions",
+                            "clicks": "Clicks",
+                            "ctr": "CTR",
+                            "total_conversions": "Conversions",
+                            "conv_rate": "Conv. Rate",
+                        },
+                        selected="impressions",
+                        inline=True,
+                    ),
+                    style="display:none;",
+                ),
+                # Visible pill toolbar
+                ui.tags.span("SORT BY", class_="crv-sort-label"),
+                ui.tags.div(
+                    ui.tags.button("Impressions", class_="crv-sort-pill active",
+                                   **{"data-val": "impressions"},
+                                   onclick="window._crvSort(this)"),
+                    ui.tags.button("Clicks", class_="crv-sort-pill",
+                                   **{"data-val": "clicks"},
+                                   onclick="window._crvSort(this)"),
+                    ui.tags.button("CTR", class_="crv-sort-pill",
+                                   **{"data-val": "ctr"},
+                                   onclick="window._crvSort(this)"),
+                    ui.tags.button("Conversions", class_="crv-sort-pill",
+                                   **{"data-val": "total_conversions"},
+                                   onclick="window._crvSort(this)"),
+                    ui.tags.button("Conv. Rate", class_="crv-sort-pill",
+                                   **{"data-val": "conv_rate"},
+                                   onclick="window._crvSort(this)"),
+                    class_="crv-sort-pills",
+                ),
+                class_="crv-sort-bar",
+            ),
+            ui.tags.script(
+                "window._crvSort=function(btn){"
+                "  var pills=btn.parentElement.querySelectorAll('.crv-sort-pill');"
+                "  var val=btn.getAttribute('data-val');"
+                "  var cur=document.querySelector('.crv-sort-pill.active');"
+                "  if(cur&&cur.getAttribute('data-val')===val){"
+                "    var asc=btn.classList.contains('asc');"
+                "    pills.forEach(function(p){p.classList.remove('active','asc');});"
+                "    btn.classList.add('active');"
+                "    if(!asc){btn.classList.add('asc');}"
+                "  }else{"
+                "    pills.forEach(function(p){p.classList.remove('active','asc');});"
+                "    btn.classList.add('active');"
+                "  }"
+                "  var dir=btn.classList.contains('asc')?'__asc':'';"
+                "  Shiny.setInputValue('crv_sort',val+dir);"
+                "};"
+                "window._crvToggle=function(id,btn){"
+                "  var panel=document.getElementById(id);"
+                "  if(!panel)return;"
+                "  var open=panel.style.display!=='none';"
+                "  panel.style.display=open?'none':'flex';"
+                "  var lbl=btn.querySelector('.crv-toggle-label');"
+                "  var chev=btn.querySelector('.crv-toggle-chevron');"
+                "  if(lbl)lbl.textContent=open?'Details':'Close';"
+                "  if(chev){chev.textContent=open?'\\u25BE':'\\u25B4';}"
+                "  btn.classList.toggle('crv-details-btn--open',!open);"
+                "  btn.closest('.crv-card').classList.toggle('crv-card--expanded',!open);"
+                "};"
+            ),
+            # ── Creative card list ──
+            ui.output_ui("crv_card_list"),
+            # ── Pagination ──
+            ui.tags.div(
+                ui.tags.div(
+                    ui.tags.label("Cards per page", class_="insight-pag-label"),
+                    ui.tags.select(
+                        ui.tags.option("10", value="10", selected="selected"),
+                        ui.tags.option("25", value="25"),
+                        ui.tags.option("50", value="50"),
+                        class_="insight-pag-select",
+                        id="crv_per_page",
+                        onchange=(
+                            "Shiny.setInputValue('crv_per_page', parseInt(this.value));"
+                            "Shiny.setInputValue('crv_page', 1);"
+                        ),
+                    ),
+                    class_="insight-pag-group",
+                ),
+                ui.tags.div(
+                    ui.output_ui("crv_pag_range"),
+                    class_="insight-pag-range",
+                ),
+                ui.tags.div(
+                    ui.output_ui("crv_pag_buttons"),
+                    class_="insight-pag-nav",
+                ),
+                class_="insight-pag-bar",
+            ),
+            # Initialize pagination inputs on first render
+            ui.tags.script(
+                "$(function(){"
+                "  Shiny.setInputValue('crv_page', 1);"
+                "  Shiny.setInputValue('crv_per_page', 10);"
+                "});"
+            ),
         )),
     ),
 
@@ -1139,7 +1300,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=33"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=39"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(src="paginated-tables.js?v=2"),

@@ -1,11 +1,37 @@
 """Digital Performance page — reactive server logic (all 5 sub-tabs)."""
 
+import base64
 import pandas as pd
 from shiny import render, reactive, ui, req
 import plotly.graph_objects as go
+from urllib.request import urlopen, Request
 
 from digital_data import Q8, Q9, Q10, Q11_CREATIVE, Q11_KEYWORDS, Q12
 from formatters import fmt_number, fmt_currency
+
+# ── Image cache: URL → base64 data URI (fetched once, reused) ────
+_IMAGE_CACHE: dict[str, str | None] = {}
+
+def _get_image_data_uri(url: str) -> str | None:
+    """Fetch an image URL server-side and return a base64 data URI.
+    Returns None if the fetch fails. Results are cached in memory."""
+    if url in _IMAGE_CACHE:
+        return _IMAGE_CACHE[url]
+    try:
+        req_obj = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        resp = urlopen(req_obj, timeout=8)
+        ct = resp.headers.get("Content-Type", "image/jpeg")
+        data = resp.read()
+        if len(data) < 100:  # too small, likely error/tracking pixel
+            _IMAGE_CACHE[url] = None
+            return None
+        b64 = base64.b64encode(data).decode("ascii")
+        data_uri = f"data:{ct};base64,{b64}"
+        _IMAGE_CACHE[url] = data_uri
+        return data_uri
+    except Exception:
+        _IMAGE_CACHE[url] = None
+        return None
 
 # ── Carnegie brand colors ────────────────────────────────────
 CARNEGIE_NAVY = "#021326"
@@ -2081,139 +2107,480 @@ def digital_server(input, output, session):
     # TAB 4: CREATIVE
     # ══════════════════════════════════════════════════════════
 
-    @reactive.effect
-    def _update_platform_campaign():
-        df = _apply_dig_filters_monthly(Q11_CREATIVE.copy())
-        pcs = sorted([p for p in df["platform_campaign_name"].unique() if p])
-        ui.update_selectize("dig_platform_campaign", choices=pcs, selected=[])
+    # ── Reactive: base creative data with global + page filters ──
 
-    @render.ui
-    def dig_creative_sections():
-        df = _apply_dig_filters_monthly(Q11_CREATIVE.copy())
+    @reactive.calc
+    def _crv_base():
+        """Apply global filters to creative data."""
+        return _apply_dig_filters_monthly(Q11_CREATIVE.copy())
+
+    @reactive.calc
+    def _crv_agg():
+        """Aggregate creative data at the creative-level grain and apply page filters."""
+        df = _crv_base()
+        # Page-specific dropdown filters
         pc = input.dig_platform_campaign()
         if pc and len(pc) > 0:
             df = df[df["platform_campaign_name"].isin(pc)]
-        kw_df = _apply_dig_filters_monthly(Q11_KEYWORDS.copy())
+        grp = input.crv_group()
+        if grp and len(grp) > 0:
+            df = df[df["group_name"].isin(grp)]
+        sub = input.crv_subgroup()
+        if sub and len(sub) > 0:
+            df = df[df["subgroup_name"].isin(sub)]
 
-        if df.empty and kw_df.empty:
-            return ui.tags.div("No creative data available.", class_="empty-state")
+        if df.empty:
+            return df
 
-        sections = []
+        # Aggregate to creative level
+        grp_cols = ["campaign_name", "ad_group", "product_name",
+                    "platform_campaign_name", "group_name", "subgroup_name"]
+        str_agg = {c: "first" for c in ["creative", "ad_description", "image_url",
+                                         "preview_url", "ad_url"] if c in df.columns}
+        num_agg = {c: "sum" for c in ["impressions", "clicks", "direct_conversions",
+                                       "view_through_conversions", "in_platform_leads",
+                                       "total_conversions"] if c in df.columns}
+        valid_grp = [c for c in grp_cols if c in df.columns]
+        agged = df.groupby(valid_grp, as_index=False).agg({**str_agg, **num_agg})
+        # Computed metrics
+        if "impressions" in agged.columns and "clicks" in agged.columns:
+            agged["ctr"] = (agged["clicks"] / agged["impressions"].replace(0, float("nan")) * 100).round(2)
+        else:
+            agged["ctr"] = 0.0
+        if "impressions" in agged.columns and "total_conversions" in agged.columns:
+            agged["conv_rate"] = (agged["total_conversions"] / agged["impressions"].replace(0, float("nan")) * 100).round(2)
+        else:
+            agged["conv_rate"] = 0.0
+        agged = agged.sort_values("impressions", ascending=False).reset_index(drop=True)
+        return agged
 
-        # Platform sections
-        _PLATFORM_CONFIGS = [
-            ("Display", lambda p: "Display" in p and "IP" not in p,
-             ["campaign_name", "ad_group", "creative", "ad_url", "impressions", "clicks",
-              "direct_conversions", "view_through_conversions", "total_conversions"],
-             {"campaign_name": "Campaign", "ad_group": "Ad Group", "creative": "Creative",
-              "ad_url": "Landing Page", "impressions": "Impressions", "clicks": "Clicks",
-              "direct_conversions": "Direct Key Int.", "view_through_conversions": "View-Through Int.",
-              "total_conversions": "Total Key Int."}),
-            ("Meta", lambda p: p == "Meta",
-             ["campaign_name", "creative", "ad_description", "image_url", "ad_url",
-              "impressions", "clicks", "direct_conversions", "view_through_conversions",
-              "in_platform_leads", "total_conversions"],
-             {"campaign_name": "Campaign", "creative": "Ad Name", "ad_description": "Description",
-              "image_url": "Image", "ad_url": "Landing Page", "impressions": "Impressions",
-              "clicks": "Clicks", "direct_conversions": "Direct Key Int.",
-              "view_through_conversions": "View-Through Int.", "in_platform_leads": "In-Platform Leads",
-              "total_conversions": "Total Key Int."}),
-            ("YouTube", lambda p: p == "YouTube",
-             ["campaign_name", "ad_description", "ad_url", "impressions", "clicks",
-              "direct_conversions", "view_through_conversions", "total_conversions",
-              "video_starts", "video_completions"],
-             {"campaign_name": "Campaign", "ad_description": "Description",
-              "ad_url": "Landing Page", "impressions": "Impressions", "clicks": "Clicks",
-              "direct_conversions": "Direct Key Int.", "view_through_conversions": "View-Through Int.",
-              "total_conversions": "Total Key Int.", "video_starts": "Video Starts",
-              "video_completions": "Video Completions"}),
-            ("Snapchat", lambda p: "Snapchat" in p,
-             ["campaign_name", "ad_description", "ad_url", "impressions", "clicks", "total_conversions"],
-             {"campaign_name": "Campaign", "ad_description": "Description",
-              "ad_url": "Landing Page", "impressions": "Impressions",
-              "clicks": "Clicks (Swipe Ups)", "total_conversions": "Total Key Int."}),
-            ("TikTok", lambda p: p == "TikTok",
-             ["campaign_name", "ad_description", "ad_url", "impressions", "clicks",
-              "total_conversions", "followers", "likes", "shares", "comments"],
-             {"campaign_name": "Campaign", "ad_description": "Description",
-              "ad_url": "Landing Page", "impressions": "Impressions", "clicks": "Clicks",
-              "total_conversions": "Total Key Int.", "followers": "Followers",
-              "likes": "Likes", "shares": "Shares", "comments": "Comments"}),
-            ("Spotify", lambda p: p == "Spotify",
-             ["campaign_name", "ad_description", "ad_url", "impressions", "clicks"],
-             {"campaign_name": "Campaign", "ad_description": "Description",
-              "ad_url": "Landing Page", "impressions": "Impressions", "clicks": "Clicks"}),
-            ("Reddit", lambda p: p == "Reddit",
-             ["campaign_name", "ad_description", "ad_url", "impressions", "clicks", "total_conversions"],
-             {"campaign_name": "Campaign", "ad_description": "Description",
-              "ad_url": "Landing Page", "impressions": "Impressions", "clicks": "Clicks",
-              "total_conversions": "Total Key Int."}),
-            ("IP Targeting", lambda p: "IP" in p,
-             ["campaign_name", "creative", "ad_url", "impressions", "clicks",
-              "direct_conversions", "view_through_conversions", "total_conversions"],
-             {"campaign_name": "Campaign", "creative": "Creative",
-              "ad_url": "Landing Page", "impressions": "Impressions", "clicks": "Clicks",
-              "direct_conversions": "Direct Key Int.", "view_through_conversions": "View-Through Int.",
-              "total_conversions": "Total Key Int."}),
-            ("LinkedIn", lambda p: "LinkedIn" in p,
-             ["campaign_name", "ad_description", "image_url", "ad_url",
-              "impressions", "clicks", "direct_conversions", "view_through_conversions",
-              "in_platform_leads", "total_conversions"],
-             {"campaign_name": "Campaign", "ad_description": "Description",
-              "image_url": "Image", "ad_url": "Landing Page", "impressions": "Impressions",
-              "clicks": "Clicks", "direct_conversions": "Direct Key Int.",
-              "view_through_conversions": "View-Through Int.", "in_platform_leads": "In-Platform Leads",
-              "total_conversions": "Total Key Int."}),
+    @reactive.calc
+    def _crv_filtered():
+        """Apply text search and sorting to aggregated creative data."""
+        df = _crv_agg()
+        if df.empty:
+            return df
+        search = str(input.crv_search()).strip().lower()
+        if search:
+            mask = pd.Series(False, index=df.index)
+            for col in ["campaign_name", "ad_group", "product_name",
+                        "platform_campaign_name", "creative", "ad_description"]:
+                if col in df.columns:
+                    mask = mask | df[col].fillna("").str.lower().str.contains(search, regex=False)
+            df = df[mask].reset_index(drop=True)
+
+        # Sort by selected metric
+        try:
+            raw = str(input.crv_sort())
+        except Exception:
+            raw = "impressions"
+        ascending = raw.endswith("__asc")
+        sort_col = raw.replace("__asc", "")
+        if sort_col not in df.columns:
+            sort_col = "impressions"
+        df = df.sort_values(sort_col, ascending=ascending, na_position="last").reset_index(drop=True)
+        return df
+
+    # ── Filter choice updaters ──
+
+    @reactive.effect
+    def _update_platform_campaign():
+        df = _crv_base()
+        pcs = sorted([p for p in df["platform_campaign_name"].unique() if p])
+        ui.update_selectize("dig_platform_campaign", choices=pcs, selected=[])
+
+    @reactive.effect
+    def _update_crv_group():
+        df = _crv_base()
+        vals = sorted([v for v in df["group_name"].unique() if v])
+        ui.update_selectize("crv_group", choices=vals, selected=[])
+
+    @reactive.effect
+    def _update_crv_subgroup():
+        df = _crv_base()
+        vals = sorted([v for v in df["subgroup_name"].unique() if v])
+        ui.update_selectize("crv_subgroup", choices=vals, selected=[])
+
+    # ── KPI renders ──
+
+    @render.text
+    def crv_kpi_total():
+        return f"{len(_crv_filtered()):,}"
+
+    @render.text
+    def crv_kpi_impressions():
+        df = _crv_filtered()
+        v = df["impressions"].sum() if not df.empty and "impressions" in df.columns else 0
+        if v >= 1_000_000:
+            return f"{v/1_000_000:,.1f}M"
+        if v >= 1_000:
+            return f"{v/1_000:,.1f}K"
+        return f"{v:,.0f}"
+
+    @render.text
+    def crv_kpi_ctr():
+        df = _crv_filtered()
+        if df.empty or "impressions" not in df.columns:
+            return "0.00%"
+        impr = df["impressions"].sum()
+        clicks = df["clicks"].sum() if "clicks" in df.columns else 0
+        ctr = (clicks / impr * 100) if impr > 0 else 0
+        return f"{ctr:.2f}%"
+
+    @render.text
+    def crv_kpi_conversions():
+        df = _crv_filtered()
+        v = df["total_conversions"].sum() if not df.empty and "total_conversions" in df.columns else 0
+        if v >= 1_000_000:
+            return f"{v/1_000_000:,.1f}M"
+        if v >= 1_000:
+            return f"{v/1_000:,.1f}K"
+        return f"{v:,.0f}"
+
+    # ── Search count badge ──
+
+    @render.ui
+    def crv_search_count():
+        search = str(input.crv_search()).strip()
+        if not search:
+            return None
+        total = len(_crv_filtered())
+        label = "creative" if total == 1 else "creatives"
+        return ui.tags.span(
+            f"{total} {label} found",
+            style=(
+                "display:inline-block;"
+                "padding:3px 10px;border-radius:9999px;"
+                "background:#edeae6;color:#56534e;"
+                "font-family:Manrope,sans-serif;font-size:11px;font-weight:600;"
+                "white-space:nowrap;"
+            ),
+        )
+
+    # ── Creative card builder ──
+
+    def _fmt_metric(val):
+        """Format a numeric metric for display."""
+        if pd.isna(val) or val == 0:
+            return "0"
+        if val >= 1_000_000:
+            return f"{val/1_000_000:,.1f}M"
+        if val >= 10_000:
+            return f"{val/1_000:,.1f}K"
+        if val >= 1_000:
+            return f"{val:,.0f}"
+        if isinstance(val, float) and val != int(val):
+            return f"{val:,.2f}"
+        return f"{val:,.0f}"
+
+    def _creative_card(row, card_idx):
+        """Build a single creative result card with expand/collapse."""
+        campaign = str(row.get("campaign_name", "")).strip()
+        ad_group = str(row.get("ad_group", "")).strip()
+        tactic = str(row.get("product_name", "")).strip()
+        image_url = str(row.get("image_url", "")).strip()
+        preview_url = str(row.get("preview_url", "")).strip()
+        platform_campaign = str(row.get("platform_campaign_name", "")).strip()
+        ad_url = str(row.get("ad_url", "")).strip()
+        creative_text = str(row.get("creative", "")).strip()
+        ad_desc = str(row.get("ad_description", "")).strip()
+        tactic_short = tactic.split(" - ")[0] if tactic else ""
+
+        # ── Metrics ──
+        impr = row.get("impressions", 0)
+        clicks = row.get("clicks", 0)
+        ctr = row.get("ctr", 0)
+        direct = row.get("direct_conversions", 0)
+        vt = row.get("view_through_conversions", 0)
+        total_conv = row.get("total_conversions", 0)
+        conv_rate = row.get("conv_rate", 0)
+
+        # ── Image data URI ──
+        data_uri = None
+        if image_url and image_url.startswith("http"):
+            data_uri = _get_image_data_uri(image_url)
+
+        def _thumb(css_class="crv-card-img"):
+            if data_uri:
+                return ui.tags.img(src=data_uri, alt="Creative preview", class_=css_class)
+            return ui.tags.div(
+                ui.tags.div(tactic_short or "Ad", style=(
+                    "font-family:Manrope,sans-serif;font-size:11px;font-weight:700;"
+                    "color:#6b7280;text-align:center;line-height:1.3;"
+                    "max-width:90px;word-break:break-word;"
+                )),
+                class_="crv-card-fallback",
+                style="display:flex;",
+            )
+
+        # ══════════════════════════════════════
+        # COLLAPSED SUMMARY ROW
+        # ══════════════════════════════════════
+        image_box = ui.tags.div(_thumb(), class_="crv-card-image")
+
+        text_children = [
+            ui.tags.div(campaign or "Untitled Creative", class_="crv-card-title"),
         ]
+        if ad_group:
+            text_children.append(ui.tags.div(
+                ui.tags.span("Ad Group: ", class_="crv-card-meta-label"),
+                ui.tags.span(ad_group, class_="crv-card-meta-value"),
+                class_="crv-card-meta-row",
+            ))
+        if tactic:
+            text_children.append(ui.tags.div(
+                ui.tags.span("Tactic: ", class_="crv-card-meta-label"),
+                ui.tags.span(tactic, class_="crv-card-meta-value"),
+                class_="crv-card-meta-row",
+            ))
+        text_section = ui.tags.div(*text_children, class_="crv-card-text")
 
-        for title, filter_fn, cols, renames in _PLATFORM_CONFIGS:
-            sub = df[df["product_name"].apply(filter_fn)]
-            if sub.empty:
-                continue
-            available = [c for c in cols if c in sub.columns]
-            num_cols = [c for c in available if sub[c].dtype in ["int64", "float64"]]
-            str_cols = [c for c in available if c not in num_cols]
-            agg_dict = {c: "sum" for c in num_cols}
-            for c in str_cols:
-                agg_dict[c] = "first"
-            grp_cols = [c for c in ["campaign_name", "creative", "ad_group", "ad_description"] if c in available]
-            if not grp_cols:
-                grp_cols = [available[0]]
-            agged = sub.groupby(grp_cols, as_index=False).agg(agg_dict)
-            if "impressions" in agged.columns and "clicks" in agged.columns:
-                agged["CTR"] = (agged["clicks"] / agged["impressions"].replace(0, float("nan")) * 100).round(2)
-                available.append("CTR")
-                renames["CTR"] = "CTR %"
-            agged = agged.sort_values(num_cols[0] if num_cols else available[0], ascending=False)
-            display = agged[[c for c in available if c in agged.columns]].rename(columns=renames)
-            html = _df_to_html(display, title)
-            sections.append(html)
+        def _metric_cell(label, value):
+            return ui.tags.div(
+                ui.tags.div(label, class_="crv-metric-label"),
+                ui.tags.div(value, class_="crv-metric-value"),
+                class_="crv-metric-cell",
+            )
 
-        # PPC Keywords
-        if not kw_df.empty:
-            kw_agg = kw_df.groupby(["campaign_name", "keyword", "match_type"]).agg(
-                impressions=("impressions", "sum"), clicks=("clicks", "sum"),
-                direct_conversions=("direct_conversions", "sum"), budget=("budget", "sum"),
-            ).reset_index()
-            kw_agg["direct_conversions"] = kw_agg["direct_conversions"].round(2)
-            kw_agg["CTR"] = (kw_agg["clicks"] / kw_agg["impressions"].replace(0, float("nan")) * 100).round(2)
-            kw_agg["CPC"] = (kw_agg["budget"] / kw_agg["clicks"].replace(0, float("nan"))).round(2)
-            kw_agg["Cost/Conv."] = (kw_agg["budget"] / kw_agg["direct_conversions"].replace(0, float("nan"))).round(2)
-            kw_agg = kw_agg.sort_values("impressions", ascending=False)
-            display = kw_agg.rename(columns={
-                "campaign_name": "Campaign", "keyword": "Keyword", "match_type": "Match Type",
-                "impressions": "Impressions", "clicks": "Clicks",
-                "direct_conversions": "Direct Key Int.", "CTR": "CTR %", "CPC": "CPC",
-                "Cost/Conv.": "Cost/Conv.",
-            })
-            show = ["Campaign", "Keyword", "Match Type", "Impressions", "Clicks",
-                    "CTR %", "CPC", "Direct Key Int.", "Cost/Conv."]
-            html = _df_to_html(display[[c for c in show if c in display.columns]], "PPC Keyword Performance")
-            sections.append(html)
+        metrics_summary = ui.tags.div(
+            _metric_cell("Impressions", _fmt_metric(impr)),
+            _metric_cell("Clicks", _fmt_metric(clicks)),
+            _metric_cell("CTR", f"{ctr:.2f}%" if pd.notna(ctr) else "—"),
+            _metric_cell("Total Conv.", _fmt_metric(total_conv)),
+            _metric_cell("Conv. Rate", f"{conv_rate:.2f}%" if pd.notna(conv_rate) else "—"),
+            class_="crv-metric-grid crv-metric-grid--summary",
+        )
 
-        if not sections:
-            return ui.tags.div("No creative data available for the selected filters.", class_="empty-state")
-        return ui.TagList(*sections)
+        # Details toggle button
+        card_id = f"crv-expand-{card_idx}"
+        toggle_btn = ui.tags.button(
+            ui.tags.span("Details", class_="crv-toggle-label"),
+            ui.tags.span("▾", class_="crv-toggle-chevron"),
+            class_="crv-details-btn",
+            onclick=f"window._crvToggle('{card_id}', this)",
+        )
+
+        summary_row = ui.tags.div(
+            image_box,
+            ui.tags.div(text_section, metrics_summary, class_="crv-card-body"),
+            ui.tags.div(toggle_btn, class_="crv-card-actions"),
+            class_="crv-card-summary",
+        )
+
+        # ══════════════════════════════════════
+        # EXPANDED PANEL
+        # ══════════════════════════════════════
+
+        # ── Left column: larger image + metadata ──
+        large_image = ui.tags.div(_thumb("crv-card-img-lg"), class_="crv-expand-image")
+
+        def _meta_row(label, value, is_link=False):
+            if not value:
+                return None
+            if is_link and value.startswith("http"):
+                val_el = ui.tags.a(
+                    value if len(value) <= 60 else value[:57] + "...",
+                    href=value, target="_blank", class_="crv-meta-link",
+                    title=value,
+                )
+            else:
+                val_el = ui.tags.span(value, class_="crv-expand-meta-val")
+            return ui.tags.div(
+                ui.tags.span(label, class_="crv-expand-meta-key"),
+                val_el,
+                class_="crv-expand-meta-row",
+            )
+
+        meta_rows = [r for r in [
+            _meta_row("Tactic", tactic),
+            _meta_row("Platform Campaign", platform_campaign),
+            _meta_row("Ad Group", ad_group),
+            _meta_row("Image URL", image_url, is_link=True),
+            _meta_row("Landing Page", ad_url, is_link=True),
+        ] if r is not None]
+
+        left_col = ui.tags.div(
+            large_image,
+            ui.tags.div(*meta_rows, class_="crv-expand-meta") if meta_rows else "",
+            class_="crv-expand-left",
+        )
+
+        # ── Right column: grouped metrics + insight chips ──
+        def _detail_metric(label, value):
+            return ui.tags.div(
+                ui.tags.div(label, class_="crv-dm-label"),
+                ui.tags.div(value, class_="crv-dm-value"),
+                class_="crv-dm-cell",
+            )
+
+        reach_group = ui.tags.div(
+            ui.tags.div("Reach & Engagement", class_="crv-dm-group-title"),
+            ui.tags.div(
+                _detail_metric("Impressions", _fmt_metric(impr)),
+                _detail_metric("Clicks", _fmt_metric(clicks)),
+                _detail_metric("CTR", f"{ctr:.2f}%" if pd.notna(ctr) else "—"),
+                class_="crv-dm-grid",
+            ),
+            class_="crv-dm-group",
+        )
+
+        conv_group = ui.tags.div(
+            ui.tags.div("Conversions", class_="crv-dm-group-title"),
+            ui.tags.div(
+                _detail_metric("Direct", _fmt_metric(direct)),
+                _detail_metric("View-through", _fmt_metric(vt)),
+                _detail_metric("Total", _fmt_metric(total_conv)),
+                _detail_metric("Conv. Rate", f"{conv_rate:.2f}%" if pd.notna(conv_rate) else "—"),
+                class_="crv-dm-grid",
+            ),
+            class_="crv-dm-group",
+        )
+
+        # ── Insight chips ──
+        chips = []
+        ctr_val = ctr if pd.notna(ctr) else 0
+        conv_rate_val = conv_rate if pd.notna(conv_rate) else 0
+        impr_val = impr if pd.notna(impr) else 0
+        clicks_val = clicks if pd.notna(clicks) else 0
+        direct_val = direct if pd.notna(direct) else 0
+        vt_val = vt if pd.notna(vt) else 0
+        total_val = total_conv if pd.notna(total_conv) else 0
+
+        if ctr_val >= 2:
+            chips.append(("positive", "Strong CTR"))
+        elif ctr_val < 0.5 and impr_val > 0:
+            chips.append(("warning", "CTR below benchmark"))
+
+        if clicks_val >= 1000:
+            chips.append(("positive", "Strong click volume"))
+
+        if conv_rate_val >= 5:
+            chips.append(("positive", "Conversion efficiency strong"))
+        elif conv_rate_val < 0.5 and impr_val > 1000:
+            chips.append(("warning", "Conv. rate low"))
+
+        if direct_val == 0 and vt_val > 0:
+            chips.append(("neutral", "No direct conversions"))
+
+        if total_val > 0 and vt_val / total_val > 0.7:
+            chips.append(("neutral", "High view-through share"))
+
+        if total_val == 0 and impr_val > 0:
+            chips.append(("warning", "No conversions recorded"))
+
+        chip_els = []
+        for tone, text in chips:
+            chip_els.append(ui.tags.span(text, class_=f"crv-chip crv-chip--{tone}"))
+
+        chip_section = ui.tags.div(*chip_els, class_="crv-chip-row") if chip_els else ""
+
+        right_col = ui.tags.div(
+            reach_group,
+            conv_group,
+            chip_section,
+            class_="crv-expand-right",
+        )
+
+        expanded_panel = ui.tags.div(
+            left_col, right_col,
+            class_="crv-expand-panel",
+            id=card_id,
+            style="display:none;",
+        )
+
+        # ══════════════════════════════════════
+        # FULL CARD
+        # ══════════════════════════════════════
+        return ui.tags.div(summary_row, expanded_panel, class_="crv-card")
+
+    # ── Card list render ──
+
+    @render.ui
+    def crv_card_list():
+        df = _crv_filtered()
+        if df.empty:
+            return ui.tags.div("No creatives available for the selected filters.",
+                               class_="empty-state",
+                               style="padding:40px 0;text-align:center;color:#6b7280;font-size:14px;")
+        per_page = _crv_per_page()
+        page = _crv_current_page()
+        total = len(df)
+        max_page = max(1, -(-total // per_page))
+        page = min(page, max_page)
+        start = (page - 1) * per_page
+        end = min(start + per_page, total)
+        page_df = df.iloc[start:end]
+
+        cards = [_creative_card(row, start + i) for i, (_, row) in enumerate(page_df.iterrows())]
+        return ui.tags.div(
+            *cards, class_="crv-card-list",
+            style="display:flex;flex-direction:column;gap:16px;margin-bottom:28px;",
+        )
+
+    # ── Pagination helpers ──
+
+    @reactive.effect
+    @reactive.event(input.crv_search, input.crv_group, input.crv_subgroup,
+                    input.dig_platform_campaign, input.dig_period,
+                    input.dig_group, input.dig_subgroup, input.dig_product, input.dig_campaign)
+    def _crv_reset_page():
+        ui.insert_ui(
+            ui.tags.script("Shiny.setInputValue('crv_page', 1);"),
+            selector="body", where="beforeEnd",
+        )
+
+    @reactive.calc
+    def _crv_per_page():
+        try:
+            v = input.crv_per_page()
+            return max(1, int(v))
+        except Exception:
+            return 10
+
+    @reactive.calc
+    def _crv_current_page():
+        try:
+            v = input.crv_page()
+            return max(1, int(v))
+        except Exception:
+            return 1
+
+    @render.ui
+    def crv_pag_range():
+        df = _crv_filtered()
+        total = len(df)
+        if total == 0:
+            return ui.tags.span("No results", class_="insight-pag-text")
+        per_page = _crv_per_page()
+        page = min(_crv_current_page(), max(1, -(-total // per_page)))
+        start = (page - 1) * per_page + 1
+        end = min(page * per_page, total)
+        return ui.tags.span(f"{start}–{end} of {total}", class_="insight-pag-text")
+
+    @render.ui
+    def crv_pag_buttons():
+        df = _crv_filtered()
+        total = len(df)
+        per_page = _crv_per_page()
+        max_page = max(1, -(-total // per_page))
+        page = min(_crv_current_page(), max_page)
+
+        prev_disabled = "disabled" if page <= 1 else ""
+        next_disabled = "disabled" if page >= max_page else ""
+
+        return ui.tags.div(
+            ui.tags.button(
+                "\u25C0 Prev", class_=f"insight-pag-btn {prev_disabled}",
+                onclick=f"Shiny.setInputValue('crv_page', {page - 1});",
+            ),
+            ui.tags.span(f"Page {page} of {max_page}", class_="insight-pag-text",
+                         style="margin:0 12px;"),
+            ui.tags.button(
+                "Next \u25B6", class_=f"insight-pag-btn {next_disabled}",
+                onclick=f"Shiny.setInputValue('crv_page', {page + 1});",
+            ),
+            style="display:flex;align-items:center;",
+        )
 
     # ══════════════════════════════════════════════════════════
     # TAB 5: INSIGHTS
