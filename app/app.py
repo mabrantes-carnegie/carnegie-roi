@@ -225,14 +225,14 @@ page_overview = ui.nav_panel(
         # Section 3a: Conversion Rates collapsible row
         ui.tags.div(
             ui.tags.button(
-                ui.tags.span("Show Interaction Rates", class_="collapsible-btn-label"),
+                ui.tags.span("Show Conversion Rates", class_="collapsible-btn-label"),
                 ui.tags.span("\u203a", class_="collapsible-btn-chevron"),
                 class_="collapsible-section-btn",
                 onclick=(
                     "var row=document.getElementById('conv-rates-row');"
                     "var open=row.classList.contains('collapsible-row--open');"
                     "row.classList.toggle('collapsible-row--open',!open);"
-                    "this.querySelector('.collapsible-btn-label').textContent=open?'Show Interaction Rates':'Hide Interaction Rates';"
+                    "this.querySelector('.collapsible-btn-label').textContent=open?'Show Conversion Rates':'Hide Conversion Rates';"
                     "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
                 ),
             ),
@@ -379,7 +379,7 @@ page_funnel = ui.nav_panel(
         ),
 
         # Section 3: Conversion rates by source
-        ui.tags.h2("Interaction rates by source", class_="section-heading"),
+        ui.tags.h2("Conversion rates by source", class_="section-heading"),
         ui.tags.div(
             ui.output_ui("conversion_by_source_chart"),
             class_="chart-card",
