@@ -994,6 +994,10 @@ page_digital = ui.nav_menu(
                     class_="card-header-row",
                 ),
                 ui.output_ui("dig_geo_map"),
+                ui.tags.p(
+                    "* \"Unknown\" represents students who did not fill in the State or City field in a form or registration.",
+                    style="text-align:right; font-size:0.75rem; color:#6B7280; margin:4px 0 0 0;",
+                ),
                 class_="chart-card",
             ),
             ui.tags.h2("Region performance", class_="section-heading"),
