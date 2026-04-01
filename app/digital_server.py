@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 from urllib.request import urlopen, Request
 
 from digital_data import Q8, Q9, Q10, Q11_CREATIVE, Q11_KEYWORDS, Q12
-from formatters import fmt_number, fmt_currency
+from formatters import fmt_number, fmt_currency, fmt_compact
 
 # ── Image cache: URL → base64 data URI (fetched once, reused) ────
 _IMAGE_CACHE: dict[str, str | None] = {}
@@ -562,7 +562,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_key_interactions():
         v = _dig_q8()["total_interactions"].sum()
-        return f"{v:,.1f}"
+        return fmt_compact(v)
 
     @render.ui
     def dig_key_interactions_delta():
@@ -585,7 +585,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_inquiry_int():
         v = _dig_q9()[_dig_q9()["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum()
-        return f"{v:,.1f}"
+        return fmt_compact(v)
 
     @render.ui
     def dig_inquiry_int_delta():
@@ -597,7 +597,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_visit_int():
         v = _dig_q9()[_dig_q9()["interaction_category"] == "Visit/Event"]["total_interactions"].sum()
-        return f"{v:,.1f}"
+        return fmt_compact(v)
 
     @render.ui
     def dig_visit_int_delta():
@@ -609,7 +609,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_apply_int():
         v = _dig_q9()[_dig_q9()["interaction_category"] == "Apply"]["total_interactions"].sum()
-        return f"{v:,.1f}"
+        return fmt_compact(v)
 
     @render.ui
     def dig_apply_int_delta():
@@ -644,7 +644,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_direct_conv():
-        return f"{_dig_q8()['direct_conversions'].sum():,.1f}"
+        return fmt_compact(_dig_q8()['direct_conversions'].sum())
 
     @render.ui
     def dig_direct_conv_delta():
@@ -961,7 +961,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_key_interactions_yoy():
         v = _dig_q8()["total_interactions"].sum()
-        return f"{v:,.1f}"
+        return fmt_compact(v)
 
     @render.ui
     def dig_key_interactions_delta_yoy():
@@ -984,7 +984,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_inquiry_int_yoy():
         v = _dig_q9()[_dig_q9()["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum()
-        return f"{v:,.1f}"
+        return fmt_compact(v)
 
     @render.ui
     def dig_inquiry_int_delta_yoy():
@@ -996,7 +996,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_visit_int_yoy():
         v = _dig_q9()[_dig_q9()["interaction_category"] == "Visit/Event"]["total_interactions"].sum()
-        return f"{v:,.1f}"
+        return fmt_compact(v)
 
     @render.ui
     def dig_visit_int_delta_yoy():
@@ -1008,7 +1008,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_apply_int_yoy():
         v = _dig_q9()[_dig_q9()["interaction_category"] == "Apply"]["total_interactions"].sum()
-        return f"{v:,.1f}"
+        return fmt_compact(v)
 
     @render.ui
     def dig_apply_int_delta_yoy():
@@ -1041,7 +1041,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_direct_conv_yoy():
-        return f"{_dig_q8()['direct_conversions'].sum():,.1f}"
+        return fmt_compact(_dig_q8()['direct_conversions'].sum())
 
     @render.ui
     def dig_direct_conv_yoy_delta():
@@ -1535,7 +1535,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_cat_rfi():
-        return f"{_dig_q9()[_dig_q9()['interaction_category'] == 'RFI/Lead Gen']['total_interactions'].sum():,.1f}"
+        return fmt_compact(_dig_q9()[_dig_q9()['interaction_category'] == 'RFI/Lead Gen']['total_interactions'].sum())
 
     @render.ui
     def dig_cat_rfi_delta():
@@ -1546,7 +1546,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_cat_visit():
-        return f"{_dig_q9()[_dig_q9()['interaction_category'] == 'Visit/Event']['total_interactions'].sum():,.1f}"
+        return fmt_compact(_dig_q9()[_dig_q9()['interaction_category'] == 'Visit/Event']['total_interactions'].sum())
 
     @render.ui
     def dig_cat_visit_delta():
@@ -1557,7 +1557,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_cat_apply():
-        return f"{_dig_q9()[_dig_q9()['interaction_category'] == 'Apply']['total_interactions'].sum():,.1f}"
+        return fmt_compact(_dig_q9()[_dig_q9()['interaction_category'] == 'Apply']['total_interactions'].sum())
 
     @render.ui
     def dig_cat_apply_delta():
@@ -1568,7 +1568,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_cat_enroll():
-        return f"{_dig_q9()[_dig_q9()['interaction_category'] == 'Enroll/Deposit']['total_interactions'].sum():,.1f}"
+        return fmt_compact(_dig_q9()[_dig_q9()['interaction_category'] == 'Enroll/Deposit']['total_interactions'].sum())
 
     @render.ui
     def dig_cat_enroll_delta():
@@ -1579,7 +1579,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_cat_other():
-        return f"{_dig_q9()[_dig_q9()['interaction_category'] == 'Other']['total_interactions'].sum():,.1f}"
+        return fmt_compact(_dig_q9()[_dig_q9()['interaction_category'] == 'Other']['total_interactions'].sum())
 
     @render.ui
     def dig_cat_other_delta():

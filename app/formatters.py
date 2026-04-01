@@ -24,6 +24,26 @@ def fmt_currency(n) -> str:
     return f"${n:,.2f}"
 
 
+def fmt_compact(n) -> str:
+    """Format a count as a whole number, using M/B suffix for large values.
+
+    Examples: 397 → '397', 1250 → '1,250', 1_500_000 → '1.5M', 2_000_000 → '2M',
+              1_250_000_000 → '1.3B', 3_000_000_000 → '3B'.
+    """
+    if n is None or (isinstance(n, float) and n != n):
+        return "\u2014"
+    n = round(n)
+    if abs(n) >= 1_000_000_000:
+        v = n / 1_000_000_000
+        s = f"{v:.1f}B"
+        return s[:-2] + "B" if s.endswith(".0B") else s
+    if abs(n) >= 1_000_000:
+        v = n / 1_000_000
+        s = f"{v:.1f}M"
+        return s[:-2] + "M" if s.endswith(".0M") else s
+    return f"{n:,}"
+
+
 def fmt_yoy(n) -> tuple[str, str]:
     """Format YoY change. Returns (display_string, sentiment).
 
