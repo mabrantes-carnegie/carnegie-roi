@@ -210,6 +210,12 @@ def server_logic(input, output, session):
                 df = df[df["origin_source_first"].isin(src)]
         except Exception:
             pass
+        try:
+            st = input.geo_student_type()
+            if st and len(st) > 0:
+                df = df[df["student_type"].isin(st)]
+        except Exception:
+            pass
         return df
 
     # ── Update filter choices ─────────────────────────────────
@@ -250,6 +256,16 @@ def server_logic(input, output, session):
             return
         sources = sorted([s for s in df["origin_source_first"].dropna().unique().tolist() if s and s != "Unknown"])
         ui.update_selectize("geo_lead_source", choices=sources, selected=[])
+
+    @reactive.effect
+    def _update_geo_student_type_choices():
+        """Populate Geography page Student Type filter from Q6."""
+        df = filtered_main()
+        if df.empty:
+            ui.update_selectize("geo_student_type", choices=[], selected=[])
+            return
+        types = sorted([t for t in df["student_type"].dropna().unique().tolist() if t and t != "Unknown"])
+        ui.update_selectize("geo_student_type", choices=types, selected=[])
 
     # ══════════════════════════════════════════════════════════
     # KPI CALCULATIONS (from Q6)

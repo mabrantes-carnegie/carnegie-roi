@@ -426,6 +426,15 @@ page_geography = ui.nav_panel(
                 ),
                 class_="inline-filter",
             ),
+            ui.tags.div(
+                ui.input_selectize(
+                    "geo_student_type", "Student Type",
+                    choices=[],
+                    multiple=True,
+                    options={"placeholder": "All"},
+                ),
+                class_="inline-filter",
+            ),
             class_="page-filter-bar",
             style="flex-wrap:wrap; gap:12px;",
         ),
@@ -1026,6 +1035,7 @@ page_digital = ui.nav_menu(
             ui.tags.h2("Region performance", class_="section-heading"),
             ui.tags.div(ui.output_ui("dig_geo_table"), class_="carnegie-table-card"),
         )),
+        value="dig_geography",
     ),
 
     ui.nav_panel(
@@ -1321,9 +1331,9 @@ app_ui = ui.page_navbar(
             # Show/hide digital filters based on active tab (uses Shiny nav input)
             ui.tags.script("""
 (function() {
-  var DIG_TABS  = ['Overview','Overview YoY','Interactions','Geography','Creative','Insights'];
+  var DIG_TABS  = ['Overview','Overview YoY','Interactions','dig_geography','Creative','Insights'];
   // Tabs that default to academic-year start → current month
-  var ACAD_TABS = ['Overview YoY', 'Geography', 'Creative'];
+  var ACAD_TABS = ['Overview YoY', 'dig_geography', 'Creative'];
 
   // Helper: get the last available month option value from the end dropdown
   // (this is the latest month with data, e.g. "2026-03-01")
