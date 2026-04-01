@@ -1602,6 +1602,8 @@ def digital_server(input, output, session):
         _costs = [
             ("Cost per RFI / Lead Gen", "RFI/Lead Gen"),
             ("Cost per Visit / Events", "Visit/Event"),
+            ("Cost per Application", "Apply"),
+            ("Cost per Enroll", "Enroll/Deposit"),
             ("Cost per Key Interaction", None),
         ]
 
