@@ -194,6 +194,24 @@ def server_logic(input, output, session):
         df = df[df["term_semester"] == input.term_semester()]
         return df
 
+    @reactive.calc
+    def filtered_geo():
+        """Q6 filtered by global filters + Geography page-specific Program and Lead Source filters."""
+        df = filtered_main()
+        try:
+            prog = input.geo_program()
+            if prog and len(prog) > 0:
+                df = df[df["program_name"].isin(prog)]
+        except Exception:
+            pass
+        try:
+            src = input.geo_lead_source()
+            if src and len(src) > 0:
+                df = df[df["origin_source_first"].isin(src)]
+        except Exception:
+            pass
+        return df
+
     # ── Update filter choices ─────────────────────────────────
 
     @reactive.effect
@@ -212,6 +230,26 @@ def server_logic(input, output, session):
         df = filtered_main()
         levels = sorted([l for l in df["program_level"].dropna().unique().tolist() if l and str(l).strip()])
         ui.update_selectize("program_level_adv", choices=levels, selected=[])
+
+    @reactive.effect
+    def _update_geo_program_choices():
+        """Populate Geography page Program filter from Q6."""
+        df = filtered_main()
+        if df.empty:
+            ui.update_selectize("geo_program", choices=[], selected=[])
+            return
+        progs = df[df["program_name"].notna() & (df["program_name"].str.strip() != "")]["program_name"].unique().tolist()
+        ui.update_selectize("geo_program", choices=sorted(progs), selected=[])
+
+    @reactive.effect
+    def _update_geo_lead_source_choices():
+        """Populate Geography page Lead Source filter from Q6."""
+        df = filtered_main()
+        if df.empty:
+            ui.update_selectize("geo_lead_source", choices=[], selected=[])
+            return
+        sources = sorted([s for s in df["origin_source_first"].dropna().unique().tolist() if s and s != "Unknown"])
+        ui.update_selectize("geo_lead_source", choices=sources, selected=[])
 
     # ══════════════════════════════════════════════════════════
     # KPI CALCULATIONS (from Q6)
@@ -1609,7 +1647,7 @@ def server_logic(input, output, session):
 
     @render.ui
     def geo_map_section():
-        df = filtered_main()
+        df = filtered_geo()
         if df.empty:
             return ui.tags.div("No data available for the selected filters.", class_="empty-state")
 

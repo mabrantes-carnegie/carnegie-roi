@@ -406,6 +406,29 @@ PROGRAM_TREND_METRICS = {
 page_geography = ui.nav_panel(
     "Geography",
     ui.tags.div(
+        # Page-level filters
+        ui.tags.div(
+            ui.tags.div(
+                ui.input_selectize(
+                    "geo_program", "Program",
+                    choices=[],
+                    multiple=True,
+                    options={"placeholder": "All"},
+                ),
+                class_="inline-filter",
+            ),
+            ui.tags.div(
+                ui.input_selectize(
+                    "geo_lead_source", "Lead Source",
+                    choices=[],
+                    multiple=True,
+                    options={"placeholder": "All"},
+                ),
+                class_="inline-filter",
+            ),
+            class_="page-filter-bar",
+            style="flex-wrap:wrap; gap:12px;",
+        ),
         ui.tags.div(
             ui.tags.div(
                 ui.output_ui("geo_map_title"),
