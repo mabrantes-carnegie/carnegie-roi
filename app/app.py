@@ -1002,6 +1002,26 @@ page_digital = ui.nav_menu(
     ui.nav_panel(
         "Creative",
         _dig_page(ui.tags.div(
+            # ── Sub-page tab switcher ──
+            ui.tags.div(
+                ui.input_radio_buttons(
+                    "crv_sub", None,
+                    choices={
+                        "display": "Display Creative",
+                        "ppc": "PPC Keyword Performance",
+                        "meta": "Meta Creative",
+                        "linkedin": "LinkedIn Creative",
+                        "youtube": "YouTube Creative",
+                        "snapchat": "Snapchat Creative",
+                        "tiktok": "TikTok Creative",
+                        "spotify": "Spotify Creative",
+                        "reddit": "Reddit Creative",
+                    },
+                    selected="display",
+                    inline=True,
+                ),
+                class_="insight-segmented",
+            ),
             # ── KPI summary strip ──
             ui.tags.div(
                 _dig_kpi_card("Total Creatives", "crv_total", "#EA332D"),
@@ -1096,7 +1116,7 @@ page_digital = ui.nav_menu(
                 "  btn.closest('.crv-card').classList.toggle('crv-card--expanded',!open);"
                 "};"
             ),
-            # ── Creative card list ──
+            # ── Creative card / table list (dynamic based on sub-page) ──
             ui.output_ui("crv_card_list"),
             # ── Pagination ──
             ui.tags.div(

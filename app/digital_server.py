@@ -454,14 +454,14 @@ def digital_server(input, output, session):
 
     @reactive.calc
     def _dig_q8_prior():
-        """Prior period for Q8 — shift date range back by same duration."""
+        """Prior period for Q8 — previous month (MoM comparison)."""
         df = Q8.copy()
         period = input.dig_period()
         if period and len(period) == 2:
             start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
-            duration = end - start
-            prior_end = start - pd.Timedelta(days=1)
-            prior_start = prior_end - duration
+            # Shift by 1 month
+            prior_start = start - pd.DateOffset(months=1)
+            prior_end = end - pd.DateOffset(months=1)
             df = df[(df["day"] >= prior_start) & (df["day"] <= prior_end)]
         else:
             df = df.iloc[0:0]  # empty
@@ -486,13 +486,13 @@ def digital_server(input, output, session):
 
     @reactive.calc
     def _dig_q9_prior():
+        """Prior period for Q9 — previous month (MoM comparison)."""
         df = Q9.copy()
         period = input.dig_period()
         if period and len(period) == 2:
             start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
-            duration = end - start
-            prior_end = start - pd.Timedelta(days=1)
-            prior_start = prior_end - duration
+            prior_start = start - pd.DateOffset(months=1)
+            prior_end = end - pd.DateOffset(months=1)
             df = df[(df["day"] >= prior_start) & (df["day"] <= prior_end)]
         else:
             df = df.iloc[0:0]
@@ -513,16 +513,11 @@ def digital_server(input, output, session):
 
     @reactive.calc
     def _dig_q8_yoy():
-        """Same months as selected period but one year prior (Year-over-Year)."""
+        """Fixed prior academic year Jul 2024 – Jun 2025 for YoY comparison."""
         df = Q8.copy()
-        period = input.dig_period()
-        if period and len(period) == 2:
-            start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
-            yoy_start = start.replace(year=start.year - 1)
-            yoy_end   = end.replace(year=end.year - 1)
-            df = df[(df["day"] >= yoy_start) & (df["day"] <= yoy_end)]
-        else:
-            df = df.iloc[0:0]
+        yoy_start = pd.Timestamp("2024-07-01")
+        yoy_end = pd.Timestamp("2025-06-30")
+        df = df[(df["day"] >= yoy_start) & (df["day"] <= yoy_end)]
         grp = input.dig_group()
         if grp and len(grp) > 0:
             df = df[df["group_name"].isin(grp)]
@@ -539,16 +534,11 @@ def digital_server(input, output, session):
 
     @reactive.calc
     def _dig_q9_yoy():
-        """Same months as selected period but one year prior (YoY) for Q9."""
+        """Fixed prior academic year Jul 2024 – Jun 2025 for YoY comparison (Q9)."""
         df = Q9.copy()
-        period = input.dig_period()
-        if period and len(period) == 2:
-            start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
-            yoy_start = start.replace(year=start.year - 1)
-            yoy_end   = end.replace(year=end.year - 1)
-            df = df[(df["day"] >= yoy_start) & (df["day"] <= yoy_end)]
-        else:
-            df = df.iloc[0:0]
+        yoy_start = pd.Timestamp("2024-07-01")
+        yoy_end = pd.Timestamp("2025-06-30")
+        df = df[(df["day"] >= yoy_start) & (df["day"] <= yoy_end)]
         grp = input.dig_group()
         if grp and len(grp) > 0:
             df = df[df["group_name"].isin(grp)]
@@ -1839,8 +1829,21 @@ def digital_server(input, output, session):
 
     @render.ui
     def dig_interactions_month_table():
-        # Use full unfiltered data for the 12-month spine; apply only category/name filters
-        df_full = _dig_q9()
+        # Always show last 12 months regardless of page date filter
+        df_full = Q9.copy()
+        # Apply only non-date global filters
+        grp = input.dig_group()
+        if grp and len(grp) > 0:
+            df_full = df_full[df_full["group_name"].isin(grp)]
+        sub = input.dig_subgroup()
+        if sub and len(sub) > 0:
+            df_full = df_full[df_full["subgroup_name"].isin(sub)]
+        prod = input.dig_product()
+        if prod and len(prod) > 0:
+            df_full = df_full[df_full["product_name"].isin(prod)]
+        camp = input.dig_campaign()
+        if camp and len(camp) > 0:
+            df_full = df_full[df_full["campaign_name"].isin(camp)]
         cat = input.dig_interaction_cat()
         if cat and len(cat) > 0:
             df_full = df_full[df_full["interaction_category"].isin(cat)]
@@ -1990,12 +1993,10 @@ def digital_server(input, output, session):
             metric = "impressions"
         metric_short = _DIG_GEO_METRIC_SHORT.get(metric, "Impressions")
 
-        # Filter to state-level rows and map to abbreviations
-        state_df = df[df["region"].str.endswith(" (State)")].copy()
-        state_df["state_name"] = state_df["region"].str.replace(r" \(State\)$", "", regex=True)
-        state_df["abbr"] = state_df["state_name"].map(_STATE_NAME_TO_ABBR)
-        state_df = state_df.dropna(subset=["abbr"])
-        map_df = state_df.groupby("abbr")[metric].sum().reset_index()
+        # Region is now sanitized to 2-letter state codes, "International", or "Unknown"
+        state_df = df[~df["region"].isin(["Unknown", "International", ""])].copy()
+        state_df = state_df[state_df["region"].str.match(r"^[A-Z]{2}$", na=False)]
+        map_df = state_df.groupby("region")[metric].sum().reset_index()
         map_df.columns = ["abbr", "value"]
 
         if map_df.empty:
@@ -2089,41 +2090,125 @@ def digital_server(input, output, session):
                    "view_through_conversions", "total_conversions"]
         agg = df.groupby("region")[metrics].sum().reset_index()
         agg["CTR"] = (agg["clicks"] / agg["impressions"].replace(0, float("nan")) * 100).round(2)
-        agg = agg.sort_values(metric, ascending=False)
+
+        # Compute International and Unknown summary
+        total_impr = agg["impressions"].sum()
+        intl_row = agg[agg["region"] == "International"]
+        unk_row = agg[agg["region"] == "Unknown"]
+        intl_impr = int(intl_row["impressions"].sum()) if not intl_row.empty else 0
+        unk_impr = int(unk_row["impressions"].sum()) if not unk_row.empty else 0
+        intl_pct = (intl_impr / total_impr * 100) if total_impr > 0 else 0
+        unk_pct = (unk_impr / total_impr * 100) if total_impr > 0 else 0
+
+        # Summary badges for International and Unknown
+        badge_style = (
+            "display:inline-flex;align-items:center;gap:8px;"
+            "padding:8px 16px;border-radius:8px;"
+            "font-family:Manrope,sans-serif;font-size:13px;font-weight:600;"
+        )
+        summary_badges = ui.tags.div(
+            ui.tags.div(
+                ui.tags.span("International", style="color:#6b7280;font-weight:600;"),
+                ui.tags.span(f"{intl_impr:,}", style="color:#021326;"),
+                ui.tags.span(f"({intl_pct:.1f}%)", style="color:#9B9893;font-size:11px;"),
+                style=badge_style + "background:#f0f7ff;border:1px solid #d0e3f7;",
+            ),
+            ui.tags.div(
+                ui.tags.span("Unknown", style="color:#6b7280;font-weight:600;"),
+                ui.tags.span(f"{unk_impr:,}", style="color:#021326;"),
+                ui.tags.span(f"({unk_pct:.1f}%)", style="color:#9B9893;font-size:11px;"),
+                style=badge_style + "background:#fef3c7;border:1px solid #f0dfa0;",
+            ),
+            style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;",
+        )
+
+        # Filter to US state rows only for table display
+        us_agg = agg[~agg["region"].isin(["Unknown", "International", ""])].copy()
+        us_agg = us_agg.sort_values(metric, ascending=False)
         for c in metrics:
-            agg[c] = agg[c].round(0).astype(int)
-        agg = agg.rename(columns={
+            us_agg[c] = us_agg[c].round(0).astype(int)
+        us_agg = us_agg.rename(columns={
             "region": "Region", "impressions": "Impressions", "clicks": "Clicks",
             "direct_conversions": "Direct Key Int.", "view_through_conversions": "View-Through Int.",
             "total_conversions": "Total Conversions",
         })
         show = ["Region", "Impressions", "Clicks", "CTR", "Direct Key Int.",
                 "View-Through Int.", "Total Conversions"]
-        display = agg[[c for c in show if c in agg.columns]]
+        display = us_agg[[c for c in show if c in us_agg.columns]]
         heatmap_cols = [c for c in display.columns if c != "Region"]
-        return _heatmap_table(display, heatmap_cols, paginated=True)
+        table = _heatmap_table(display, heatmap_cols, paginated=True)
+        return ui.tags.div(summary_badges, table)
 
     # ══════════════════════════════════════════════════════════
     # TAB 4: CREATIVE
     # ══════════════════════════════════════════════════════════
 
-    # ── Reactive: base creative data with global + page filters ──
+    # ── Sub-page product mappings ──
+
+    _CRV_DISPLAY_PRODUCTS = {"Display", "IP Targeting", "Audience Select",
+                              "Mobile Footprint", "Discovery", "Mobile Location Targeting"}
+    _CRV_SUB_PRODUCT_MAP = {
+        "display": _CRV_DISPLAY_PRODUCTS,
+        "meta": {"Facebook/Instagram", "Meta"},
+        "linkedin": {"LinkedIn"},
+        "youtube": {"YouTube"},
+        "snapchat": {"Snapchat Snap Ads", "Snapchat"},
+        "tiktok": {"TikTok"},
+        "spotify": {"Spotify"},
+        "reddit": {"Reddit"},
+    }
+
+    import re as _re
+    _SIZE_RE = _re.compile(r"(\d{2,4}x\d{2,4})")
+
+    def _extract_creative_size(creative_text: str) -> str:
+        """Extract ad size (e.g. '300x250') from creative text field."""
+        if not creative_text:
+            return ""
+        m = _SIZE_RE.search(creative_text)
+        return m.group(1) if m else ""
+
+    # ── Reactive: base creative data with global + sub-page filters ──
+
+    @reactive.calc
+    def _crv_sub_tab():
+        try:
+            return input.crv_sub()
+        except Exception:
+            return "display"
+
+    @reactive.calc
+    def _crv_is_ppc():
+        return _crv_sub_tab() == "ppc"
 
     @reactive.calc
     def _crv_base():
-        """Apply global filters to creative data."""
-        return _apply_dig_filters_monthly(Q11_CREATIVE.copy())
+        """Apply global filters + sub-page product filter to creative data."""
+        sub = _crv_sub_tab()
+        if sub == "ppc":
+            # PPC uses keyword data
+            df = _apply_dig_filters_monthly(Q11_KEYWORDS.copy())
+            # Exclude Reddit
+            df = df[~df["product_name"].str.contains("Reddit", case=False, na=False)]
+            return df
+        # All other subs use creative data
+        df = _apply_dig_filters_monthly(Q11_CREATIVE.copy())
+        products = _CRV_SUB_PRODUCT_MAP.get(sub)
+        if products:
+            df = df[df["product_name"].isin(products)]
+        return df
 
     @reactive.calc
     def _crv_base_prior():
-        """Prior period for creative data — shift date range back by same duration."""
-        df = Q11_CREATIVE.copy()
+        """Prior period for creative data — shift date range back by 1 month (MoM)."""
+        sub_tab = _crv_sub_tab()
+        source = Q11_KEYWORDS.copy() if sub_tab == "ppc" else Q11_CREATIVE.copy()
+        df = source
         period = input.dig_period()
         if period and len(period) == 2:
             start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
-            duration = end - start
-            prior_end = start - pd.Timedelta(days=1)
-            prior_start = prior_end - duration
+            prior_start = start - pd.DateOffset(months=1)
+            prior_end = end - pd.DateOffset(months=1)
             df["_month_start"] = pd.to_datetime(
                 df["event_year"].astype(str) + "-" + df["event_month"].astype(str).str.zfill(2) + "-01"
             )
@@ -2145,29 +2230,60 @@ def digital_server(input, output, session):
         camp = input.dig_campaign()
         if camp and len(camp) > 0 and "campaign_name" in df.columns:
             df = df[df["campaign_name"].isin(camp)]
+        # Apply sub-page product filter
+        if sub_tab == "ppc":
+            df = df[~df["product_name"].str.contains("Reddit", case=False, na=False)]
+        else:
+            products = _CRV_SUB_PRODUCT_MAP.get(sub_tab)
+            if products and "product_name" in df.columns:
+                df = df[df["product_name"].isin(products)]
         return df
 
     def _crv_aggregate(df):
-        """Aggregate a creative DataFrame to creative-level grain."""
+        """Aggregate a creative/keyword DataFrame to row-level grain."""
         if df.empty:
             return df
-        grp_cols = ["campaign_name", "ad_group", "product_name",
-                    "platform_campaign_name", "group_name", "subgroup_name"]
-        str_agg = {c: "first" for c in ["creative", "ad_description", "image_url",
-                                         "preview_url", "ad_url"] if c in df.columns}
-        num_agg = {c: "sum" for c in ["impressions", "clicks", "direct_conversions",
-                                       "view_through_conversions", "in_platform_leads",
-                                       "total_conversions"] if c in df.columns}
+        is_kw = "keyword" in df.columns
+        if is_kw:
+            grp_cols = ["platform_campaign_name", "product_name", "keyword", "match_type"]
+            str_agg = {}
+            num_agg = {c: "sum" for c in ["impressions", "clicks", "direct_conversions",
+                                           "budget"] if c in df.columns}
+        else:
+            grp_cols = ["campaign_name", "ad_group", "product_name",
+                        "platform_campaign_name", "group_name", "subgroup_name"]
+            str_agg = {c: "first" for c in ["creative", "ad_description", "image_url",
+                                             "preview_url", "ad_url"] if c in df.columns}
+            num_agg = {c: "sum" for c in ["impressions", "clicks", "direct_conversions",
+                                           "view_through_conversions", "in_platform_leads",
+                                           "total_conversions", "budget"] if c in df.columns}
         valid_grp = [c for c in grp_cols if c in df.columns]
         agged = df.groupby(valid_grp, as_index=False).agg({**str_agg, **num_agg})
         if "impressions" in agged.columns and "clicks" in agged.columns:
             agged["ctr"] = (agged["clicks"] / agged["impressions"].replace(0, float("nan")) * 100).round(2)
         else:
             agged["ctr"] = 0.0
-        if "impressions" in agged.columns and "total_conversions" in agged.columns:
-            agged["conv_rate"] = (agged["total_conversions"] / agged["impressions"].replace(0, float("nan")) * 100).round(2)
+
+        if is_kw:
+            # PPC: Total Conv. = direct_conversions, Cost Per Click, Cost Per Direct Conv, Conv Rate
+            if "budget" in agged.columns and "clicks" in agged.columns:
+                agged["cost_per_click"] = (agged["budget"] / agged["clicks"].replace(0, float("nan"))).round(2)
+            else:
+                agged["cost_per_click"] = 0.0
+            if "budget" in agged.columns and "direct_conversions" in agged.columns:
+                agged["cost_per_conversion"] = (agged["budget"] / agged["direct_conversions"].replace(0, float("nan"))).round(2)
+            else:
+                agged["cost_per_conversion"] = 0.0
+            agged["total_conversions"] = agged.get("direct_conversions", 0)
+            if "clicks" in agged.columns and "direct_conversions" in agged.columns:
+                agged["conv_rate"] = (agged["direct_conversions"] / agged["clicks"].replace(0, float("nan")) * 100).round(2)
+            else:
+                agged["conv_rate"] = 0.0
         else:
-            agged["conv_rate"] = 0.0
+            if "impressions" in agged.columns and "total_conversions" in agged.columns:
+                agged["conv_rate"] = (agged["total_conversions"] / agged["impressions"].replace(0, float("nan")) * 100).round(2)
+            else:
+                agged["conv_rate"] = 0.0
         agged = agged.sort_values("impressions", ascending=False).reset_index(drop=True)
         return agged
 
@@ -2178,7 +2294,7 @@ def digital_server(input, output, session):
 
     @reactive.calc
     def _crv_filtered():
-        """Apply text search and sorting to aggregated creative data."""
+        """Apply text search and sorting to aggregated creative/keyword data."""
         df = _crv_agg()
         if df.empty:
             return df
@@ -2186,7 +2302,8 @@ def digital_server(input, output, session):
         if search:
             mask = pd.Series(False, index=df.index)
             for col in ["campaign_name", "ad_group", "product_name",
-                        "platform_campaign_name", "creative", "ad_description"]:
+                        "platform_campaign_name", "creative", "ad_description",
+                        "keyword", "match_type"]:
                 if col in df.columns:
                     mask = mask | df[col].fillna("").str.lower().str.contains(search, regex=False)
             df = df[mask].reset_index(drop=True)
@@ -2251,13 +2368,19 @@ def digital_server(input, output, session):
     @render.text
     def dig_crv_conversions():
         df = _crv_agg()
-        return fmt_number(df["total_conversions"].sum() if not df.empty else 0)
+        col = "total_conversions" if "total_conversions" in df.columns else "direct_conversions"
+        return fmt_number(df[col].sum() if not df.empty and col in df.columns else 0)
 
     @render.ui
     def dig_crv_conversions_delta():
-        curr = _crv_base()["total_conversions"].sum() if not _crv_base().empty else 0
-        prev = _crv_base_prior()["total_conversions"].sum() if not _crv_base_prior().empty else 0
-        return _fmt_delta(curr, prev)
+        def _conv(d):
+            if d.empty:
+                return 0
+            for c in ["total_conversions", "direct_conversions"]:
+                if c in d.columns:
+                    return d[c].sum()
+            return 0
+        return _fmt_delta(_conv(_crv_base()), _conv(_crv_base_prior()))
 
     # ── Search count badge ──
 
@@ -2297,6 +2420,7 @@ def digital_server(input, output, session):
 
     def _creative_card(row, card_idx):
         """Build a single creative result card with expand/collapse."""
+        sub_tab = _crv_sub_tab()
         campaign = str(row.get("campaign_name", "")).strip()
         ad_group = str(row.get("ad_group", "")).strip()
         tactic = str(row.get("product_name", "")).strip()
@@ -2307,6 +2431,7 @@ def digital_server(input, output, session):
         creative_text = str(row.get("creative", "")).strip()
         ad_desc = str(row.get("ad_description", "")).strip()
         tactic_short = tactic.split(" - ")[0] if tactic else ""
+        creative_size = _extract_creative_size(creative_text)
 
         # ── Metrics ──
         impr = row.get("impressions", 0)
@@ -2340,19 +2465,40 @@ def digital_server(input, output, session):
         # ══════════════════════════════════════
         image_box = ui.tags.div(_thumb(), class_="crv-card-image")
 
-        text_children = [
-            ui.tags.div(campaign or "Untitled Creative", class_="crv-card-title"),
-        ]
-        if ad_group:
+        text_children = []
+        if sub_tab == "meta":
+            # Meta: Campaign Name, Ad Name, Description
+            text_children.append(ui.tags.div(platform_campaign or campaign or "Untitled", class_="crv-card-title"))
+            if creative_text:
+                text_children.append(ui.tags.div(
+                    ui.tags.span("Ad Name: ", class_="crv-card-meta-label"),
+                    ui.tags.span(creative_text, class_="crv-card-meta-value"),
+                    class_="crv-card-meta-row",
+                ))
+            if ad_desc:
+                text_children.append(ui.tags.div(
+                    ui.tags.span("Description: ", class_="crv-card-meta-label"),
+                    ui.tags.span(ad_desc, class_="crv-card-meta-value"),
+                    class_="crv-card-meta-row",
+                ))
+        else:
+            text_children.append(ui.tags.div(campaign or "Untitled Creative", class_="crv-card-title"))
+            if ad_group:
+                text_children.append(ui.tags.div(
+                    ui.tags.span("Ad Group: ", class_="crv-card-meta-label"),
+                    ui.tags.span(ad_group, class_="crv-card-meta-value"),
+                    class_="crv-card-meta-row",
+                ))
+            if tactic:
+                text_children.append(ui.tags.div(
+                    ui.tags.span("Tactic: ", class_="crv-card-meta-label"),
+                    ui.tags.span(tactic, class_="crv-card-meta-value"),
+                    class_="crv-card-meta-row",
+                ))
+        if creative_size:
             text_children.append(ui.tags.div(
-                ui.tags.span("Ad Group: ", class_="crv-card-meta-label"),
-                ui.tags.span(ad_group, class_="crv-card-meta-value"),
-                class_="crv-card-meta-row",
-            ))
-        if tactic:
-            text_children.append(ui.tags.div(
-                ui.tags.span("Tactic: ", class_="crv-card-meta-label"),
-                ui.tags.span(tactic, class_="crv-card-meta-value"),
+                ui.tags.span("Creative Size: ", class_="crv-card-meta-label"),
+                ui.tags.span(creative_size, class_="crv-card-meta-value"),
                 class_="crv-card-meta-row",
             ))
         text_section = ui.tags.div(*text_children, class_="crv-card-text")
@@ -2364,14 +2510,28 @@ def digital_server(input, output, session):
                 class_="crv-metric-cell",
             )
 
-        metrics_summary = ui.tags.div(
-            _metric_cell("Impressions", _fmt_metric(impr)),
-            _metric_cell("Clicks", _fmt_metric(clicks)),
-            _metric_cell("CTR", f"{ctr:.2f}%" if pd.notna(ctr) else "—"),
-            _metric_cell("Total Conv.", _fmt_metric(total_conv)),
-            _metric_cell("Conv. Rate", f"{conv_rate:.2f}%" if pd.notna(conv_rate) else "—"),
-            class_="crv-metric-grid",
-        )
+        if sub_tab == "meta":
+            # Meta: Impressions, Clicks, CTR, Direct Conv., View-through Conv., Total Conv.
+            metrics_summary = ui.tags.div(
+                _metric_cell("Impressions", _fmt_metric(impr)),
+                _metric_cell("Clicks", _fmt_metric(clicks)),
+                _metric_cell("CTR", f"{ctr:.2f}%" if pd.notna(ctr) else "—"),
+                _metric_cell("Direct Conv.", _fmt_metric(direct)),
+                _metric_cell("View-through Conv.", _fmt_metric(vt)),
+                _metric_cell("Total Conv.", _fmt_metric(total_conv)),
+                class_="crv-metric-grid",
+            )
+        else:
+            # Default: Impressions, Clicks, CTR, View-through Conv., Total Conv., Conv. Rate
+            metrics_summary = ui.tags.div(
+                _metric_cell("Impressions", _fmt_metric(impr)),
+                _metric_cell("Clicks", _fmt_metric(clicks)),
+                _metric_cell("CTR", f"{ctr:.2f}%" if pd.notna(ctr) else "—"),
+                _metric_cell("View-through Conv.", _fmt_metric(vt)),
+                _metric_cell("Total Conv.", _fmt_metric(total_conv)),
+                _metric_cell("Conv. Rate", f"{conv_rate:.2f}%" if pd.notna(conv_rate) else "—"),
+                class_="crv-metric-grid",
+            )
 
         # Details toggle button
         card_id = f"crv-expand-{card_idx}"
@@ -2488,12 +2648,28 @@ def digital_server(input, output, session):
                 class_="crv-expand-meta-row",
             )
 
-        meta_rows = [r for r in [
-            _meta_row("Tactic", tactic),
-            _meta_row("Platform Campaign", platform_campaign),
-            _meta_row("Image URL", image_url, is_link=True),
-            _meta_row("Landing Page", ad_url, is_link=True),
-        ] if r is not None]
+        if sub_tab == "meta":
+            # Ad Preview as clickable link
+            ad_preview_el = None
+            if preview_url and preview_url.startswith("http"):
+                ad_preview_el = ui.tags.div(
+                    ui.tags.span("Ad Preview", class_="crv-expand-meta-key"),
+                    ui.tags.a("Click to View", href=preview_url, target="_blank",
+                              class_="crv-meta-link"),
+                    class_="crv-expand-meta-row",
+                )
+            meta_rows = [r for r in [
+                _meta_row("Landing Page", ad_url, is_link=True),
+                ad_preview_el,
+                _meta_row("Image URL", image_url, is_link=True),
+            ] if r is not None]
+        else:
+            meta_rows = [r for r in [
+                _meta_row("Tactic", tactic),
+                _meta_row("Platform Campaign", platform_campaign),
+                _meta_row("Image URL", image_url, is_link=True),
+                _meta_row("Landing Page", ad_url, is_link=True),
+            ] if r is not None]
 
         col_meta = ui.tags.div(
             ui.tags.div("Details", class_="crv-expand-meta-title"),
@@ -2515,13 +2691,65 @@ def digital_server(input, output, session):
 
     # ── Card list render ──
 
+    def _ppc_table(df):
+        """Render PPC keyword data as a table."""
+        display = df.copy()
+        # Build display columns
+        col_map = {
+            "product_name": "Platform",
+            "platform_campaign_name": "Campaign Name",
+            "keyword": "Keyword",
+            "match_type": "Match Type",
+        }
+        metric_cols = ["impressions", "clicks", "ctr", "cost_per_click",
+                       "total_conversions", "cost_per_conversion", "conv_rate"]
+        metric_labels = {
+            "impressions": "Impressions",
+            "clicks": "Clicks",
+            "ctr": "CTR",
+            "cost_per_click": "Cost Per Click",
+            "total_conversions": "Total Conv.",
+            "cost_per_conversion": "Cost Per Direct Conv.",
+            "conv_rate": "Conv. Rate",
+        }
+        # Format columns
+        for c in ["impressions", "clicks"]:
+            if c in display.columns:
+                display[c] = display[c].apply(lambda v: f"{round(v):,}" if pd.notna(v) else "0")
+        for c in ["ctr", "conv_rate"]:
+            if c in display.columns:
+                display[c] = display[c].apply(lambda v: f"{v:.2f}%" if pd.notna(v) else "—")
+        for c in ["cost_per_click", "cost_per_conversion"]:
+            if c in display.columns:
+                display[c] = display[c].apply(lambda v: f"${v:,.2f}" if pd.notna(v) and v != float("inf") else "—")
+        if "total_conversions" in display.columns:
+            display["total_conversions"] = display["total_conversions"].apply(
+                lambda v: f"{round(v):,}" if pd.notna(v) else "0")
+
+        # Rename and select
+        rename = {**col_map, **metric_labels}
+        display = display.rename(columns=rename)
+        text_cols = set(col_map.values())
+        show_cols = [rename.get(c, c) for c in list(col_map.keys()) + metric_cols if rename.get(c, c) in display.columns]
+        display = display[[c for c in show_cols if c in display.columns]]
+        heatmap_cols = [c for c in show_cols if c not in text_cols]
+        return _heatmap_table(display, heatmap_cols, paginated=True)
+
     @render.ui
     def crv_card_list():
         df = _crv_filtered()
+        sub_tab = _crv_sub_tab()
+        empty_label = "keywords" if sub_tab == "ppc" else "creatives"
         if df.empty:
-            return ui.tags.div("No creatives available for the selected filters.",
+            return ui.tags.div(f"No {empty_label} available for the selected filters.",
                                class_="empty-state",
                                style="padding:40px 0;text-align:center;color:#6b7280;font-size:14px;")
+
+        # PPC: render as table
+        if sub_tab == "ppc":
+            return _ppc_table(df)
+
+        # Creative sub-pages: render as cards with pagination
         per_page = _crv_per_page()
         page = _crv_current_page()
         total = len(df)
@@ -2540,7 +2768,7 @@ def digital_server(input, output, session):
     # ── Pagination helpers ──
 
     @reactive.effect
-    @reactive.event(input.crv_search, input.dig_period,
+    @reactive.event(input.crv_search, input.crv_sub, input.dig_period,
                     input.dig_group, input.dig_subgroup, input.dig_product, input.dig_campaign)
     def _crv_reset_page():
         ui.insert_ui(
