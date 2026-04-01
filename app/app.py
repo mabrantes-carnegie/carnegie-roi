@@ -828,6 +828,7 @@ _dig_overview_content = ui.tags.div(
         _dig_kpi_card("Visit Interactions", "visit_int", "#E8B9A4"),
         _dig_kpi_card("Apply Interactions", "apply_int", "#8B1A1A"),
         class_="funnel-strip",
+        style="grid-template-columns:repeat(5, 1fr);",
     ),
     # Row A: Trending + Key Interaction Categories
     ui.tags.div(
@@ -913,6 +914,7 @@ _dig_overview_yoy_content = ui.tags.div(
         _dig_kpi_card("Total Key Interactions", "total_conv_yoy", "#021326"),
         _dig_kpi_card("Key Interaction Rate", "conv_rate_yoy", "#C99D44"),
         class_="funnel-strip",
+        style="grid-template-columns:repeat(5, 1fr);",
     ),
     ui.tags.div(
         ui.tags.div(
