@@ -401,6 +401,26 @@ PROGRAM_TREND_METRICS = {
 }
 
 
+# --- Shared date range and month helpers (used by Geography, Programs, Digital) ---
+
+_dig_min, _dig_max = get_digital_date_range()
+
+
+def _month_options(min_dt, max_dt):
+    """Return list of (value, label) for every month in [min_dt, max_dt]."""
+    opts = []
+    cur = min_dt.replace(day=1)
+    end = max_dt.replace(day=1)
+    while cur <= end:
+        opts.append((cur.strftime("%Y-%m-%d"), cur.strftime("%b %Y")))
+        # advance one month
+        if cur.month == 12:
+            cur = cur.replace(year=cur.year + 1, month=1)
+        else:
+            cur = cur.replace(month=cur.month + 1)
+    return opts
+
+
 # --- Page 4: Geography ---
 
 def _geo_filters():
@@ -536,23 +556,6 @@ page_geography = ui.nav_panel(
 
 
 # --- Page 5: Digital Performance (5 sub-tabs) ---
-
-_dig_min, _dig_max = get_digital_date_range()
-
-
-def _month_options(min_dt, max_dt):
-    """Return list of (value, label) for every month in [min_dt, max_dt]."""
-    opts = []
-    cur = min_dt.replace(day=1)
-    end = max_dt.replace(day=1)
-    while cur <= end:
-        opts.append((cur.strftime("%Y-%m-%d"), cur.strftime("%b %Y")))
-        # advance one month
-        if cur.month == 12:
-            cur = cur.replace(year=cur.year + 1, month=1)
-        else:
-            cur = cur.replace(month=cur.month + 1)
-    return opts
 
 
 def _programs_filters():
