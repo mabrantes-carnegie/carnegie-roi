@@ -1885,14 +1885,14 @@ def digital_server(input, output, session):
         wide = wide.rename(columns={
             **month_labels,
             "interaction_category": "Category",
-            "conversion_name": "Conversion Name",
+            "conversion_name": "Interaction Name",
         })
         display_month_cols = [month_labels[m] for m in month_cols]
         heatmap_cols = display_month_cols + ["Grand Total"]
         for c in heatmap_cols:
             wide[c] = wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
 
-        col_order = ["Category", "Conversion Name"] + display_month_cols + ["Grand Total"]
+        col_order = ["Category", "Interaction Name"] + display_month_cols + ["Grand Total"]
         return _heatmap_table(wide[[c for c in col_order if c in wide.columns]], heatmap_cols, paginated=True)
 
     # --- Interactions detail table ---
@@ -1909,7 +1909,7 @@ def digital_server(input, output, session):
             vt=("view_through_conversions", "sum"),
         ).reset_index().sort_values("total", ascending=False)
         agg = agg.rename(columns={
-            "interaction_category": "Category", "conversion_name": "Conversion Name",
+            "interaction_category": "Category", "conversion_name": "Interaction Name",
             "product_name": "Strategy", "campaign_name": "Campaign Name",
             "total": "Total Key Int.", "direct": "Direct Key Int.", "vt": "View-Through Int.",
         })
@@ -1942,7 +1942,7 @@ def digital_server(input, output, session):
     _DIG_GEO_METRIC_LABELS = {
         "impressions": "Impressions by state",
         "clicks": "Clicks by state",
-        "total_conversions": "Total Conversions by state",
+        "total_conversions": "Total Interactions by state",
     }
     _DIG_GEO_METRIC_SHORT = {
         "impressions": "Impressions",
@@ -2130,10 +2130,10 @@ def digital_server(input, output, session):
         us_agg = us_agg.rename(columns={
             "region": "Region", "impressions": "Impressions", "clicks": "Clicks",
             "direct_conversions": "Direct Key Int.", "view_through_conversions": "View-Through Int.",
-            "total_conversions": "Total Conversions",
+            "total_conversions": "Total Interactions",
         })
         show = ["Region", "Impressions", "Clicks", "CTR", "Direct Key Int.",
-                "View-Through Int.", "Total Conversions"]
+                "View-Through Int.", "Total Interactions"]
         display = us_agg[[c for c in show if c in us_agg.columns]]
         heatmap_cols = [c for c in display.columns if c != "Region"]
         table = _heatmap_table(display, heatmap_cols, paginated=True)
@@ -2483,24 +2483,18 @@ def digital_server(input, output, session):
                 ))
         else:
             text_children.append(ui.tags.div(campaign or "Untitled Creative", class_="crv-card-title"))
-            if ad_group:
-                text_children.append(ui.tags.div(
-                    ui.tags.span("Ad Group: ", class_="crv-card-meta-label"),
-                    ui.tags.span(ad_group, class_="crv-card-meta-value"),
-                    class_="crv-card-meta-row",
-                ))
             if tactic:
                 text_children.append(ui.tags.div(
                     ui.tags.span("Tactic: ", class_="crv-card-meta-label"),
                     ui.tags.span(tactic, class_="crv-card-meta-value"),
                     class_="crv-card-meta-row",
                 ))
-        if creative_size:
-            text_children.append(ui.tags.div(
-                ui.tags.span("Creative Size: ", class_="crv-card-meta-label"),
-                ui.tags.span(creative_size, class_="crv-card-meta-value"),
-                class_="crv-card-meta-row",
-            ))
+            if ad_group:
+                text_children.append(ui.tags.div(
+                    ui.tags.span("Ad Group: ", class_="crv-card-meta-label"),
+                    ui.tags.span(ad_group, class_="crv-card-meta-value"),
+                    class_="crv-card-meta-row",
+                ))
         text_section = ui.tags.div(*text_children, class_="crv-card-text")
 
         def _metric_cell(label, value):
@@ -2579,12 +2573,12 @@ def digital_server(input, output, session):
         )
 
         conv_group = ui.tags.div(
-            ui.tags.div("Conversions", class_="crv-dm-group-title"),
+            ui.tags.div("Interactions", class_="crv-dm-group-title"),
             ui.tags.div(
                 _detail_metric("Direct", _fmt_metric(direct)),
                 _detail_metric("View-through", _fmt_metric(vt)),
                 _detail_metric("Total", _fmt_metric(total_conv)),
-                _detail_metric("Conv. Rate", f"{conv_rate:.2f}%" if pd.notna(conv_rate) else "—"),
+                _detail_metric("Int. Rate", f"{conv_rate:.2f}%" if pd.notna(conv_rate) else "—"),
                 class_="crv-dm-grid",
             ),
             class_="crv-dm-group",
@@ -2609,18 +2603,18 @@ def digital_server(input, output, session):
             chips.append(("positive", "Strong click volume"))
 
         if conv_rate_val >= 5:
-            chips.append(("positive", "Conversion efficiency strong"))
+            chips.append(("positive", "Interaction efficiency strong"))
         elif conv_rate_val < 0.5 and impr_val > 1000:
-            chips.append(("warning", "Conv. rate low"))
+            chips.append(("warning", "Int. rate low"))
 
         if direct_val == 0 and vt_val > 0:
-            chips.append(("neutral", "No direct conversions"))
+            chips.append(("neutral", "No direct interactions"))
 
         if total_val > 0 and vt_val / total_val > 0.7:
             chips.append(("neutral", "High view-through share"))
 
         if total_val == 0 and impr_val > 0:
-            chips.append(("warning", "No conversions recorded"))
+            chips.append(("warning", "No interactions recorded"))
 
         chip_els = [ui.tags.span(text, class_=f"crv-chip crv-chip--{tone}") for tone, text in chips]
         chip_section = ui.tags.div(*chip_els, class_="crv-chip-row") if chip_els else ""
@@ -2667,6 +2661,8 @@ def digital_server(input, output, session):
             meta_rows = [r for r in [
                 _meta_row("Tactic", tactic),
                 _meta_row("Platform Campaign", platform_campaign),
+                _meta_row("Creative Size", creative_size) if creative_size else None,
+                _meta_row("Creative", creative_text) if creative_text else None,
                 _meta_row("Image URL", image_url, is_link=True),
                 _meta_row("Landing Page", ad_url, is_link=True),
             ] if r is not None]
@@ -2708,9 +2704,9 @@ def digital_server(input, output, session):
             "clicks": "Clicks",
             "ctr": "CTR",
             "cost_per_click": "Cost Per Click",
-            "total_conversions": "Total Conv.",
-            "cost_per_conversion": "Cost Per Direct Conv.",
-            "conv_rate": "Conv. Rate",
+            "total_conversions": "Total Int.",
+            "cost_per_conversion": "Cost Per Direct Int.",
+            "conv_rate": "Int. Rate",
         }
         # Format columns
         for c in ["impressions", "clicks"]:
@@ -3170,8 +3166,8 @@ def _pct_change(curr, prev):
 def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str) -> "ui.HTML":
     """
     Build a YoY table with interleaved metric + Δ% columns.
-    Columns: Impressions, Clicks, CTR, Direct Conversion, View-through Conversion,
-             In-Platform Leads, Total Conversions, Conversion Rate.
+    Columns: Impressions, Clicks, CTR, Direct Interaction, View-through Interaction,
+             In-Platform Leads, Total Interactions, Interaction Rate.
     """
     raw_metrics = [
         "impressions", "clicks", "direct_conversions",
@@ -3180,7 +3176,7 @@ def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str) -> "
     col_labels = [
         "Impressions", "Clicks", "CTR",
         "Direct Key Interaction", "View-Through Int.", "In-Platform Leads",
-        "Total Conversions", "Conversion Rate",
+        "Total Interactions", "Interaction Rate",
     ]
 
     curr = df_c.groupby(group_col)[raw_metrics].sum().reset_index()
@@ -3227,8 +3223,8 @@ def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str) -> "
             "Direct Key Interaction":   (_fmt_int(r["direct_conversions"]),  _pct_change(r["direct_conversions"], p.get("direct_conversions", 0)) if p else "N/A"),
             "View-Through Int.":  (_fmt_int(r["view_through_conversions"]), _pct_change(r["view_through_conversions"], p.get("view_through_conversions", 0)) if p else "N/A"),
             "In-Platform Leads":   (_fmt_int(r["in_platform_leads"]),   _pct_change(r["in_platform_leads"], p.get("in_platform_leads", 0)) if p else "N/A"),
-            "Total Conversions":   (_fmt_int(r["total_interactions"]),  _pct_change(r["total_interactions"], p.get("total_interactions", 0)) if p else "N/A"),
-            "Conversion Rate":     (_fmt_pct(conv_rate_curr * 100 if conv_rate_curr is not None else None),
+            "Total Interactions":  (_fmt_int(r["total_interactions"]),  _pct_change(r["total_interactions"], p.get("total_interactions", 0)) if p else "N/A"),
+            "Interaction Rate":    (_fmt_pct(conv_rate_curr * 100 if conv_rate_curr is not None else None),
                                     _pct_change(conv_rate_curr, conv_rate_prev) if (conv_rate_curr is not None and conv_rate_prev is not None) else "N/A"),
         }
         rows.append({"label": grp, "metrics": metrics_data})

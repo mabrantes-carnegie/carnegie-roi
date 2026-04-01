@@ -225,14 +225,14 @@ page_overview = ui.nav_panel(
         # Section 3a: Conversion Rates collapsible row
         ui.tags.div(
             ui.tags.button(
-                ui.tags.span("Show Conversion Rates", class_="collapsible-btn-label"),
+                ui.tags.span("Show Interaction Rates", class_="collapsible-btn-label"),
                 ui.tags.span("\u203a", class_="collapsible-btn-chevron"),
                 class_="collapsible-section-btn",
                 onclick=(
                     "var row=document.getElementById('conv-rates-row');"
                     "var open=row.classList.contains('collapsible-row--open');"
                     "row.classList.toggle('collapsible-row--open',!open);"
-                    "this.querySelector('.collapsible-btn-label').textContent=open?'Show Conversion Rates':'Hide Conversion Rates';"
+                    "this.querySelector('.collapsible-btn-label').textContent=open?'Show Interaction Rates':'Hide Interaction Rates';"
                     "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
                 ),
             ),
@@ -379,7 +379,7 @@ page_funnel = ui.nav_panel(
         ),
 
         # Section 3: Conversion rates by source
-        ui.tags.h2("Conversion rates by source", class_="section-heading"),
+        ui.tags.h2("Interaction rates by source", class_="section-heading"),
         ui.tags.div(
             ui.output_ui("conversion_by_source_chart"),
             class_="chart-card",
@@ -987,7 +987,7 @@ page_digital = ui.nav_menu(
                         {
                             "impressions": "Impressions",
                             "clicks": "Clicks",
-                            "total_conversions": "Total Conversions",
+                            "total_conversions": "Total Interactions",
                         },
                         "impressions",
                     ),
@@ -1033,7 +1033,7 @@ page_digital = ui.nav_menu(
                 _dig_kpi_card("Total Creatives", "crv_total", "#EA332D"),
                 _dig_kpi_card("Impressions", "crv_impressions", "#021326"),
                 _dig_kpi_card("Avg. CTR", "crv_ctr", "#C99D44"),
-                _dig_kpi_card("Total Conversions", "crv_conversions", "#021326"),
+                _dig_kpi_card("Total Interactions", "crv_conversions", "#021326"),
                 class_="funnel-strip",
             ),
             # ── Page-specific filters ──
@@ -1062,8 +1062,8 @@ page_digital = ui.nav_menu(
                             "impressions": "Impressions",
                             "clicks": "Clicks",
                             "ctr": "CTR",
-                            "total_conversions": "Conversions",
-                            "conv_rate": "Conv. Rate",
+                            "total_conversions": "Interactions",
+                            "conv_rate": "Int. Rate",
                         },
                         selected="impressions",
                         inline=True,
@@ -1082,10 +1082,10 @@ page_digital = ui.nav_menu(
                     ui.tags.button("CTR", class_="crv-sort-pill",
                                    **{"data-val": "ctr"},
                                    onclick="window._crvSort(this)"),
-                    ui.tags.button("Conversions", class_="crv-sort-pill",
+                    ui.tags.button("Interactions", class_="crv-sort-pill",
                                    **{"data-val": "total_conversions"},
                                    onclick="window._crvSort(this)"),
-                    ui.tags.button("Conv. Rate", class_="crv-sort-pill",
+                    ui.tags.button("Int. Rate", class_="crv-sort-pill",
                                    **{"data-val": "conv_rate"},
                                    onclick="window._crvSort(this)"),
                     class_="crv-sort-pills",
@@ -1286,7 +1286,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=41"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=42"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(src="paginated-tables.js?v=2"),
