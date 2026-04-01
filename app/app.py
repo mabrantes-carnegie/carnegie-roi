@@ -403,41 +403,98 @@ PROGRAM_TREND_METRICS = {
 
 # --- Page 4: Geography ---
 
+def _geo_filters():
+    """Filter bar for the Funnel Geography page — mirrors Programs filter bar."""
+    from datetime import date as _date
+    today = _date.today()
+    # Default: Jul of prior year → latest available data month
+    geo_start = _date(today.year - 1, 7, 1)
+    data_max = _dig_max.date()
+    geo_end = _date(data_max.year, data_max.month, 1)
+    geo_start_val = geo_start.strftime("%Y-%m-%d")
+    geo_end_val = geo_end.strftime("%Y-%m-%d")
+
+    month_opts = _month_options(_dig_min.date(), _dig_max.date())
+
+    def _month_select(select_id, default_val):
+        options = [
+            ui.tags.option(label, value=val, selected=(val == default_val))
+            for val, label in month_opts
+        ]
+        return ui.tags.div(
+            ui.tags.select(
+                *options,
+                id=select_id,
+                class_="ios-month-select",
+                onchange=(
+                    "var s=document.getElementById('geo_month_start').value;"
+                    "var e=document.getElementById('geo_month_end').value;"
+                    "var ep=e.split('-'); var ey=+ep[0]; var em=+ep[1];"
+                    "var lastDay=new Date(ey, em, 0).getDate();"
+                    "var endStr=ep[0]+'-'+ep[1]+'-'+lastDay.toString().padStart(2,'0');"
+                    "Shiny.setInputValue('geo_period',[s, endStr],{priority:'event'});"
+                ),
+            ),
+            class_="ios-month-wrap",
+        )
+
+    return ui.tags.div(
+        ui.tags.div(
+            ui.tags.span("Period", class_="ios-month-label"),
+            ui.tags.div(
+                _month_select("geo_month_start", geo_start_val),
+                ui.tags.span("→", class_="ios-month-sep"),
+                _month_select("geo_month_end", geo_end_val),
+                class_="ios-month-row",
+            ),
+            class_="inline-filter ios-month-filter",
+        ),
+        ui.tags.div(
+            ui.input_selectize(
+                "geo_program", "Program",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            class_="inline-filter",
+        ),
+        ui.tags.div(
+            ui.input_selectize(
+                "geo_student_type", "Student Type",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            class_="inline-filter",
+        ),
+        ui.tags.div(
+            ui.input_selectize(
+                "geo_lead_source", "Lead Source",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            class_="inline-filter",
+        ),
+        ui.tags.div(
+            ui.input_date_range(
+                "geo_period", None,
+                start=geo_start,
+                end=geo_end,
+                min=_dig_min.date(),
+                max=_dig_max.date(),
+            ),
+            style="display:none;",
+        ),
+        class_="page-filter-bar",
+        style="flex-wrap:wrap; gap:12px;",
+    )
+
+
 page_geography = ui.nav_panel(
     "Geography",
     ui.tags.div(
-        # Page-level filters
-        ui.tags.div(
-            ui.tags.div(
-                ui.input_selectize(
-                    "geo_program", "Program",
-                    choices=[],
-                    multiple=True,
-                    options={"placeholder": "All"},
-                ),
-                class_="inline-filter",
-            ),
-            ui.tags.div(
-                ui.input_selectize(
-                    "geo_lead_source", "Lead Source",
-                    choices=[],
-                    multiple=True,
-                    options={"placeholder": "All"},
-                ),
-                class_="inline-filter",
-            ),
-            ui.tags.div(
-                ui.input_selectize(
-                    "geo_student_type", "Student Type",
-                    choices=[],
-                    multiple=True,
-                    options={"placeholder": "All"},
-                ),
-                class_="inline-filter",
-            ),
-            class_="page-filter-bar",
-            style="flex-wrap:wrap; gap:12px;",
-        ),
+        _geo_filters(),
         ui.tags.div(
             ui.tags.div(
                 ui.output_ui("geo_map_title"),

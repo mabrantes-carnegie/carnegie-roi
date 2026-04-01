@@ -196,8 +196,15 @@ def server_logic(input, output, session):
 
     @reactive.calc
     def filtered_geo():
-        """Q6 filtered by global filters + Geography page-specific Program and Lead Source filters."""
-        df = filtered_main()
+        """Q6 filtered by global filters + Geography page-specific Period, Program, Student Type, Lead Source."""
+        df = _apply_global_filters(Q6.copy())
+        try:
+            period = input.geo_period()
+            if period and len(period) == 2 and "event_date" in df.columns:
+                start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
+                df = df[(df["event_date"] >= start) & (df["event_date"] <= end)]
+        except Exception:
+            pass
         try:
             prog = input.geo_program()
             if prog and len(prog) > 0:
@@ -205,15 +212,15 @@ def server_logic(input, output, session):
         except Exception:
             pass
         try:
-            src = input.geo_lead_source()
-            if src and len(src) > 0:
-                df = df[df["origin_source_first"].isin(src)]
-        except Exception:
-            pass
-        try:
             st = input.geo_student_type()
             if st and len(st) > 0:
                 df = df[df["student_type"].isin(st)]
+        except Exception:
+            pass
+        try:
+            src = input.geo_lead_source()
+            if src and len(src) > 0:
+                df = df[df["origin_source_first"].isin(src)]
         except Exception:
             pass
         return df
