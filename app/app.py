@@ -1298,57 +1298,106 @@ app_ui = ui.page_navbar(
             # Show/hide digital filters based on active tab (uses Shiny nav input)
             ui.tags.script("""
 (function() {
-  var DIG_TABS = ['Overview','Overview YoY','Interactions','Geography','Creative','Insights'];
+  var DIG_TABS  = ['Overview','Overview YoY','Interactions','Geography','Creative','Insights'];
+  // Tabs that default to academic-year start → current month
+  var ACAD_TABS = ['Overview YoY', 'Geography', 'Creative'];
 
-  // Academic year default for Overview YoY: start Jul 2025, end = last available month
-  var YOY_START = '2025-07-01';
+  // Helper: get the last available month option value from the end dropdown
+  // (this is the latest month with data, e.g. "2026-03-01")
+  function _lastDataMonth() {
+    var me = document.getElementById('dig_month_end');
+    if (me && me.options.length > 0) return me.options[me.options.length - 1].value;
+    return null;
+  }
 
-  // Previous-month default (matches Python server default)
-  function _prevMonthRange() {
-    var d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - 1);
-    var y = d.getFullYear(), m = d.getMonth(); // 0-based
-    var start = y + '-' + String(m+1).padStart(2,'0') + '-01';
-    var lastDay = new Date(y, m+1, 0).getDate();
-    var end   = y + '-' + String(m+1).padStart(2,'0') + '-' + String(lastDay).padStart(2,'0');
-    // also the YYYY-MM-DD value used by the month selects (first of month)
-    return {start: start, end: end, startSel: start, endSel: start};
+  // Helper: compute last day of a "YYYY-MM-DD" first-of-month string
+  function _lastDayOf(sel) {
+    var p = sel.split('-'); var ey = +p[0]; var em = +p[1];
+    var ld = new Date(ey, em, 0).getDate();
+    return p[0] + '-' + p[1] + '-' + String(ld).padStart(2, '0');
+  }
+
+  // Data-month range: both start and end = last available data month
+  // Used for Overview & Interactions
+  function _dataMonthRange() {
+    var sel = _lastDataMonth();
+    if (!sel) return null;
+    return {start: sel, end: _lastDayOf(sel), startSel: sel, endSel: sel};
+  }
+
+  // Academic-year range: Jul of current AY → last data month
+  // Used for Overview YoY, Geography, Creative
+  function _acadRange() {
+    var sel = _lastDataMonth();
+    if (!sel) return null;
+    var p = sel.split('-'); var ey = +p[0]; var em = +p[1]; // 1-based month
+    var ayStartYear = (em >= 7) ? ey : ey - 1;
+    var startStr = ayStartYear + '-07-01';
+    return {start: startStr, end: _lastDayOf(sel), startSel: startStr, endSel: sel};
+  }
+
+  // Insights default: Jul of current AY → last data month (if AY 2025-26),
+  // or Jul AY-start → Jun AY-end for subsequent academic years.
+  function _insightsAcadRange() {
+    var sel = _lastDataMonth();
+    if (!sel) return null;
+    var p = sel.split('-'); var ey = +p[0]; var em = +p[1]; // 1-based month
+    var ayStartYear = (em >= 7) ? ey : ey - 1;
+    var startStr = ayStartYear + '-07-01';
+    var endStr, endSel;
+    if (ayStartYear === 2025) {
+      endStr = _lastDayOf(sel);
+      endSel = sel;
+    } else {
+      var endYear = ayStartYear + 1;
+      endStr = endYear + '-06-30';
+      endSel = endYear + '-06-01';
+    }
+    return {start: startStr, end: endStr, startSel: startStr, endSel: endSel};
   }
 
   function _setDigPeriod(startStr, endStr, startSel, endSel) {
-    // Update hidden Shiny input
-    Shiny.setInputValue('dig_period', [startStr, endStr], {priority:'event'});
-    // Update the visible month dropdowns
+    // Update the visible month dropdowns IMMEDIATELY (prevents flash)
     var ms = document.getElementById('dig_month_start');
     var me = document.getElementById('dig_month_end');
     if (ms) ms.value = startSel;
     if (me) me.value = endSel;
+    // Defer Shiny input update to next tick
+    setTimeout(function() {
+      Shiny.setInputValue('dig_period', [startStr, endStr], {priority:'event'});
+    }, 50);
   }
 
   var _prevTab = null;
 
-  function updateDigFilters(tabVal) {
+  // Show/hide the digital filter bar (no period change)
+  function _showHideBar(tabVal) {
     var bar = document.getElementById('dig-global-filters');
-    if (!bar) return;
-    bar.style.display = DIG_TABS.indexOf(tabVal) !== -1 ? '' : 'none';
+    if (bar) bar.style.display = DIG_TABS.indexOf(tabVal) !== -1 ? '' : 'none';
+  }
 
-    if (tabVal === 'Overview YoY' && _prevTab !== 'Overview YoY') {
-      setTimeout(function() {
-        // End = last option available in the end select (last month with data)
-        var me = document.getElementById('dig_month_end');
-        var lastOpt = me ? me.options[me.options.length - 1] : null;
-        var endSel = lastOpt ? lastOpt.value : YOY_START;
-        // Compute last day of that month for the period end
-        var ep = endSel.split('-'); var ey = +ep[0]; var em = +ep[1];
-        var endStr = ep[0] + '-' + ep[1] + '-' + String(new Date(ey, em, 0).getDate()).padStart(2,'0');
-        _setDigPeriod(YOY_START, endStr, YOY_START, endSel);
-      }, 50);
-    } else if (_prevTab === 'Overview YoY' && tabVal !== 'Overview YoY') {
-      var r = _prevMonthRange();
-      setTimeout(function() {
-        _setDigPeriod(r.start, r.end, r.startSel, r.startSel);
-      }, 50);
+  // Adjust period defaults when switching between Digital sub-tabs
+  function updateDigFilters(tabVal) {
+    _showHideBar(tabVal);
+
+    // Only adjust period on actual tab switches (not initial load)
+    if (_prevTab === null) { _prevTab = tabVal; return; }
+    if (_prevTab === tabVal) return;
+
+    var r;
+
+    if (ACAD_TABS.indexOf(tabVal) !== -1) {
+      // → Overview YoY / Geography / Creative: AY start → last data month
+      r = _acadRange();
+      if (r) _setDigPeriod(r.start, r.end, r.startSel, r.endSel);
+    } else if (tabVal === 'Insights') {
+      // → Insights: own academic-year rule
+      r = _insightsAcadRange();
+      if (r) _setDigPeriod(r.start, r.end, r.startSel, r.endSel);
+    } else if (tabVal === 'Overview' || tabVal === 'Interactions') {
+      // → Overview / Interactions: always reset to last data month
+      r = _dataMonthRange();
+      if (r) _setDigPeriod(r.start, r.end, r.startSel, r.endSel);
     }
     _prevTab = tabVal;
   }
@@ -1356,11 +1405,14 @@ app_ui = ui.page_navbar(
   $(document).on('shiny:inputchanged', function(e) {
     if (e.name === 'nav') updateDigFilters(e.value);
   });
+  // On initial connection: only show/hide bar + record tab, let Python default handle period
   $(document).on('shiny:connected', function() {
     try {
       var val = Shiny.shinyapp.$inputValues ? Shiny.shinyapp.$inputValues['nav'] : '';
-      updateDigFilters(val || '');
-    } catch(err) { updateDigFilters(''); }
+      val = val || '';
+      _showHideBar(val);
+      _prevTab = val;
+    } catch(err) {}
   });
 })();
 """),

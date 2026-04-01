@@ -1,6 +1,6 @@
 # ROI Dashboard — Query Documentation
 
-Last updated: March 20, 2026
+Last updated: March 31, 2026
 
 ---
 
@@ -83,6 +83,115 @@ The dbt model documents an important grain detail:
 - Prospect and Inquiry are **person-level** (use COUNT DISTINCT person_id to avoid double-counting people with multiple applications)
 - Application-level stages (App Created onward) use **COUNTIF** since the grain is already correct at the application level
 - The table's counts already handle this correctly — we just need to SUM them
+
+---
+
+## Campaign Attribution Gap — Critical Finding
+
+> **Investigated: March 31, 2026**
+
+### Root cause
+
+`conversion_campaign_attribution` only includes students whose funnel stage date falls **within an active campaign period**. The WHERE clause in the underlying dbt model (`conversion_campaign_attribution.sql`) enforces this:
+
+```sql
+where case
+    when c.funnel_target = 'Prospect' then bc.person_prospect_date
+    when c.funnel_target = 'Inquiry'  then bc.person_inquired_date
+    ...
+end between c.start_date and c.end_date
+```
+
+For CWU, no campaigns are registered in BigQuery before **2024-04-01**. This means any student who reached a funnel stage before that date has no campaign attribution — even if they are enrolled in a 2026 term cohort.
+
+This is expected behavior per the dbt model design. It is not a bug in the dashboard.
+
+### Measured gap (CWU, Fall 2026, First Year)
+
+| Source | Total Inquiries |
+|---|---|
+| `funnel_benchmark_current` (Source of Truth) | 27,851 |
+| `conversion_campaign_attribution` | 356 |
+| **Gap** | **27,495 (98.7%)** |
+
+The 27,495 students without campaign attribution either converted organically, converted before any campaign was registered, or were never touched by a tracked campaign.
+
+**Important note from engineering (Roy Nalven):** `funnel_day` for Prospect comes from `person.person_prospect_date`, which can originate from the distant past (e.g., middle school engagement events). It is valid for a prospect date of 2018 to belong to a 2026 entry term cohort — which is why funnel_day values as old as 2018-08-08 appear in Fall 2026 data.
+
+### Implication for cost metrics
+
+Because Q2 funnel counts represent only 1.3% of the real funnel, **Q2 counts must never be used as denominators for cost metrics shown alongside Q6 totals.** The correct formula for all cost-per-stage metrics is:
+
+| Metric | Numerator | Denominator | Notes |
+|---|---|---|---|
+| Cost per Net Deposit | Q2 total spend | Q6 net deposits | ✅ Valid — measures total investment efficiency |
+| Cost per Inquiry (campaign-attributed) | Q2 spend | Q2 inquiries (356) | ✅ Valid only if labeled "campaign-attributed" |
+| Cost per Inquiry (vs full funnel) | Q2 spend | Q6 inquiries (27,851) | ❌ Misleading — dilutes cost across non-campaign students |
+
+In Python, always verify the denominator source:
+
+```python
+# Correct
+cost_per_net_deposit = q2['total_cost'].sum() / q6['total_net_deposits'].sum()
+
+# Wrong — denominador inflado pelo multi-touch, universo errado
+cost_per_inquiry = q2['total_cost'].sum() / q2['total_inquiries'].sum()
+```
+
+### Validation query
+
+Use this to confirm the gap for any institution/term combination:
+
+```sql
+select
+  'funnel_benchmark_current' as source,
+  sum(funnel_inquired_count) as total_inquiries
+from `unified-data-platform-prod.udp_url.funnel_benchmark_current`
+where institution_name like '%Central Washington%'
+  and entry_term_year = 2026
+  and entry_term_semester = 'Fall'
+  and student_type = 'First Year'
+
+union all
+
+select
+  'conversion_campaign_attribution' as source,
+  count(distinct person_id) as total_inquiries
+from `unified-data-platform-prod.udp_url.conversion_campaign_attribution`
+where institution_name like '%Central Washington%'
+  and entry_term_year = 2026
+  and entry_term_semester = 'Fall'
+  and campaign_funnel_target = 'Inquiry'
+```
+
+To validate Q6 against the raw `conversion` table (confirming the gap is a campaign data issue, not a counting logic issue):
+
+```sql
+select
+  'funnel_benchmark_current' as source,
+  sum(funnel_inquired_count) as total_inquiries
+from `unified-data-platform-prod.udp_url.funnel_benchmark_current`
+where institution_name like '%Central Washington%'
+  and entry_term_year = 2026
+  and entry_term_semester = 'Fall'
+  and student_type = 'First Year'
+
+union all
+
+select
+  'conversion' as source,
+  count(distinct c.person_id) as total_inquiries
+from `unified-data-platform-prod.udp_url.conversion` as c
+inner join `unified-data-platform-prod.udp_udl.institution` as i
+  on c.institution_id = i.id
+where i.name like '%Central Washington%'
+  and coalesce(c.person_entry_term_year, c.app_entry_term_year) = 2026
+  and coalesce(c.person_entry_term_semester, c.app_entry_term_semester) = 'Fall'
+  and coalesce(c.person_student_type, c.app_student_type) = 'First Year'
+  and c.person_inquired_date is not null
+```
+
+If both rows return equal numbers → Q6 is correct. The gap with Q2 is purely a campaign data coverage issue upstream. The open question (tracked in Asana) is why CWU campaign history prior to April 2024 was not imported into BigQuery.
 
 ---
 
@@ -174,7 +283,7 @@ The enrollment dashboard uses a **cumulative funnel**: a student who is Net Conf
 | **File** | `data/q2_campaign_cost.csv` |
 | **Source table** | `udp_url.conversion_campaign_attribution` + `udp_url.campaign_roi` |
 | **Status** | ✅ Active — only source of campaign spend data |
-| **Powers** | Cost per lead source, cost per net deposit, campaign-attributed source breakdown |
+| **Powers** | Cost per net deposit badge on ROI Overview |
 | **Grain** | institution × term_year × term_semester × lead_source × campaign_service |
 | **Has monthly data?** | No |
 | **Has source data?** | Yes (`campaign_product_group` as lead_source — marketing attribution, multi-touch) |
@@ -183,11 +292,54 @@ The enrollment dashboard uses a **cumulative funnel**: a student who is Net Conf
 
 **Columns:** institution_name, term_year, term_semester, lead_source, campaign_service, campaign_funnel_target, campaign_attributable, total_cost, total_inquiries, total_app_starts, total_app_submits, total_admits, total_deposits, total_net_deposits, total_enrolled
 
-**Known issue — Multi-touch attribution:** Funnel counts in this query are inflated because each student counts in every campaign/source they were attributed to. These numbers will NOT match Q6 totals. This is expected — Q2 shows campaign-attributed performance, Q6 shows full-funnel deduplicated performance. Different scopes.
+**⚠️ Critical — Campaign attribution gap:** For CWU Fall 2026 First Year, Q2 captures only 356 out of 27,851 inquiries (1.3%). This is because `conversion_campaign_attribution` only links students whose funnel stage date falls within a registered campaign period, and CWU has no campaigns in BigQuery before 2024-04-01. See the **Campaign Attribution Gap** section above for full details.
 
-**Python calculates:** cost per inquiry, cost per app start, cost per app submit, cost per admit, cost per deposit, cost per net deposit, YoY cost comparison
+**⚠️ Critical — Funnel counts in Q2 must not be used as denominators for cost metrics displayed against Q6 totals.** The only valid cost metric combining Q2 and Q6 is Cost per Net Deposit (Q2 spend ÷ Q6 net deposits). All other per-stage cost metrics must use Q2 counts as the denominator AND be clearly labeled "campaign-attributed only" in the UI.
 
-**Used by:** Funnel Deep Dive (cost per lead source table), ROI Overview (cost per net deposit badge)
+**Known issue — Multi-touch attribution:** Funnel counts in this query are also inflated because each student counts in every campaign/source they were attributed to. These numbers will NOT match Q6 totals. This is expected — Q2 shows campaign-attributed performance, Q6 shows full-funnel deduplicated performance. Different scopes.
+
+#### Spend allocation — Critical finding (March 31, 2026)
+
+The original Q2 used `campaign_roi.campaign_spend` as the spend source. This caused **double-counting**: the same campaign's total spend appeared in both 2025 and 2026 whenever the campaign touched students from both cohorts.
+
+**Root cause:** The dbt pipeline aggregates `campaign_revenue` into a single total per campaign before any join with `entry_term_year`:
+
+```sql
+-- Inside conversion_campaign_attribution dbt model
+select campaign_id, sum(revenue) as total_revenue  -- loses campaign_month
+from campaign_revenue
+group by 1
+```
+
+This discards `campaign_month`, so `campaign_roi` has no way to know which portion of spend belongs to which year — it simply repeats the total for every `entry_term_year` that had conversions.
+
+**The fix:** Bypass `campaign_roi` and read `campaign_revenue` directly, allocating spend by `campaign_month` using the academic year definition (Fall N = July N-1 to June N):
+
+```sql
+CASE
+    WHEN campaign_month BETWEEN '2024-07-01' AND '2025-06-30' THEN 2025
+    WHEN campaign_month BETWEEN '2025-07-01' AND '2026-06-30' THEN 2026
+END AS term_year
+```
+
+**Why this is the correct approach:** The dashboard shows a funnel view filtered by academic year. A campaign may touch a student today who only enrolls in a future term — that is a sign of campaign effectiveness, not a problem. But the spend itself happened in a specific month and should be counted in the academic year that month belongs to. This is consistent with how all other metrics in the dashboard are scoped: by the academic year in which the activity occurred.
+
+This means a campaign that spent $110k between July 2024 and June 2025 counts fully as Fall 2025 spend — regardless of whether some attributed students converted in Fall 2026. The spend allocation follows the financial calendar, not the student cohort.
+
+**Scope note:** Spend that occurred before July 2024 (e.g. a Clarity Slate Integration with $3,000 in April 2024) belongs to Fall 2024 and is intentionally excluded from the dashboard scope (2025/2026 only).
+
+**Validated spend after fix:**
+
+| term_year | Old spend (campaign_roi) | Correct spend (campaign_revenue) |
+|---|---|---|
+| 2025 | $782,816 | $375,622 |
+| 2026 | $741,469 | $224,675 |
+
+The old values were inflated by ~2x because campaign spend was being double-counted across years.
+
+**Python calculates:** cost per net deposit (Q2 spend ÷ Q6 net deposits), YoY cost comparison
+
+**Used by:** ROI Overview (cost per net deposit badge)
 
 ---
 
@@ -208,7 +360,47 @@ The enrollment dashboard uses a **cumulative funnel**: a student who is Net Conf
 
 **Note:** State-level totals now come from Q6. Q3 is only needed for the city-level drill-down table. If city detail is removed from the dashboard, Q3 can be retired.
 
-**Known data quality issue:** ~4,950 inquiries have NULL/empty state and city values.
+#### Bug fix — March 31, 2026
+
+The original Q3 had two bugs that caused incorrect counts for app-level stages (App Submits, Admits, Deposits, Enrolled), especially for 2026 (gap of -610 app_submits, -648 admits).
+
+**Bug 1 — Wrong COALESCE order for app stages:** The original query used `COALESCE(person_student_type, app_student_type)` and `COALESCE(person_entry_term_year, app_entry_term_year)` for all stages. App-level stages require `app` fields first — same logic as `funnel_benchmark_current`.
+
+**Bug 2 — GROUP BY conflicting with stage logic:** Even with the correct COALESCE inside each `COUNT DISTINCT`, the `GROUP BY term_year` used `COALESCE(person_entry_term_year, app_entry_term_year)`. A student with `person_term_year=2025` and `app_term_year=2026` was bucketed into 2025, but the SOT placed their app_submit in 2026 — causing counts in the wrong year.
+
+**Fix:** Each funnel stage now has its own CTE with the correct `term_year` COALESCE order before aggregation. The final SELECT joins all stage CTEs at the `student_state × student_city × term_year × term_semester` level. This is the only approach that correctly attributes each stage to the right term_year when person fields differ from app fields.
+
+**Validation results (March 31, 2026):**
+
+| Stage | 2024 | 2025 | 2026 |
+|---|---|---|---|
+| Inquiries | ✅ 0 | ✅ 0 | ✅ 0 |
+| App Submits | ✅ 0 | ✅ 0 | ✅ 0 |
+| Admits | ✅ 0 | ✅ 0 | ✅ 0 |
+| Deposits | -2 | ✅ 0 | ✅ 0 |
+| Enrolled | -2 | ✅ 0 | ✅ 0 |
+
+The -2 gap in 2024 deposits/enrolled is negligible and may reflect an edge case in `app_exit_after_deposit` logic for historical data.
+
+**Known data quality issues:**
+
+**NULL state/city — by stage (CWU Fall 2026 First Year Domestic):**
+
+| Stage | Total | No State | % |
+|---|---|---|---|
+| Inquiries | 27,720 | 4,901 | 17.7% |
+| App Submits | 7,766 | 102 | 1.3% |
+| Admits | 6,948 | 58 | 0.8% |
+| Deposits | 1,858 | 26 | 1.4% |
+| Enrolled | 1,877 | 27 | 1.4% |
+
+The NULL state concentration in Inquiries is expected and by design — students captured at campus events or college fairs are not required to provide an address at that point. The top sources with no state are Campus Event (1,566), College Fair (932), RFI Forms (431), and International Fair (290). As students progress through the funnel and complete an application, they provide a full address — which is why NULL state drops to ~1% at App Submits and beyond.
+
+For 2024, NULL state reaches 53.6% — historical records from before consistent address collection was in place.
+
+**Display rule:** All NULL and empty string states should be displayed as "Unknown" in the dashboard with the note: *"Students captured at campus events or college fairs may not have a state on record."*
+
+**Q6 vs Q3 representation:** Q6 represents no-state as `""` (empty string), Q3 as `NULL` — same students, different representation. Python must treat both as "Unknown".
 
 ---
 
@@ -228,7 +420,35 @@ All digital queries pull from BigQuery project: `carnegie-dartlet-1528198422380.
 
 Common filter fields across all digital tables: `client_name`, `campaign_group_name` (Group), `campaign_subgroup_name` (Subgroup), `product_name` (Product), `campaign_name` (Campaign), `day` (date).
 
-**CRITICAL — Cost field:** The Looker dashboard uses `budget` (not `cost`) for all cost metrics. Validated: CWU Feb 2026 Cost per Interaction = $22.83 matches `budget / total_interactions`. All Python cost calculations must use `budget`.
+**CRITICAL — Cost field:** The Looker dashboard uses `budget` (not `cost`) for all cost metrics. Validated: CWU Feb 2026 Cost per Interaction = $22.71 matches `budget / total_interactions`. All Python cost calculations must use `budget`.
+
+**CRITICAL — Metric formulas (validated against Looker, March 31, 2026):**
+
+| Metric | Formula | Notes |
+|---|---|---|
+| Total Interactions | `SUM(conversions + view_through_conversions + leads)` | Includes view-through |
+| Conversion Rate | `SUM(conversions + leads) / SUM(clicks)` | **Excludes** view_through_conversions |
+| CTR | `SUM(clicks) / SUM(impressions)` | |
+| Cost per Interaction | `SUM(budget) / SUM(total_interactions)` | |
+| CPC | `SUM(budget) / SUM(clicks)` | |
+
+`view_through_conversions` counts toward Total Interactions but is excluded from Conversion Rate. Looker formula confirmed: `SUM(conversions + leads) / SUM(clicks)`. Validated: CWU Jul 2025–Jun 2026 = 3.6% ✅.
+
+**CRITICAL — Interaction Category mapping (Q9):** The `conversion_type` field does not match Looker's "Conversion Buckets" logic exactly. Q9 replicates the full Looker CASE using `LOWER(conversion) LIKE` pattern matching. Key example: `submit_application_website` has `conversion_type = 'Other'` but Looker maps it to `Apply` via pattern `%app%`. Without this remapping, Apply interactions are undercounted. See Digital Architecture doc for full mapping logic.
+
+**Validated benchmarks (CWU):**
+
+| Period | Metric | Value |
+|---|---|---|
+| Feb 2026 | Total Interactions | 568.8 ✅ |
+| Feb 2026 | Cost per Interaction | $22.71 ✅ |
+| Feb 2026 | RFI/Lead Gen | 278.9 ✅ |
+| Feb 2026 | Visit/Event | 48.0 ✅ |
+| Feb 2026 | Apply | 241.9 ✅ |
+| Jul 25–Jun 26 | Impressions | 21.6M ✅ |
+| Jul 25–Jun 26 | Clicks | 115.4K ✅ |
+| Jul 25–Jun 26 | CTR | 0.5% ✅ |
+| Jul 25–Jun 26 | Conversion Rate | 3.6% ✅ |
 
 ---
 
@@ -330,6 +550,38 @@ Common filter fields across all digital tables: `client_name`, `campaign_group_n
 | **Rows** | ~2,380 |
 
 **Columns:** client_name, platform_campaign_name, campaign_name, product_name, keyword, match_type, event_year, event_month, event_month_name, impressions, clicks, direct_conversions, cost, budget
+
+---
+
+### Q13: Campaign Coverage by Funnel Stage
+
+| Property | Value |
+|---|---|
+| **File** | `data/q13_campaign_coverage.csv` |
+| **Source table** | `udp_url.funnel_benchmark_current` + `udp_url.conversion_campaign_attribution` + `udp_url.conversion` |
+| **Status** | ✅ Active |
+| **Powers** | Campaign Reach section — shows the real penetration of Carnegie campaigns within the full funnel |
+| **Grain** | institution × term_year |
+| **Term years** | 2025, 2026 |
+
+**Columns:** term_year, sot_prospects, campaign_prospects, pct_prospects, sot_inquiries, campaign_inquiries, pct_inquiries, sot_app_starts, campaign_app_starts, pct_app_starts, sot_app_submits, campaign_app_submits, pct_app_submits, sot_admits, campaign_admits, pct_admits, sot_deposits, campaign_deposits, pct_deposits, sot_net_deposits, campaign_net_deposits, pct_net_deposits, sot_enrolled, campaign_enrolled, pct_enrolled
+
+**Why this query exists:** The campaign attribution gap (~1-8% for early funnel stages) means the client needs context on how much of their total funnel was actually touched by Carnegie campaigns. This query provides that context by stage.
+
+**Key finding (CWU Fall 2025/2026, First Year Domestic):**
+
+| Stage | 2025 | 2026 |
+|---|---|---|
+| Prospects | 1.0% | 0.6% |
+| Inquiries | 7.6% | 4.2% |
+| App Starts | 15.6% | 11.9% |
+| App Submits | 18.9% | 14.1% |
+| Admits | 21.0% | 15.7% |
+| Deposits | 57.2% | 56.8% |
+| Net Deposits | 59.8% | 56.3% |
+| Enrolled | 57.9% | 57.6% |
+
+**Notable insight:** There is a large jump between Admits (~21%) and Deposits (~57%), suggesting Carnegie yield campaigns (deposit-stage) are significantly more effective than awareness/inquiry campaigns at penetrating the full funnel. Coverage stabilizes at ~57-60% for all final conversion stages, consistent across both years.
 
 ---
 
@@ -478,3 +730,5 @@ Digital Performance page (5 sub-pages via tabs)
 9. **Scaling question** — Greg asked about scaling from 1 client to 10/20/100. Architecture is institution-agnostic (Institution filter in sidebar), but performance and deployment need assessment. Backlog item.
 
 10. **Deployment** — Currently running on local machine. Need to identify Carnegie infra team for deployment (Shiny for Python on Linux/Docker/Posit Connect). Backlog item.
+
+11. **Campaign history gap for CWU (open — engineering):** CWU has no campaigns registered in BigQuery before 2024-04-01, resulting in 98.7% of Fall 2026 First Year inquiries having no campaign attribution. Engineering needs to investigate whether pre-2024 campaign data was never imported or simply doesn't exist. Tracked in Asana. This does not affect dashboard correctness — Q6 uses the full funnel regardless of campaign coverage.

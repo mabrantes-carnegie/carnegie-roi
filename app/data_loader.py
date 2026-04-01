@@ -135,3 +135,8 @@ def get_student_types() -> list[str]:
     types = Q6["student_type"].unique().tolist()
     priority = ["First Year", "Transfer", "Graduate", "Adult", "Readmit", "Other", "Unknown"]
     return [t for t in priority if t in types]
+
+
+def get_programs_date_range() -> tuple:
+    """Return min/max event_date from Q6."""
+    return Q6["event_date"].min(), Q6["event_date"].max()

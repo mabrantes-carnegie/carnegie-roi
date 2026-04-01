@@ -77,7 +77,8 @@
       "Bash(~/.venv/Scripts/python -c \":*)",
       "Read(//c/Users/mabrantes/**)",
       "Bash(/c/Users/mabrantes/AppData/Local/uv/cache/archive-v0/6Geu6903yVphaKkV8SXp7/Scripts/python.exe -c \":*)",
-      "Bash(find /c/Users/mabrantes -path */site-packages/pandas -type d)"
+      "Bash(find /c/Users/mabrantes -path */site-packages/pandas -type d)",
+      "Bash(pip list:*)"
     ]
   }
 }

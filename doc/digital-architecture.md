@@ -362,3 +362,125 @@ The "DIGITAL PERFORMANCE" navbar item has a dropdown showing the 5 sub-pages. Th
 5. **Q10 + Geography sub-page** — nice to have, can be last
 
 Build Overview first, validate numbers against Looker, then expand.
+
+## Validated Metrics & Formulas
+
+All formulas validated against Looker for CWU Feb 2026 and Jul 2025–Jun 2026.
+
+### Key metrics
+
+| Metric | Formula | Notes |
+|---|---|---|
+| Total Interactions | `SUM(conversions + view_through_conversions + leads)` | Includes view-through |
+| Conversion Rate | `SUM(conversions + leads) / SUM(clicks)` | **Excludes view_through_conversions** |
+| CTR | `SUM(clicks) / SUM(impressions)` | |
+| Cost per Interaction | `SUM(budget) / SUM(total_interactions)` | Uses `budget`, not `cost` |
+| CPC | `SUM(budget) / SUM(clicks)` | Uses `budget`, not `cost` |
+| Cost per Direct Conversion | `SUM(budget) / SUM(conversions)` | Uses `budget`, not `cost` |
+| Cost per In-Platform Lead | `SUM(budget) / SUM(leads)` | Uses `budget`, not `cost` |
+
+**Critical — `budget` vs `cost`:** The Looker dashboard uses `budget` for all cost metrics. Validated: CWU Feb 2026 Cost per Interaction = $22.71 matches `budget / total_interactions`. The `cost` field exists in the data but is not what Looker displays. All Python cost calculations must use `budget`.
+
+**Critical — Conversion Rate formula:** `view_through_conversions` is included in `total_interactions` but **excluded** from the Conversion Rate numerator. Looker formula confirmed: `SUM(conversions + leads) / SUM(clicks)`. Validated: CWU Jul 2025–Jun 2026 = 3.6% ✅.
+
+### Validated benchmarks (CWU)
+
+| Period | Metric | Value | Status |
+|---|---|---|---|
+| Feb 2026 | Total Interactions | 568.8 | ✅ |
+| Feb 2026 | Cost per Interaction | $22.71 | ✅ |
+| Feb 2026 | RFI/Lead Gen | 278.9 | ✅ |
+| Feb 2026 | Visit/Event | 48.0 | ✅ |
+| Feb 2026 | Apply | 241.9 | ✅ |
+| Jul 25–Jun 26 | Impressions | 21.6M | ✅ |
+| Jul 25–Jun 26 | Clicks | 115.4K | ✅ |
+| Jul 25–Jun 26 | CTR | 0.5% | ✅ |
+| Jul 25–Jun 26 | Total Conversions | 6,571 | ✅ |
+| Jul 25–Jun 26 | Conversion Rate | 3.6% | ✅ |
+
+---
+
+## Interaction Category Mapping (Conversion Buckets)
+
+The `conversion_type` field in `v_kpi_conversion` does not match the Looker "Conversion Buckets" logic exactly. Q9 replicates the full Looker CASE logic using `LOWER(conversion) LIKE` pattern matching.
+
+**Why this matters:** `submit_application_website` has `conversion_type = 'Other'` but Looker categorizes it as `Apply` via the Conversion Buckets field. Without this remapping, Apply interactions are undercounted by ~1 per month.
+
+The full CASE logic is implemented in Q9. Key patterns by category:
+
+| Category | Key patterns |
+|---|---|
+| Other | `custom_event` (checked first — takes priority) |
+| Enroll/Deposit | `enroll`, `deposit`, `admits`, `payment`, `fb_pixel_purchase` |
+| RFI/Lead Gen | `lead`, `form`, `rfi`, `inquiry`, `learn more`, `contact` |
+| Apply | `app`, `apply`, `application`, `fb_pixel_submit_application`, `subscribe_website` |
+| Visit/Event | `visit`, `event`, `tour`, `open house`, `rsvp`, `schedule`, `attend` |
+| Campus Visit | `unknown` (via REGEXP) |
+
+**Order matters** — `custom_event` is checked first to prevent false matches on patterns like `app` inside `custom_event_app`.
+
+---
+
+## Page Architecture
+
+Danielle confirmed Digital Performance needs multiple sub-pages. The navbar item "DIGITAL PERFORMANCE" should expand into sub-pages.
+
+### Proposed sub-page structure
+
+| # | Sub-page | Looker equivalent | Data source | Purpose |
+|---|---|---|---|---|
+| 1 | **Overview** | Digital Performance + Digital Performance Overview YoY (merged) | `v_kpi_campaign` | KPIs, trending, engagement metrics, channel mix, performance by strategy & subgroup |
+| 2 | **Interactions** | Key Interactions | `v_kpi_conversion` | Interaction categories, trending by category, breakdown by strategy & campaign |
+| 3 | **Geography** | Geography (digital) | `v_kpi_geo` | Map + table of impressions/clicks/conversions by region/location |
+| 4 | **Creative** | Creative | `v_kpi_creative` + `v_kpi_keyword` | Creative performance by platform, PPC keyword performance |
+| 5 | **Insights** | Insights & Optimizations | `v_opnote` | Performance notes, campaign optimization history |
+
+---
+
+## Filter Strategy
+
+### Sub-page level filters
+
+| Filter | Source field | Default |
+|---|---|---|
+| Period | `day` range picker | Jul 1, 2025 – Jun 30, 2026 (current academic year) |
+| Group | `campaign_group_name` | All |
+| Subgroup | `campaign_subgroup_name` | All |
+| Product | `product_name` | All |
+| Campaign | `campaign_name` | All (searchable dropdown) |
+
+### Additional filters per sub-page
+
+| Sub-page | Extra filters |
+|---|---|
+| Interactions | Interaction Category (`conversion_type`), Conversion Name (`conversion`) |
+| Insights | Milestone (`is_milestone`), Note Type (`note_type`) |
+| Creative | Platform Campaign Name (`platform_campaign_name`) |
+
+### Relationship to global filters
+
+Digital Performance uses its own filter set because digital data has `day` ranges (not `term_year`/`term_semester`) and `campaign_group_name`/`campaign_subgroup_name` (not `student_type`). The Institution filter still applies (`client_name` = selected institution).
+
+---
+
+## Navigation Implementation
+
+**Recommendation: Tabs within the page (Option A)**
+
+When the user clicks "DIGITAL PERFORMANCE" in the navbar, the page loads with a secondary tab bar:
+
+```
+[ Overview | Interactions | Geography | Creative | Insights ]
+```
+
+Implemented via Shiny's `ui.navset_pill()` or `ui.navset_tab()`. Keeps the main navbar clean and is easy to add/remove/reorder sub-pages.
+
+---
+
+## Implementation Priority
+
+1. **Q8 + Overview** — highest impact, replaces 2 Looker pages
+2. **Q9 + Interactions** — high value for strategists
+3. **Q12 + Insights** — easy to build (just tables), high value for optimization history
+4. **Q11 + Creative** — many tables, lower daily-use priority
+5. **Q10 + Geography** — nice to have, lowest priority
