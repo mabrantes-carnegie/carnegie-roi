@@ -470,9 +470,10 @@ def _programs_filters():
     """Filter bar for the Programs page."""
     import calendar
     today = date.today()
-    # Default: Jul of prior year → current month of current year
+    data_max = _dig_max.date()
+    # Default: Jul of prior year → latest available data month (capped at _dig_max)
     prog_start = date(today.year - 1, 7, 1)
-    prog_end = date(today.year, today.month, 1)
+    prog_end = date(data_max.year, data_max.month, 1)
     prog_start_val = prog_start.strftime("%Y-%m-%d")
     prog_end_val = prog_end.strftime("%Y-%m-%d")
 
@@ -596,30 +597,18 @@ page_programs = ui.nav_panel(
 def _digital_filters():
     """Shared filter bar for digital performance page."""
     import calendar
-    # Default: current academic year (Jul Y → Jun Y+1), capped at latest available data.
-    # Academic year is determined from _dig_max: if max data >= Jul 1 of its year,
-    # the academic year started that Jul; otherwise it started Jul of the prior year.
-    # This automatically rolls over when data beyond Jun of the current cycle arrives.
+    # Default: current month (latest available data month).
     data_max = _dig_max.date()
-    if data_max.month >= 7:
-        ay_start = date(data_max.year, 7, 1)
-    else:
-        ay_start = date(data_max.year - 1, 7, 1)
-    ay_end_raw = date(ay_start.year + 1, 6, 30)
-    # Cap end at the last available data month (use last day of that month)
-    if data_max < ay_end_raw:
-        data_max_month_end = data_max.replace(
-            day=calendar.monthrange(data_max.year, data_max.month)[1]
-        )
-        default_end = data_max_month_end
-    else:
-        default_end = ay_end_raw
-    prev_month_start = ay_start
+    curr_month_start = date(data_max.year, data_max.month, 1)
+    curr_month_end = data_max.replace(
+        day=calendar.monthrange(data_max.year, data_max.month)[1]
+    )
+    prev_month_start = curr_month_start
     # month_opts uses "%Y-%m-%d" (first day of month) as values
-    prev_month_val = ay_start.strftime("%Y-%m-%d")
-    prev_month_end = default_end
+    prev_month_val = curr_month_start.strftime("%Y-%m-%d")
+    prev_month_end = curr_month_end
     # End dropdown uses first-of-month value; JS converts to last day on the fly
-    default_end_val = date(default_end.year, default_end.month, 1).strftime("%Y-%m-%d")
+    default_end_val = curr_month_start.strftime("%Y-%m-%d")
 
     month_opts = _month_options(_dig_min.date(), _dig_max.date())
 
