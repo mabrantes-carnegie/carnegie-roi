@@ -3007,12 +3007,13 @@ def digital_server(input, output, session):
         df = _dig_notes()
         view = input.insights_view()
         if view == "performance":
-            df = df[df["note_type"].isin([
-                "Performance", "Performance with Recommendation",
-                "Campaign Launch", "Budget", "Key Dates",
-            ])]
+            df = df[df["note_type"].str.contains("Performance", case=False, na=False)]
         else:
-            df = df[df["note_type"].isin(["Optimization", "Campaign Launch"])]
+            df = df[
+                (df["note_type"] == "Optimization")
+                | df["note_type"].str.contains("Campaign", case=False, na=False)
+                | df["note_type"].str.contains("Budget", case=False, na=False)
+            ]
         # Text search filter
         search = str(input.insights_search()).strip().lower()
         if search:
