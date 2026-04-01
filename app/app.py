@@ -596,17 +596,30 @@ page_programs = ui.nav_panel(
 def _digital_filters():
     """Shared filter bar for digital performance page."""
     import calendar
-    # Default: previous month (first day → last day)
-    today = date.today()
-    if today.month == 1:
-        prev_month_start = date(today.year - 1, 12, 1)
+    # Default: current academic year (Jul Y → Jun Y+1), capped at latest available data.
+    # Academic year is determined from _dig_max: if max data >= Jul 1 of its year,
+    # the academic year started that Jul; otherwise it started Jul of the prior year.
+    # This automatically rolls over when data beyond Jun of the current cycle arrives.
+    data_max = _dig_max.date()
+    if data_max.month >= 7:
+        ay_start = date(data_max.year, 7, 1)
     else:
-        prev_month_start = date(today.year, today.month - 1, 1)
-    prev_month_val = prev_month_start.strftime("%Y-%m-%d")
-    prev_month_end = prev_month_start.replace(
-        day=calendar.monthrange(prev_month_start.year, prev_month_start.month)[1]
-    )
-    default_end_val = prev_month_val
+        ay_start = date(data_max.year - 1, 7, 1)
+    ay_end_raw = date(ay_start.year + 1, 6, 30)
+    # Cap end at the last available data month (use last day of that month)
+    if data_max < ay_end_raw:
+        data_max_month_end = data_max.replace(
+            day=calendar.monthrange(data_max.year, data_max.month)[1]
+        )
+        default_end = data_max_month_end
+    else:
+        default_end = ay_end_raw
+    prev_month_start = ay_start
+    # month_opts uses "%Y-%m-%d" (first day of month) as values
+    prev_month_val = ay_start.strftime("%Y-%m-%d")
+    prev_month_end = default_end
+    # End dropdown uses first-of-month value; JS converts to last day on the fly
+    default_end_val = date(default_end.year, default_end.month, 1).strftime("%Y-%m-%d")
 
     month_opts = _month_options(_dig_min.date(), _dig_max.date())
 
