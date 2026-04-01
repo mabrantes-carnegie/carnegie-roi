@@ -1011,6 +1011,7 @@ page_digital = ui.nav_menu(
                 _dig_kpi_card("Enroll / Deposit", "cat_enroll", "#E8B9A4"),
                 _dig_kpi_card("Other", "cat_other", "#8B1A1A"),
                 class_="funnel-strip",
+                style="grid-template-columns:repeat(5, 1fr);",
             ),
             # Cost Metrics collapsible row
             ui.tags.div(

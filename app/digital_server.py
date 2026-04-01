@@ -1636,6 +1636,7 @@ def digital_server(input, output, session):
             *badges,
             id="int-cost-metrics-row",
             class_="secondary-row collapsible-row",
+            style="display:grid; grid-template-columns:repeat(5, 1fr);",
             title="Cost metrics use total campaign budget divided by category interaction volume.",
         )
 
