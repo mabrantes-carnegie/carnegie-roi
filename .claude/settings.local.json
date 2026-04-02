@@ -78,7 +78,12 @@
       "Read(//c/Users/mabrantes/**)",
       "Bash(/c/Users/mabrantes/AppData/Local/uv/cache/archive-v0/6Geu6903yVphaKkV8SXp7/Scripts/python.exe -c \":*)",
       "Bash(find /c/Users/mabrantes -path */site-packages/pandas -type d)",
-      "Bash(pip list:*)"
+      "Bash(pip list:*)",
+      "Bash(.venv/Scripts/python -c \"import app.app\")",
+      "Bash(python -c \"import app.digital_server; print\\('OK'\\)\")",
+      "Bash(python -c ':*)",
+      "Bash(py -3.12 -c ':*)",
+      "Bash(.venv/Scripts/python.exe -c ':*)"
     ]
   }
 }

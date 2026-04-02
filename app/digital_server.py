@@ -6,7 +6,7 @@ from shiny import render, reactive, ui, req
 import plotly.graph_objects as go
 from urllib.request import urlopen, Request
 
-from digital_data import Q8, Q9, Q10, Q11_CREATIVE, Q11_KEYWORDS, Q12
+from digital_data import Q8, Q9, Q10, Q11_CREATIVE, Q11_KEYWORDS, Q11_YOUTUBE, Q12
 from formatters import fmt_number, fmt_currency, fmt_compact
 
 # ── Image cache: URL → base64 data URI (fetched once, reused) ────
@@ -370,6 +370,28 @@ def _safe_div(num, denom):
     return (num / denom) if denom and denom > 0 else None
 
 
+def _fmt_digital_count(n, compact=False):
+    """Format Digital Performance count metrics as rounded whole numbers."""
+    if n is None or (isinstance(n, float) and pd.isna(n)):
+        return "—"
+    rounded = round(n)
+    if compact:
+        abs_val = abs(rounded)
+        if abs_val >= 1_000_000_000:
+            v = rounded / 1_000_000_000
+            s = f"{v:.1f}B"
+            return s[:-2] + "B" if s.endswith(".0B") else s
+        if abs_val >= 1_000_000:
+            v = rounded / 1_000_000
+            s = f"{v:.1f}M"
+            return s[:-2] + "M" if s.endswith(".0M") else s
+        if abs_val >= 1_000:
+            v = rounded / 1_000
+            s = f"{v:.1f}K"
+            return s[:-2] + "K" if s.endswith(".0K") else s
+    return f"{rounded:,}"
+
+
 def _fmt_delta(curr, prev, invert=False):
     """Build a YoY/MoM delta badge. invert=True means down is good (cost)."""
     if prev is None or prev == 0 or curr is None:
@@ -562,7 +584,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_key_interactions():
         v = _dig_q8()["total_interactions"].sum()
-        return fmt_compact(v)
+        return _fmt_digital_count(v, compact=True)
 
     @render.ui
     def dig_key_interactions_delta():
@@ -585,7 +607,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_inquiry_int():
         v = _dig_q9()[_dig_q9()["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum()
-        return fmt_compact(v)
+        return _fmt_digital_count(v, compact=True)
 
     @render.ui
     def dig_inquiry_int_delta():
@@ -597,7 +619,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_visit_int():
         v = _dig_q9()[_dig_q9()["interaction_category"] == "Visit/Event"]["total_interactions"].sum()
-        return fmt_compact(v)
+        return _fmt_digital_count(v, compact=True)
 
     @render.ui
     def dig_visit_int_delta():
@@ -609,7 +631,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_apply_int():
         v = _dig_q9()[_dig_q9()["interaction_category"] == "Apply"]["total_interactions"].sum()
-        return fmt_compact(v)
+        return _fmt_digital_count(v, compact=True)
 
     @render.ui
     def dig_apply_int_delta():
@@ -644,7 +666,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_direct_conv():
-        return fmt_compact(_dig_q8()['direct_conversions'].sum())
+        return _fmt_digital_count(_dig_q8()['direct_conversions'].sum(), compact=True)
 
     @render.ui
     def dig_direct_conv_delta():
@@ -669,7 +691,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_ipl():
-        return fmt_number(_dig_q8()["in_platform_leads"].sum())
+        return _fmt_digital_count(_dig_q8()["in_platform_leads"].sum(), compact=True)
 
     @render.ui
     def dig_ipl_delta():
@@ -694,7 +716,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_vtc():
-        return fmt_number(_dig_q8()["view_through_conversions"].sum())
+        return _fmt_digital_count(_dig_q8()["view_through_conversions"].sum(), compact=True)
 
     @render.ui
     def dig_vtc_delta():
@@ -902,7 +924,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_impressions_yoy():
-        return fmt_number(_dig_q8()["impressions"].sum())
+        return _fmt_digital_count(_dig_q8()["impressions"].sum(), compact=True)
 
     @render.ui
     def dig_impressions_yoy_delta():
@@ -910,7 +932,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_clicks_yoy():
-        return fmt_number(_dig_q8()["clicks"].sum())
+        return _fmt_digital_count(_dig_q8()["clicks"].sum(), compact=True)
 
     @render.ui
     def dig_clicks_yoy_delta():
@@ -933,7 +955,7 @@ def digital_server(input, output, session):
     def dig_total_conv_yoy():
         df = _dig_q8()
         v = df["direct_conversions"].sum() + df["view_through_conversions"].sum() + df["in_platform_leads"].sum()
-        return fmt_number(v)
+        return _fmt_digital_count(v, compact=True)
 
     @render.ui
     def dig_total_conv_yoy_delta():
@@ -961,7 +983,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_key_interactions_yoy():
         v = _dig_q8()["total_interactions"].sum()
-        return fmt_compact(v)
+        return _fmt_digital_count(v, compact=True)
 
     @render.ui
     def dig_key_interactions_delta_yoy():
@@ -984,7 +1006,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_inquiry_int_yoy():
         v = _dig_q9()[_dig_q9()["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum()
-        return fmt_compact(v)
+        return _fmt_digital_count(v, compact=True)
 
     @render.ui
     def dig_inquiry_int_delta_yoy():
@@ -996,7 +1018,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_visit_int_yoy():
         v = _dig_q9()[_dig_q9()["interaction_category"] == "Visit/Event"]["total_interactions"].sum()
-        return fmt_compact(v)
+        return _fmt_digital_count(v, compact=True)
 
     @render.ui
     def dig_visit_int_delta_yoy():
@@ -1008,7 +1030,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_apply_int_yoy():
         v = _dig_q9()[_dig_q9()["interaction_category"] == "Apply"]["total_interactions"].sum()
-        return fmt_compact(v)
+        return _fmt_digital_count(v, compact=True)
 
     @render.ui
     def dig_apply_int_delta_yoy():
@@ -1041,7 +1063,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_direct_conv_yoy():
-        return fmt_compact(_dig_q8()['direct_conversions'].sum())
+        return _fmt_digital_count(_dig_q8()['direct_conversions'].sum(), compact=True)
 
     @render.ui
     def dig_direct_conv_yoy_delta():
@@ -1063,7 +1085,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_ipl_yoy():
-        return fmt_number(_dig_q8()["in_platform_leads"].sum())
+        return _fmt_digital_count(_dig_q8()["in_platform_leads"].sum(), compact=True)
 
     @render.ui
     def dig_ipl_yoy_delta():
@@ -1085,7 +1107,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_vtc_yoy():
-        return fmt_number(_dig_q8()["view_through_conversions"].sum())
+        return _fmt_digital_count(_dig_q8()["view_through_conversions"].sum(), compact=True)
 
     @render.ui
     def dig_vtc_yoy_delta():
@@ -1535,7 +1557,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_cat_rfi():
-        return fmt_compact(_dig_q9()[_dig_q9()['interaction_category'] == 'RFI/Lead Gen']['total_interactions'].sum())
+        return _fmt_digital_count(_dig_q9()[_dig_q9()['interaction_category'] == 'RFI/Lead Gen']['total_interactions'].sum(), compact=True)
 
     @render.ui
     def dig_cat_rfi_delta():
@@ -1546,7 +1568,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_cat_visit():
-        return fmt_compact(_dig_q9()[_dig_q9()['interaction_category'] == 'Visit/Event']['total_interactions'].sum())
+        return _fmt_digital_count(_dig_q9()[_dig_q9()['interaction_category'] == 'Visit/Event']['total_interactions'].sum(), compact=True)
 
     @render.ui
     def dig_cat_visit_delta():
@@ -1557,7 +1579,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_cat_apply():
-        return fmt_compact(_dig_q9()[_dig_q9()['interaction_category'] == 'Apply']['total_interactions'].sum())
+        return _fmt_digital_count(_dig_q9()[_dig_q9()['interaction_category'] == 'Apply']['total_interactions'].sum(), compact=True)
 
     @render.ui
     def dig_cat_apply_delta():
@@ -1568,7 +1590,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_cat_enroll():
-        return fmt_compact(_dig_q9()[_dig_q9()['interaction_category'] == 'Enroll/Deposit']['total_interactions'].sum())
+        return _fmt_digital_count(_dig_q9()[_dig_q9()['interaction_category'] == 'Enroll/Deposit']['total_interactions'].sum(), compact=True)
 
     @render.ui
     def dig_cat_enroll_delta():
@@ -1579,7 +1601,7 @@ def digital_server(input, output, session):
 
     @render.text
     def dig_cat_other():
-        return fmt_compact(_dig_q9()[_dig_q9()['interaction_category'] == 'Other']['total_interactions'].sum())
+        return _fmt_digital_count(_dig_q9()[_dig_q9()['interaction_category'] == 'Other']['total_interactions'].sum(), compact=True)
 
     @render.ui
     def dig_cat_other_delta():
@@ -1980,8 +2002,8 @@ def digital_server(input, output, session):
         try:
             metric = input.dig_geo_metric()
         except Exception:
-            metric = "impressions"
-        label = _DIG_GEO_METRIC_LABELS.get(metric, "Impressions by state")
+            metric = "total_conversions"
+        label = _DIG_GEO_METRIC_LABELS.get(metric, "Total Interactions by state")
         return ui.tags.h2(label, class_="section-heading", style="margin:0;")
 
     @render.ui
@@ -1993,8 +2015,8 @@ def digital_server(input, output, session):
         try:
             metric = input.dig_geo_metric()
         except Exception:
-            metric = "impressions"
-        metric_short = _DIG_GEO_METRIC_SHORT.get(metric, "Impressions")
+            metric = "total_conversions"
+        metric_short = _DIG_GEO_METRIC_SHORT.get(metric, "Total Key Int.")
 
         # Region is now sanitized to 2-letter state codes, "International", or "Unknown"
         state_df = df[~df["region"].isin(["Unknown", "International", ""])].copy()
@@ -2007,17 +2029,18 @@ def digital_server(input, output, session):
 
         import numpy as _np
         z_raw = map_df["value"].fillna(0)
+        z_display = z_raw.round(0).astype(int)
         _POW = 0.3
         z_log = z_raw ** _POW
         _max_raw = z_raw.max()
         _tick_vals = [v ** _POW for v in [0, _max_raw * 0.1, _max_raw * 0.3, _max_raw * 0.6, _max_raw]]
-        _tick_text = [f"{int(v):,}" for v in [0, _max_raw * 0.1, _max_raw * 0.3, _max_raw * 0.6, _max_raw]]
+        _tick_text = [_fmt_digital_count(v) for v in [0, _max_raw * 0.1, _max_raw * 0.3, _max_raw * 0.6, _max_raw]]
 
         fig = go.Figure(go.Choropleth(
             locations=map_df["abbr"],
             locationmode="USA-states",
             z=z_log,
-            customdata=z_raw,
+            customdata=z_display,
             colorscale=[
                 [0, "#FFFFFF"], [0.3, "#FADADB"],
                 [0.6, "#F08080"], [1, "#EA332D"],
@@ -2051,7 +2074,7 @@ def digital_server(input, output, session):
         if not label_rows.empty:
             lats = [_DIG_STATE_CENTROIDS[s][0] for s in label_rows["abbr"]]
             lons = [_DIG_STATE_CENTROIDS[s][1] for s in label_rows["abbr"]]
-            texts = [f"{s}<br>{int(v):,}" for s, v in zip(label_rows["abbr"], label_rows["value"])]
+            texts = [f"{s}<br>{_fmt_digital_count(v)}" for s, v in zip(label_rows["abbr"], label_rows["value"])]
             fig.add_scattergeo(
                 lat=lats, lon=lons, text=texts, mode="text",
                 textfont=dict(family="Manrope, sans-serif", size=9, color="#1A1A1A"),
@@ -2063,7 +2086,7 @@ def digital_server(input, output, session):
         top_rows = [
             ui.tags.div(
                 ui.tags.span(row["abbr"]),
-                ui.tags.span(f"{int(row['value']):,}", class_="count"),
+                ui.tags.span(_fmt_digital_count(row["value"]), class_="count"),
                 class_="top-state-row",
             )
             for _, row in top_states.iterrows()
@@ -2088,7 +2111,7 @@ def digital_server(input, output, session):
         try:
             metric = input.dig_geo_metric()
         except Exception:
-            metric = "impressions"
+            metric = "total_conversions"
         metrics = ["impressions", "clicks", "direct_conversions",
                    "view_through_conversions", "total_conversions"]
         agg = df.groupby("region")[metrics].sum().reset_index()
@@ -2098,8 +2121,8 @@ def digital_server(input, output, session):
         total_impr = agg["impressions"].sum()
         intl_row = agg[agg["region"] == "International"]
         unk_row = agg[agg["region"] == "Unknown"]
-        intl_impr = int(intl_row["impressions"].sum()) if not intl_row.empty else 0
-        unk_impr = int(unk_row["impressions"].sum()) if not unk_row.empty else 0
+        intl_impr = round(intl_row["impressions"].sum()) if not intl_row.empty else 0
+        unk_impr = round(unk_row["impressions"].sum()) if not unk_row.empty else 0
         intl_pct = (intl_impr / total_impr * 100) if total_impr > 0 else 0
         unk_pct = (unk_impr / total_impr * 100) if total_impr > 0 else 0
 
@@ -2112,13 +2135,13 @@ def digital_server(input, output, session):
         summary_badges = ui.tags.div(
             ui.tags.div(
                 ui.tags.span("International", style="color:#6b7280;font-weight:600;"),
-                ui.tags.span(f"{intl_impr:,}", style="color:#021326;"),
+                ui.tags.span(_fmt_digital_count(intl_impr), style="color:#021326;"),
                 ui.tags.span(f"({intl_pct:.1f}%)", style="color:#9B9893;font-size:11px;"),
                 style=badge_style + "background:#f0f7ff;border:1px solid #d0e3f7;",
             ),
             ui.tags.div(
                 ui.tags.span("Unknown", style="color:#6b7280;font-weight:600;"),
-                ui.tags.span(f"{unk_impr:,}", style="color:#021326;"),
+                ui.tags.span(_fmt_digital_count(unk_impr), style="color:#021326;"),
                 ui.tags.span(f"({unk_pct:.1f}%)", style="color:#9B9893;font-size:11px;"),
                 style=badge_style + "background:#fef3c7;border:1px solid #f0dfa0;",
             ),
@@ -2154,7 +2177,7 @@ def digital_server(input, output, session):
         "display": _CRV_DISPLAY_PRODUCTS,
         "meta": {"Facebook/Instagram", "Meta"},
         "linkedin": {"LinkedIn"},
-        "youtube": {"YouTube"},
+        "youtube": {"YouTube", "Youtube"},
         "snapchat": {"Snapchat Snap Ads", "Snapchat"},
         "tiktok": {"TikTok"},
         "spotify": {"Spotify"},
@@ -2181,6 +2204,32 @@ def digital_server(input, output, session):
             return "display"
 
     @reactive.calc
+    def _crv_display_view():
+        """Return 'ad_group' or 'ad_size' for the Display Creative subtoggle."""
+        try:
+            return input.crv_display_view()
+        except Exception:
+            return "ad_group"
+
+    @render.ui
+    def crv_display_subtoggle():
+        if _crv_sub_tab() != "display":
+            return None
+        return ui.tags.div(
+            ui.input_radio_buttons(
+                "crv_display_view", None,
+                choices={
+                    "ad_group": "Display Creative",
+                    "ad_size": "Display Creative by Ad Size",
+                },
+                selected="ad_group",
+                inline=True,
+            ),
+            class_="insight-segmented",
+            style="margin-top:8px;",
+        )
+
+    @reactive.calc
     def _crv_is_ppc():
         return _crv_sub_tab() == "ppc"
 
@@ -2194,32 +2243,70 @@ def digital_server(input, output, session):
             # Exclude Reddit
             df = df[~df["product_name"].str.contains("Reddit", case=False, na=False)]
             return df
+        if sub == "youtube":
+            # YouTube uses its own daily-grain CSV
+            df = Q11_YOUTUBE.copy()
+            period = input.dig_period()
+            if period and len(period) == 2:
+                start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
+                df = df[(df["day"] >= start) & (df["day"] <= end)]
+            grp = input.dig_group()
+            if grp and len(grp) > 0 and "group_name" in df.columns:
+                df = df[df["group_name"].isin(grp)]
+            sub_grp = input.dig_subgroup()
+            if sub_grp and len(sub_grp) > 0 and "subgroup_name" in df.columns:
+                df = df[df["subgroup_name"].isin(sub_grp)]
+            prod = input.dig_product()
+            if prod and len(prod) > 0 and "product_name" in df.columns:
+                df = df[df["product_name"].isin(prod)]
+            camp = input.dig_campaign()
+            if camp and len(camp) > 0 and "campaign_name" in df.columns:
+                df = df[df["campaign_name"].isin(camp)]
+            return df
         # All other subs use creative data
         df = _apply_dig_filters_monthly(Q11_CREATIVE.copy())
         products = _CRV_SUB_PRODUCT_MAP.get(sub)
         if products:
             df = df[df["product_name"].isin(products)]
+        # Display subtoggle filter
+        if sub == "display":
+            view = _crv_display_view()
+            if view == "ad_size":
+                df = df[df["creative"].notna() & (df["creative"].str.strip() != "")]
+            else:
+                df = df[df["ad_group"].notna() & (df["ad_group"].str.strip() != "")]
         return df
 
     @reactive.calc
     def _crv_base_prior():
         """Prior period for creative data — shift date range back by 1 month (MoM)."""
         sub_tab = _crv_sub_tab()
-        source = Q11_KEYWORDS.copy() if sub_tab == "ppc" else Q11_CREATIVE.copy()
-        df = source
-        period = input.dig_period()
-        if period and len(period) == 2:
-            start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
-            prior_start = start - pd.DateOffset(months=1)
-            prior_end = end - pd.DateOffset(months=1)
-            df["_month_start"] = pd.to_datetime(
-                df["event_year"].astype(str) + "-" + df["event_month"].astype(str).str.zfill(2) + "-01"
-            )
-            df = df[(df["_month_start"] >= prior_start.replace(day=1)) &
-                    (df["_month_start"] <= prior_end)]
-            df = df.drop(columns=["_month_start"])
+        if sub_tab == "youtube":
+            df = Q11_YOUTUBE.copy()
+            period = input.dig_period()
+            if period and len(period) == 2:
+                start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
+                prior_start = start - pd.DateOffset(months=1)
+                prior_end = end - pd.DateOffset(months=1)
+                df = df[(df["day"] >= prior_start) & (df["day"] <= prior_end)]
+            else:
+                df = df.iloc[0:0]
         else:
-            df = df.iloc[0:0]
+            source = Q11_KEYWORDS.copy() if sub_tab == "ppc" else Q11_CREATIVE.copy()
+            df = source
+            period = input.dig_period()
+            if period and len(period) == 2:
+                start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
+                prior_start = start - pd.DateOffset(months=1)
+                prior_end = end - pd.DateOffset(months=1)
+                df["_month_start"] = pd.to_datetime(
+                    df["event_year"].astype(str) + "-" + df["event_month"].astype(str).str.zfill(2) + "-01"
+                )
+                df = df[(df["_month_start"] >= prior_start.replace(day=1)) &
+                        (df["_month_start"] <= prior_end)]
+                df = df.drop(columns=["_month_start"])
+            else:
+                df = df.iloc[0:0]
         # Apply same global filters
         grp = input.dig_group()
         if grp and len(grp) > 0 and "group_name" in df.columns:
@@ -2240,6 +2327,13 @@ def digital_server(input, output, session):
             products = _CRV_SUB_PRODUCT_MAP.get(sub_tab)
             if products and "product_name" in df.columns:
                 df = df[df["product_name"].isin(products)]
+        # Display subtoggle filter
+        if sub_tab == "display":
+            view = _crv_display_view()
+            if view == "ad_size":
+                df = df[df["creative"].notna() & (df["creative"].str.strip() != "")]
+            else:
+                df = df[df["ad_group"].notna() & (df["ad_group"].str.strip() != "")]
         return df
 
     def _crv_aggregate(df):
@@ -2253,13 +2347,58 @@ def digital_server(input, output, session):
             num_agg = {c: "sum" for c in ["impressions", "clicks", "direct_conversions",
                                            "budget"] if c in df.columns}
         else:
-            grp_cols = ["campaign_name", "ad_group", "product_name",
-                        "platform_campaign_name", "group_name", "subgroup_name"]
-            str_agg = {c: "first" for c in ["creative", "ad_description", "image_url",
-                                             "preview_url", "ad_url"] if c in df.columns}
+            # Meta and Display ad_size view: group by creative instead of ad_group
+            sub_tab_agg = _crv_sub_tab()
+            if sub_tab_agg == "youtube":
+                grp_cols = ["platform_campaign_name", "campaign_name", "creative",
+                            "image_url", "ad_url"]
+                str_agg = {c: "first" for c in ["ad_group", "ad_description", "preview_url",
+                                                 "group_name", "subgroup_name", "product_name"] if c in df.columns}
+                num_agg = {c: "sum" for c in ["impressions", "clicks", "direct_conversions",
+                                               "view_through_conversions", "in_platform_leads",
+                                               "total_conversions", "budget",
+                                               "video_starts", "video_completions",
+                                               ] if c in df.columns}
+                if "video_avg" in df.columns:
+                    num_agg["video_avg"] = "mean"
+                valid_grp = [c for c in grp_cols if c in df.columns]
+                agged = df.groupby(valid_grp, as_index=False, dropna=False).agg({**str_agg, **num_agg})
+                if "impressions" in agged.columns and "clicks" in agged.columns:
+                    agged["ctr"] = (agged["clicks"] / agged["impressions"].replace(0, float("nan")) * 100).round(2)
+                else:
+                    agged["ctr"] = 0.0
+                return agged
+            display_view = _crv_display_view() if sub_tab_agg == "display" else None
+            exact_creative_tabs = {"meta", "linkedin", "snapchat", "tiktok", "spotify", "reddit"}
+            use_exact_creative_grain = sub_tab_agg in exact_creative_tabs
+            use_creative_grain = (display_view == "ad_size") or (sub_tab_agg == "meta")
+            if use_exact_creative_grain:
+                grp_cols = ["platform_campaign_name", "campaign_name", "creative",
+                            "image_url", "ad_url"]
+                str_agg = {c: "first" for c in ["ad_group", "ad_description", "preview_url",
+                                                 "group_name", "subgroup_name", "product_name"] if c in df.columns}
+            elif use_creative_grain:
+                grp_cols = ["campaign_name", "creative", "product_name",
+                            "platform_campaign_name", "group_name", "subgroup_name"]
+                str_agg = {c: "first" for c in ["ad_group", "ad_description", "image_url",
+                                                 "preview_url", "ad_url"] if c in df.columns}
+            else:
+                grp_cols = ["campaign_name", "ad_group", "product_name",
+                            "platform_campaign_name", "group_name", "subgroup_name"]
+                str_agg = {c: "first" for c in ["creative", "ad_description", "image_url",
+                                                 "preview_url", "ad_url"] if c in df.columns}
             num_agg = {c: "sum" for c in ["impressions", "clicks", "direct_conversions",
                                            "view_through_conversions", "in_platform_leads",
-                                           "total_conversions", "budget"] if c in df.columns}
+                                           "total_conversions", "budget",
+                                           "visits", "likes", "shares", "comments", "followers",
+                                           "video_starts", "video_completions",
+                                           ] if c in df.columns}
+            # video_avg is a pre-aggregated rate — take mean across rows in the group
+            if "video_avg" in df.columns:
+                num_agg["video_avg"] = "mean"
+            # ad_headline2 is text — preserve via str_agg if not already there
+            if "ad_headline2" in df.columns and "ad_headline2" not in str_agg:
+                str_agg["ad_headline2"] = "first"
         valid_grp = [c for c in grp_cols if c in df.columns]
         agged = df.groupby(valid_grp, as_index=False).agg({**str_agg, **num_agg})
         if "impressions" in agged.columns and "clicks" in agged.columns:
@@ -2338,7 +2477,7 @@ def digital_server(input, output, session):
     @render.text
     def dig_crv_impressions():
         df = _crv_agg()
-        return fmt_number(df["impressions"].sum() if not df.empty else 0)
+        return _fmt_digital_count(df["impressions"].sum() if not df.empty else 0, compact=True)
 
     @render.ui
     def dig_crv_impressions_delta():
@@ -2372,7 +2511,7 @@ def digital_server(input, output, session):
     def dig_crv_conversions():
         df = _crv_agg()
         col = "total_conversions" if "total_conversions" in df.columns else "direct_conversions"
-        return fmt_number(df[col].sum() if not df.empty and col in df.columns else 0)
+        return _fmt_digital_count(df[col].sum() if not df.empty and col in df.columns else 0, compact=True)
 
     @render.ui
     def dig_crv_conversions_delta():
@@ -2411,15 +2550,21 @@ def digital_server(input, output, session):
         """Format a numeric metric for display."""
         if pd.isna(val) or val == 0:
             return "0"
-        if val >= 1_000_000:
-            return f"{val/1_000_000:,.1f}M"
-        if val >= 10_000:
-            return f"{val/1_000:,.1f}K"
-        if val >= 1_000:
-            return f"{val:,.0f}"
-        if isinstance(val, float) and val != int(val):
-            return f"{val:,.2f}"
-        return f"{val:,.0f}"
+        rounded = round(val)
+        abs_val = abs(rounded)
+        if abs_val >= 1_000_000_000:
+            v = rounded / 1_000_000_000
+            s = f"{v:.1f}B"
+            return s[:-2] + "B" if s.endswith(".0B") else s
+        if abs_val >= 1_000_000:
+            v = rounded / 1_000_000
+            s = f"{v:.1f}M"
+            return s[:-2] + "M" if s.endswith(".0M") else s
+        if abs_val >= 1_000:
+            v = rounded / 1_000
+            s = f"{v:.1f}K"
+            return s[:-2] + "K" if s.endswith(".0K") else s
+        return f"{rounded:,}"
 
     def _creative_card(row, card_idx):
         """Build a single creative result card with expand/collapse."""
@@ -2433,6 +2578,7 @@ def digital_server(input, output, session):
         ad_url = str(row.get("ad_url", "")).strip()
         creative_text = str(row.get("creative", "")).strip()
         ad_desc = str(row.get("ad_description", "")).strip()
+        ad_headline2 = str(row.get("ad_headline2", "")).strip()
         tactic_short = tactic.split(" - ")[0] if tactic else ""
         creative_size = _extract_creative_size(creative_text)
 
@@ -2444,6 +2590,13 @@ def digital_server(input, output, session):
         vt = row.get("view_through_conversions", 0)
         total_conv = row.get("total_conversions", 0)
         conv_rate = row.get("conv_rate", 0)
+        in_platform_leads = row.get("in_platform_leads", 0)
+        video_avg = row.get("video_avg", 0)
+        visits_val = row.get("visits", 0)
+        likes_val = row.get("likes", 0)
+        shares_val = row.get("shares", 0)
+        comments_val = row.get("comments", 0)
+        followers_val = row.get("followers", 0)
 
         # ── Image data URI ──
         data_uri = None
@@ -2468,23 +2621,32 @@ def digital_server(input, output, session):
         # ══════════════════════════════════════
         image_box = ui.tags.div(_thumb(), class_="crv-card-image")
 
+        def _meta_text_row(label, value):
+            if not value:
+                return None
+            return ui.tags.div(
+                ui.tags.span(label, class_="crv-card-meta-label"),
+                ui.tags.span(value, class_="crv-card-meta-value"),
+                class_="crv-card-meta-row",
+            )
+
         text_children = []
         if sub_tab == "meta":
-            # Meta: Campaign Name, Ad Name, Description
             text_children.append(ui.tags.div(platform_campaign or campaign or "Untitled", class_="crv-card-title"))
-            if creative_text:
-                text_children.append(ui.tags.div(
-                    ui.tags.span("Ad Name: ", class_="crv-card-meta-label"),
-                    ui.tags.span(creative_text, class_="crv-card-meta-value"),
-                    class_="crv-card-meta-row",
-                ))
-            if ad_desc:
-                text_children.append(ui.tags.div(
-                    ui.tags.span("Description: ", class_="crv-card-meta-label"),
-                    ui.tags.span(ad_desc, class_="crv-card-meta-value"),
-                    class_="crv-card-meta-row",
-                ))
+            r = _meta_text_row("Ad Name: ", creative_text)
+            if r: text_children.append(r)
+            r = _meta_text_row("Description: ", ad_desc)
+            if r: text_children.append(r)
+        elif sub_tab in ("linkedin", "youtube"):
+            text_children.append(ui.tags.div(platform_campaign or campaign or "Untitled", class_="crv-card-title"))
+            r = _meta_text_row("Description: ", ad_headline2)
+            if r: text_children.append(r)
+        elif sub_tab in ("snapchat", "tiktok", "spotify", "reddit"):
+            text_children.append(ui.tags.div(platform_campaign or campaign or "Untitled", class_="crv-card-title"))
+            r = _meta_text_row("Description: ", creative_text)
+            if r: text_children.append(r)
         else:
+            # display sub-tabs
             text_children.append(ui.tags.div(campaign or "Untitled Creative", class_="crv-card-title"))
             if tactic:
                 text_children.append(ui.tags.div(
@@ -2492,12 +2654,21 @@ def digital_server(input, output, session):
                     ui.tags.span(tactic, class_="crv-card-meta-value"),
                     class_="crv-card-meta-row",
                 ))
-            if ad_group:
-                text_children.append(ui.tags.div(
-                    ui.tags.span("Ad Group: ", class_="crv-card-meta-label"),
-                    ui.tags.span(ad_group, class_="crv-card-meta-value"),
-                    class_="crv-card-meta-row",
-                ))
+            display_view = _crv_display_view() if sub_tab == "display" else None
+            if display_view == "ad_size":
+                if creative_size:
+                    text_children.append(ui.tags.div(
+                        ui.tags.span("Creative Size: ", class_="crv-card-meta-label"),
+                        ui.tags.span(creative_size, class_="crv-card-meta-value"),
+                        class_="crv-card-meta-row",
+                    ))
+            else:
+                if ad_group:
+                    text_children.append(ui.tags.div(
+                        ui.tags.span("Ad Group: ", class_="crv-card-meta-label"),
+                        ui.tags.span(ad_group, class_="crv-card-meta-value"),
+                        class_="crv-card-meta-row",
+                    ))
         text_section = ui.tags.div(*text_children, class_="crv-card-text")
 
         def _metric_cell(label, value):
@@ -2507,26 +2678,92 @@ def digital_server(input, output, session):
                 class_="crv-metric-cell",
             )
 
+        _ctr_fmt = f"{ctr:.2f}%" if pd.notna(ctr) else "—"
+        _cr_fmt = f"{conv_rate:.2f}%" if pd.notna(conv_rate) else "—"
+        _va_fmt = f"{video_avg:.2f}%" if pd.notna(video_avg) and video_avg else "—"
+
         if sub_tab == "meta":
-            # Meta: Impressions, Clicks, CTR, Direct Conv., View-through Conv., Total Conv.
             metrics_summary = ui.tags.div(
                 _metric_cell("Impressions", _fmt_metric(impr)),
                 _metric_cell("Clicks", _fmt_metric(clicks)),
-                _metric_cell("CTR", f"{ctr:.2f}%" if pd.notna(ctr) else "—"),
-                _metric_cell("Direct Conv.", _fmt_metric(direct)),
-                _metric_cell("View-through Conv.", _fmt_metric(vt)),
-                _metric_cell("Total Conv.", _fmt_metric(total_conv)),
+                _metric_cell("CTR", _ctr_fmt),
+                _metric_cell("Direct Int.", _fmt_metric(direct)),
+                _metric_cell("View-through Int.", _fmt_metric(vt)),
+                _metric_cell("Total Int.", _fmt_metric(total_conv)),
+                class_="crv-metric-grid",
+            )
+        elif sub_tab == "linkedin":
+            metrics_summary = ui.tags.div(
+                _metric_cell("Impressions", _fmt_metric(impr)),
+                _metric_cell("Clicks", _fmt_metric(clicks)),
+                _metric_cell("CTR", _ctr_fmt),
+                _metric_cell("Direct Int.", _fmt_metric(direct)),
+                _metric_cell("View-through Int.", _fmt_metric(vt)),
+                _metric_cell("In-Platform Leads", _fmt_metric(in_platform_leads)),
+                _metric_cell("Total Int.", _fmt_metric(total_conv)),
+                _metric_cell("Int. Rate", _cr_fmt),
+                class_="crv-metric-grid",
+            )
+        elif sub_tab == "youtube":
+            metrics_summary = ui.tags.div(
+                _metric_cell("Impressions", _fmt_metric(impr)),
+                _metric_cell("Clicks", _fmt_metric(clicks)),
+                _metric_cell("CTR", _ctr_fmt),
+                _metric_cell("YouTube View Rate", _va_fmt),
+                _metric_cell("View-through Int.", _fmt_metric(vt)),
+                _metric_cell("In-Platform Leads", _fmt_metric(in_platform_leads)),
+                _metric_cell("Total Int.", _fmt_metric(total_conv)),
+                _metric_cell("Int. Rate", _cr_fmt),
+                class_="crv-metric-grid",
+            )
+        elif sub_tab == "snapchat":
+            metrics_summary = ui.tags.div(
+                _metric_cell("Impressions", _fmt_metric(impr)),
+                _metric_cell("Clicks (Swipe Ups)", _fmt_metric(clicks)),
+                _metric_cell("CTR (Swipe Up Rate)", _ctr_fmt),
+                _metric_cell("Total Int.", _fmt_metric(total_conv)),
+                _metric_cell("Int. Rate", _cr_fmt),
+                class_="crv-metric-grid",
+            )
+        elif sub_tab == "tiktok":
+            metrics_summary = ui.tags.div(
+                _metric_cell("Impressions", _fmt_metric(impr)),
+                _metric_cell("Clicks", _fmt_metric(clicks)),
+                _metric_cell("CTR", _ctr_fmt),
+                _metric_cell("Total Int.", _fmt_metric(total_conv)),
+                _metric_cell("Int. Rate", _cr_fmt),
+                _metric_cell("Profile Visits", _fmt_metric(visits_val)),
+                _metric_cell("Likes", _fmt_metric(likes_val)),
+                _metric_cell("Shares", _fmt_metric(shares_val)),
+                _metric_cell("Comments", _fmt_metric(comments_val)),
+                _metric_cell("Followers", _fmt_metric(followers_val)),
+                class_="crv-metric-grid",
+            )
+        elif sub_tab == "spotify":
+            metrics_summary = ui.tags.div(
+                _metric_cell("Impressions", _fmt_metric(impr)),
+                _metric_cell("Clicks", _fmt_metric(clicks)),
+                _metric_cell("CTR", _ctr_fmt),
+                class_="crv-metric-grid",
+            )
+        elif sub_tab == "reddit":
+            metrics_summary = ui.tags.div(
+                _metric_cell("Impressions", _fmt_metric(impr)),
+                _metric_cell("Clicks", _fmt_metric(clicks)),
+                _metric_cell("CTR", _ctr_fmt),
+                _metric_cell("Total Int.", _fmt_metric(total_conv)),
                 class_="crv-metric-grid",
             )
         else:
-            # Default: Impressions, Clicks, CTR, View-through Conv., Total Conv., Conv. Rate
+            # display tabs
+            _is_display = sub_tab == "display"
             metrics_summary = ui.tags.div(
                 _metric_cell("Impressions", _fmt_metric(impr)),
                 _metric_cell("Clicks", _fmt_metric(clicks)),
-                _metric_cell("CTR", f"{ctr:.2f}%" if pd.notna(ctr) else "—"),
-                _metric_cell("View-through Conv.", _fmt_metric(vt)),
-                _metric_cell("Total Conv.", _fmt_metric(total_conv)),
-                _metric_cell("Conv. Rate", f"{conv_rate:.2f}%" if pd.notna(conv_rate) else "—"),
+                _metric_cell("CTR", _ctr_fmt),
+                _metric_cell("View-through Int." if _is_display else "View-through Conv.", _fmt_metric(vt)),
+                _metric_cell("Total Int." if _is_display else "Total Conv.", _fmt_metric(total_conv)),
+                _metric_cell("Int. Rate", _cr_fmt),
                 class_="crv-metric-grid",
             )
 
@@ -2569,23 +2806,59 @@ def digital_server(input, output, session):
             ui.tags.div(
                 _detail_metric("Impressions", _fmt_metric(impr)),
                 _detail_metric("Clicks", _fmt_metric(clicks)),
-                _detail_metric("CTR", f"{ctr:.2f}%" if pd.notna(ctr) else "—"),
+                _detail_metric("CTR", _ctr_fmt),
                 class_="crv-dm-grid",
             ),
             class_="crv-dm-group",
         )
 
-        conv_group = ui.tags.div(
-            ui.tags.div("Interactions", class_="crv-dm-group-title"),
-            ui.tags.div(
+        if sub_tab == "linkedin":
+            conv_detail_cells = [
+                _detail_metric("Direct Int.", _fmt_metric(direct)),
+                _detail_metric("View-through Int.", _fmt_metric(vt)),
+                _detail_metric("In-Platform Leads", _fmt_metric(in_platform_leads)),
+                _detail_metric("Total Int.", _fmt_metric(total_conv)),
+                _detail_metric("Int. Rate", _cr_fmt),
+            ]
+        elif sub_tab == "youtube":
+            conv_detail_cells = [
+                _detail_metric("YouTube View Rate", _va_fmt),
+                _detail_metric("View-through Int.", _fmt_metric(vt)),
+                _detail_metric("In-Platform Leads", _fmt_metric(in_platform_leads)),
+                _detail_metric("Total Int.", _fmt_metric(total_conv)),
+                _detail_metric("Int. Rate", _cr_fmt),
+            ]
+        elif sub_tab in ("snapchat", "tiktok"):
+            conv_detail_cells = [
+                _detail_metric("Total Int.", _fmt_metric(total_conv)),
+                _detail_metric("Int. Rate", _cr_fmt),
+            ]
+        elif sub_tab == "reddit":
+            conv_detail_cells = [
+                _detail_metric("Total Int.", _fmt_metric(total_conv)),
+            ]
+        elif sub_tab == "meta":
+            conv_detail_cells = [
+                _detail_metric("Direct Int.", _fmt_metric(direct)),
+                _detail_metric("View-through Int.", _fmt_metric(vt)),
+                _detail_metric("Total Int.", _fmt_metric(total_conv)),
+            ]
+        elif sub_tab == "spotify":
+            conv_detail_cells = []
+        else:
+            # display
+            conv_detail_cells = [
                 _detail_metric("Direct", _fmt_metric(direct)),
                 _detail_metric("View-through", _fmt_metric(vt)),
                 _detail_metric("Total", _fmt_metric(total_conv)),
-                _detail_metric("Int. Rate", f"{conv_rate:.2f}%" if pd.notna(conv_rate) else "—"),
-                class_="crv-dm-grid",
-            ),
+                _detail_metric("Int. Rate", _cr_fmt),
+            ]
+
+        conv_group = ui.tags.div(
+            ui.tags.div("Interactions", class_="crv-dm-group-title"),
+            ui.tags.div(*conv_detail_cells, class_="crv-dm-grid"),
             class_="crv-dm-group",
-        )
+        ) if conv_detail_cells else ""
 
         # Insight chips
         chips = []
@@ -2616,7 +2889,7 @@ def digital_server(input, output, session):
         if total_val > 0 and vt_val / total_val > 0.7:
             chips.append(("neutral", "High view-through share"))
 
-        if total_val == 0 and impr_val > 0:
+        if total_val == 0 and impr_val > 0 and sub_tab not in ("spotify",):
             chips.append(("warning", "No interactions recorded"))
 
         chip_els = [ui.tags.span(text, class_=f"crv-chip crv-chip--{tone}") for tone, text in chips]
@@ -2645,30 +2918,64 @@ def digital_server(input, output, session):
                 class_="crv-expand-meta-row",
             )
 
+        def _preview_row(label="Ad Preview", click_to_view=True):
+            if not (preview_url and preview_url.startswith("http")):
+                return None
+            link_text = "Click to View" if click_to_view else (
+                preview_url if len(preview_url) <= 50 else preview_url[:47] + "..."
+            )
+            return ui.tags.div(
+                ui.tags.span(label, class_="crv-expand-meta-key"),
+                ui.tags.a(link_text, href=preview_url, target="_blank", class_="crv-meta-link",
+                          title=preview_url),
+                class_="crv-expand-meta-row",
+            )
+
         if sub_tab == "meta":
-            # Ad Preview as clickable link
-            ad_preview_el = None
-            if preview_url and preview_url.startswith("http"):
-                ad_preview_el = ui.tags.div(
-                    ui.tags.span("Ad Preview", class_="crv-expand-meta-key"),
-                    ui.tags.a("Click to View", href=preview_url, target="_blank",
-                              class_="crv-meta-link"),
-                    class_="crv-expand-meta-row",
-                )
             meta_rows = [r for r in [
                 _meta_row("Landing Page", ad_url, is_link=True),
-                ad_preview_el,
+                _preview_row(click_to_view=True),
                 _meta_row("Image URL", image_url, is_link=True),
+            ] if r is not None]
+        elif sub_tab == "linkedin":
+            meta_rows = [r for r in [
+                _meta_row("Landing Page", ad_url, is_link=True),
+                _preview_row(click_to_view=True),
+            ] if r is not None]
+        elif sub_tab == "youtube":
+            meta_rows = [r for r in [
+                _meta_row("Landing Page", ad_url, is_link=True),
+            ] if r is not None]
+        elif sub_tab == "snapchat":
+            meta_rows = [r for r in [
+                _meta_row("Landing Page", ad_url, is_link=True),
+                _preview_row(click_to_view=True),
+            ] if r is not None]
+        elif sub_tab in ("tiktok", "spotify", "reddit"):
+            meta_rows = [r for r in [
+                _meta_row("Landing Page", ad_url, is_link=True),
+                _preview_row(click_to_view=False),
             ] if r is not None]
         else:
-            meta_rows = [r for r in [
-                _meta_row("Tactic", tactic),
-                _meta_row("Platform Campaign", platform_campaign),
-                _meta_row("Creative Size", creative_size) if creative_size else None,
-                _meta_row("Creative", creative_text) if creative_text else None,
-                _meta_row("Image URL", image_url, is_link=True),
-                _meta_row("Landing Page", ad_url, is_link=True),
-            ] if r is not None]
+            # display tabs
+            display_view_meta = _crv_display_view() if sub_tab == "display" else None
+            if display_view_meta == "ad_size":
+                meta_rows = [r for r in [
+                    _meta_row("Tactic", tactic),
+                    _meta_row("Platform Campaign", platform_campaign),
+                    _meta_row("Creative Size", creative_size) if creative_size else None,
+                    _meta_row("Creative", creative_text) if creative_text else None,
+                    _meta_row("Image URL", image_url, is_link=True),
+                    _meta_row("Landing Page", ad_url, is_link=True),
+                ] if r is not None]
+            else:
+                meta_rows = [r for r in [
+                    _meta_row("Tactic", tactic),
+                    _meta_row("Platform Campaign", platform_campaign),
+                    _meta_row("Ad Group", ad_group) if ad_group else None,
+                    _meta_row("Image URL", image_url, is_link=True),
+                    _meta_row("Landing Page", ad_url, is_link=True),
+                ] if r is not None]
 
         col_meta = ui.tags.div(
             ui.tags.div("Details", class_="crv-expand-meta-title"),
@@ -2732,7 +3039,10 @@ def digital_server(input, output, session):
         show_cols = [rename.get(c, c) for c in list(col_map.keys()) + metric_cols if rename.get(c, c) in display.columns]
         display = display[[c for c in show_cols if c in display.columns]]
         heatmap_cols = [c for c in show_cols if c not in text_cols]
-        return _heatmap_table(display, heatmap_cols, paginated=True)
+        return ui.tags.div(
+            _heatmap_table(display, heatmap_cols, paginated=True),
+            class_="carnegie-table-card",
+        )
 
     @render.ui
     def crv_card_list():

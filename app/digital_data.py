@@ -231,8 +231,10 @@ def _load_q10() -> pd.DataFrame:
 
 
 def _load_q11_creative() -> pd.DataFrame:
-    """Q11 — Digital creative (monthly grain by creative)."""
+    """Q11 — Digital creative (monthly grain by creative). Excludes YouTube (dedicated CSV)."""
     df = pd.read_csv(_DATA_DIR / "q11_digital_creative.csv")
+    # Exclude YouTube rows — served from q11_youtube_creative CSV instead
+    df = df[~df["product_name"].str.strip().isin({"YouTube", "Youtube"})]
     for col in ["group_name", "subgroup_name", "product_name",
                 "campaign_name", "platform_campaign_name",
                 "creative", "ad_description", "ad_url",
@@ -242,10 +244,31 @@ def _load_q11_creative() -> pd.DataFrame:
     for col in ["impressions", "clicks", "direct_conversions",
                 "view_through_conversions", "in_platform_leads",
                 "total_conversions", "cost", "budget",
-                "followers", "likes", "shares", "comments",
+                "followers", "likes", "shares", "comments", "visits",
                 "video_starts", "video_completions"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    return df
+
+
+def _load_q11_youtube() -> pd.DataFrame:
+    """Q11 — YouTube creative (daily grain, dedicated CSV)."""
+    df = pd.read_csv(_DATA_DIR / "q11_youtube_creative.csv")
+    df["day"] = pd.to_datetime(df["day"], errors="coerce")
+    for col in ["group_name", "subgroup_name", "product_name",
+                "campaign_name", "platform_campaign_name",
+                "creative", "ad_description", "ad_url",
+                "image_url", "preview_url", "ad_group"]:
+        if col in df.columns:
+            df[col] = df[col].fillna("").str.strip()
+    for col in ["impressions", "clicks", "direct_conversions",
+                "view_through_conversions", "in_platform_leads",
+                "total_conversions", "cost", "budget",
+                "video_starts", "video_completions"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    if "video_avg" in df.columns:
+        df["video_avg"] = pd.to_numeric(df["video_avg"], errors="coerce")
     return df
 
 
@@ -270,6 +293,7 @@ def _load_q12() -> pd.DataFrame:
                 "is_milestone", "notes", "created_by"]:
         if col in df.columns:
             df[col] = df[col].fillna("").str.strip()
+    df = df.drop_duplicates(subset=["day", "note_type", "notes"])
     return df
 
 
@@ -279,6 +303,7 @@ Q9 = _load_q9()
 Q10 = _sanitize_q10_regions(_load_q10())
 Q11_CREATIVE = _load_q11_creative()
 Q11_KEYWORDS = _load_q11_keywords()
+Q11_YOUTUBE = _load_q11_youtube()
 Q12 = _load_q12()
 
 
