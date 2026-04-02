@@ -82,78 +82,6 @@ _CW = (
 )
 
 
-# --- Sidebar overlay (collapsible, left slide) ---
-
-def _sidebar_overlay():
-    """Filter sidebar that slides in from the left as an overlay."""
-    return ui.tags.div(
-        # Semi-transparent backdrop
-        ui.tags.div(
-            class_="sidebar-backdrop",
-            onclick="document.body.classList.remove('sidebar-open');",
-        ),
-        # Sidebar panel
-        ui.tags.div(
-            # Header
-            ui.tags.div(
-                ui.tags.span("Filters", class_="sidebar-title"),
-                ui.tags.button(
-                    ui.tags.span("\u00d7"),
-                    class_="sidebar-close",
-                    onclick="document.body.classList.remove('sidebar-open');",
-                ),
-                class_="sidebar-header",
-            ),
-            # Filter controls
-            ui.tags.div(
-                ui.input_select(
-                    "institution", "Institution",
-                    choices=get_institutions(),
-                    selected="Central Washington University",
-                ),
-                ui.input_select(
-                    "term_year", "Term Year",
-                    choices=get_term_years(),
-                    selected="2026",
-                ),
-                ui.input_select(
-                    "term_semester", "Term Semester",
-                    choices=get_term_semesters(),
-                    selected="Fall",
-                ),
-                ui.input_selectize(
-                    "student_type", "Student Type",
-                    choices=["All"] + get_student_types(),
-                    selected=["All"],
-                    multiple=True,
-                ),
-                ui.input_switch(
-                    "is_international", "Include International",
-                    value=True,
-                ),
-                class_="sidebar-filters",
-            ),
-            # Reset link
-            ui.tags.div(
-                ui.tags.a(
-                    "Reset filters",
-                    href="#",
-                    class_="sidebar-reset",
-                    onclick=(
-                        "Shiny.setInputValue('institution','Central Washington University');"
-                        "Shiny.setInputValue('term_year','2026');"
-                        "Shiny.setInputValue('term_semester','Fall');"
-                        "return false;"
-                    ),
-                ),
-                class_="sidebar-footer",
-            ),
-            class_="sidebar-panel",
-        ),
-        class_="sidebar-overlay",
-    )
-
-
 # --- Funnel KPI card helper (6 primary cards in a strip) ---
 
 PRIMARY_FUNNEL = [
@@ -323,25 +251,11 @@ page_overview = ui.nav_panel(
 )
 
 
-# --- Page 2: Funnel Deep Dive ---
+# --- Funnel Deep Dive: Lead Source ---
 
 page_funnel = ui.nav_panel(
-    "Funnel Deep Dive",
+    "Lead Source",
     ui.tags.div(
-        # Page-specific filters
-        ui.tags.div(
-            ui.tags.div(
-                ui.input_selectize(
-                    "source_filter", "Lead Source",
-                    choices=[],
-                    multiple=True,
-                    options={"placeholder": "All"},
-                ),
-                class_="inline-filter",
-            ),
-            class_="page-filter-bar",
-        ),
-
         # Section 1: Funnel waterfall
         ui.tags.h2("Enrollment funnel", class_="section-heading"),
         ui.tags.div(
@@ -421,7 +335,151 @@ def _month_options(min_dt, max_dt):
     return opts
 
 
-# --- Page 4: Geography ---
+def _funnel_filters():
+    """Shared inline filter bar for ROI + Funnel pages, plus hidden synced inputs."""
+    today = date.today()
+    data_max = _dig_max.date()
+    period_start = date(today.year - 1, 7, 1)
+    period_end = date(data_max.year, data_max.month, 1)
+    period_start_val = period_start.strftime("%Y-%m-%d")
+    period_end_val = period_end.strftime("%Y-%m-%d")
+    month_opts = _month_options(_dig_min.date(), _dig_max.date())
+
+    def _month_select(select_id, default_val):
+        options = [
+            ui.tags.option(label, value=val, selected=(val == default_val))
+            for val, label in month_opts
+        ]
+        return ui.tags.div(
+            ui.tags.select(
+                *options,
+                id=select_id,
+                class_="ios-month-select",
+                onchange=(
+                    "var s=document.getElementById('funnel_month_start').value;"
+                    "var e=document.getElementById('funnel_month_end').value;"
+                    "var ep=e.split('-'); var ey=+ep[0]; var em=+ep[1];"
+                    "var lastDay=new Date(ey, em, 0).getDate();"
+                    "var endStr=ep[0]+'-'+ep[1]+'-'+lastDay.toString().padStart(2,'0');"
+                    "Shiny.setInputValue('geo_period',[s, endStr],{priority:'event'});"
+                    "Shiny.setInputValue('prog_period',[s, endStr],{priority:'event'});"
+                ),
+            ),
+            class_="ios-month-wrap",
+        )
+
+    return ui.tags.div(
+        # Month range picker — same structure as _digital_filters()
+        ui.tags.div(
+            ui.tags.span("Period", class_="ios-month-label"),
+            ui.tags.div(
+                _month_select("funnel_month_start", period_start_val),
+                ui.tags.span("\u2192", class_="ios-month-sep"),
+                _month_select("funnel_month_end", period_end_val),
+                class_="ios-month-row",
+            ),
+            class_="inline-filter ios-month-filter",
+        ),
+        ui.tags.div(
+            ui.input_selectize(
+                "program_name_filter", "Program",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            class_="inline-filter",
+        ),
+        ui.tags.div(
+            ui.input_selectize(
+                "student_type", "Student Type",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            class_="inline-filter",
+        ),
+        ui.tags.div(
+            ui.input_selectize(
+                "source_filter", "Lead Source",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            class_="inline-filter",
+        ),
+        # Hidden inputs needed by server logic
+        ui.tags.div(
+            ui.input_select(
+                "term_year", "Period",
+                choices=get_term_years(),
+                selected="2026",
+            ),
+            ui.input_select(
+                "term_semester", "Term Semester",
+                choices=get_term_semesters(),
+                selected="Fall",
+            ),
+            ui.input_select(
+                "institution", "Institution",
+                choices=get_institutions(),
+                selected="Central Washington University",
+            ),
+            ui.input_switch(
+                "is_international", "Include International",
+                value=True,
+            ),
+            ui.input_selectize(
+                "geo_program", "Program",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            ui.input_selectize(
+                "geo_student_type", "Student Type",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            ui.input_selectize(
+                "geo_lead_source", "Lead Source",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            ui.input_date_range(
+                "geo_period", None,
+                start=period_start,
+                end=period_end,
+                min=_dig_min.date(),
+                max=_dig_max.date(),
+            ),
+            ui.input_selectize(
+                "prog_student_type", "Student Type",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            ui.input_selectize(
+                "prog_lead_source", "Lead Source",
+                choices=[],
+                multiple=True,
+                options={"placeholder": "All"},
+            ),
+            ui.input_date_range(
+                "prog_period", None,
+                start=period_start,
+                end=period_end,
+                min=_dig_min.date(),
+                max=_dig_max.date(),
+            ),
+            style="display:none;",
+        ),
+        class_="page-filter-bar",
+        style="flex-wrap:wrap; gap:12px;",
+    )
+
+
+# --- Funnel Deep Dive: Funnel Geography ---
 
 def _geo_filters():
     """Filter bar for the Funnel Geography page — mirrors Programs filter bar."""
@@ -512,9 +570,8 @@ def _geo_filters():
 
 
 page_geography = ui.nav_panel(
-    "Geography",
+    "Funnel Geography",
     ui.tags.div(
-        _geo_filters(),
         ui.tags.div(
             ui.tags.div(
                 ui.output_ui("geo_map_title"),
@@ -555,11 +612,11 @@ page_geography = ui.nav_panel(
 )
 
 
-# --- Page 5: Digital Performance (5 sub-tabs) ---
+# --- Funnel Deep Dive: Program Breakdown ---
 
 
 def _programs_filters():
-    """Filter bar for the Programs page."""
+    """Filter bar for the Program Breakdown page."""
     import calendar
     today = date.today()
     data_max = _dig_max.date()
@@ -651,10 +708,8 @@ def _programs_filters():
 
 
 page_programs = ui.nav_panel(
-    "Programs",
+    "Program Breakdown",
     ui.tags.div(
-        # Program filter bar
-        _programs_filters(),
         # Program trending vs goal
         ui.tags.div(
             ui.tags.div(
@@ -1072,7 +1127,7 @@ page_digital = ui.nav_menu(
     ),
 
     ui.nav_panel(
-        "Geography",
+        "Digital Geography",
         _dig_page(ui.tags.div(
             ui.tags.div(
                 ui.tags.div(
@@ -1080,11 +1135,11 @@ page_digital = ui.nav_menu(
                     _pill_dropdown(
                         "dig_geo_metric",
                         {
-                            "impressions": "Impressions",
-                            "clicks": "Clicks",
                             "total_conversions": "Total Interactions",
+                            "clicks": "Clicks",
+                            "impressions": "Impressions",
                         },
-                        "impressions",
+                        "total_conversions",
                     ),
                     class_="card-header-row",
                 ),
@@ -1124,6 +1179,8 @@ page_digital = ui.nav_menu(
                 ),
                 class_="insight-segmented",
             ),
+            # ── Display Creative subtoggle (visible only for Display) ──
+            ui.output_ui("crv_display_subtoggle"),
             # ── KPI summary strip ──
             ui.tags.div(
                 _dig_kpi_card("Total Creatives", "crv_total", "#EA332D"),
@@ -1345,18 +1402,17 @@ page_digital = ui.nav_menu(
 )
 
 
-# --- Navbar title (hamburger + logo + dashboard name) ---
+page_funnel_menu = ui.nav_menu(
+    "Funnel Deep Dive",
+    page_programs,
+    page_funnel,
+    page_geography,
+)
+
+
+# --- Navbar title (logo + dashboard name) ---
 
 navbar_title = ui.tags.div(
-    # Hamburger button
-    ui.tags.button(
-        ui.tags.span(class_="hamburger-line"),
-        ui.tags.span(class_="hamburger-line"),
-        ui.tags.span(class_="hamburger-line"),
-        class_="hamburger-btn",
-        onclick="document.body.classList.toggle('sidebar-open');",
-        title="Toggle filters",
-    ),
     # Logo
     ui.tags.img(
         src="img/Carnegie-Logo-Black.png",
@@ -1374,15 +1430,13 @@ navbar_title = ui.tags.div(
 app_ui = ui.page_navbar(
     ui.nav_spacer(),
     page_overview,
-    page_funnel,
-    page_programs,
-    page_geography,
+    page_funnel_menu,
     page_digital,
     title=navbar_title,
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=42"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=43"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(src="paginated-tables.js?v=2"),
@@ -1395,6 +1449,7 @@ app_ui = ui.page_navbar(
             ui.tags.script("""
 (function() {
   var DIG_TABS  = ['Overview','Overview YoY','Interactions','dig_geography','Creative','Insights'];
+  var FUNNEL_TABS = ['ROI Overview','Program Breakdown','Lead Source','Funnel Geography'];
   // Tabs that default to academic-year start → current month
   var ACAD_TABS = ['Overview YoY', 'dig_geography', 'Creative'];
 
@@ -1470,6 +1525,8 @@ app_ui = ui.page_navbar(
   function _showHideBar(tabVal) {
     var bar = document.getElementById('dig-global-filters');
     if (bar) bar.style.display = DIG_TABS.indexOf(tabVal) !== -1 ? '' : 'none';
+    var funnelBar = document.getElementById('funnel-global-filters');
+    if (funnelBar) funnelBar.style.display = FUNNEL_TABS.indexOf(tabVal) !== -1 ? '' : 'none';
   }
 
   // Adjust period defaults when switching between Digital sub-tabs
@@ -1513,7 +1570,11 @@ app_ui = ui.page_navbar(
 })();
 """),
         ),
-        _sidebar_overlay(),
+        ui.tags.div(
+            _funnel_filters(),
+            id="funnel-global-filters",
+            style="display:none;",
+        ),
         # Digital filters rendered once globally
         ui.tags.div(
             _digital_filters(),

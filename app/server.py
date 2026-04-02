@@ -102,14 +102,20 @@ def server_logic(input, output, session):
         df = df[df["institution_name"] == input.institution()]
         df = df[df["term_semester"] == input.term_semester()]
         st = input.student_type()
-        if isinstance(st, (list, tuple)):
-            if "All" not in st and len(st) > 0:
-                df = df[df["student_type"].isin(st)]
-        elif st != "All":
-            df = df[df["student_type"] == st]
+        if isinstance(st, (list, tuple)) and len(st) > 0:
+            df = df[df["student_type"].isin(st)]
         if not input.is_international():
             df = df[df["is_international"] == False]  # noqa: E712
         return df
+
+    def _clean_program_label(name) -> str:
+        display = str(name).strip().title()
+        for old, new in [
+            ("Baed", "BAEd"), ("Bsba", "BSBA"), ("Bm ", "BM "),
+            ("Ems ", "EMS "), ("Pre ", "Pre-"),
+        ]:
+            display = display.replace(old, new)
+        return display
 
     @reactive.calc
     def filtered_main():
@@ -228,6 +234,19 @@ def server_logic(input, output, session):
     # ── Update filter choices ─────────────────────────────────
 
     @reactive.effect
+    def _update_student_type_choices():
+        """Populate Student Type filter from Q6 (unfiltered by student_type to avoid circularity)."""
+        df = Q6.copy()
+        df = df[df["institution_name"] == input.institution()]
+        df = df[df["term_semester"] == input.term_semester()]
+        df = df[df["term_year"] == int(input.term_year())]
+        if df.empty:
+            ui.update_selectize("student_type", choices=[], selected=[])
+            return
+        types = sorted([t for t in df["student_type"].dropna().unique().tolist() if t and t != "Unknown"])
+        ui.update_selectize("student_type", choices=types, selected=[])
+
+    @reactive.effect
     def _update_source_choices():
         """Populate Lead Source filter from Q6 origin_source_first, sorted alphabetically."""
         df = filtered_main()
@@ -273,6 +292,40 @@ def server_logic(input, output, session):
             return
         types = sorted([t for t in df["student_type"].dropna().unique().tolist() if t and t != "Unknown"])
         ui.update_selectize("geo_student_type", choices=types, selected=[])
+
+    @reactive.effect
+    def _sync_shared_lead_source_filter():
+        try:
+            selected = input.source_filter() or []
+        except Exception:
+            selected = []
+        ui.update_selectize("geo_lead_source", selected=selected)
+        ui.update_selectize("prog_lead_source", selected=selected)
+
+    @reactive.effect
+    def _sync_shared_student_type_filter():
+        try:
+            selected = input.student_type() or []
+        except Exception:
+            selected = []
+        ui.update_selectize("geo_student_type", selected=selected)
+        ui.update_selectize("prog_student_type", selected=selected)
+
+    @reactive.effect
+    def _sync_shared_program_filter():
+        try:
+            selected = input.program_name_filter() or []
+        except Exception:
+            selected = []
+        base = _apply_global_filters(Q6.copy())
+        raw_selected = []
+        if selected:
+            program_names = base["program_name"].dropna().tolist()
+            raw_selected = sorted({
+                raw for raw in program_names
+                if str(raw).strip() and _clean_program_label(raw) in selected
+            })
+        ui.update_selectize("geo_program", selected=raw_selected)
 
     # ══════════════════════════════════════════════════════════
     # KPI CALCULATIONS (from Q6)
