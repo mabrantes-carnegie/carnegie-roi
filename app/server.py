@@ -13,7 +13,7 @@ from metrics import (
     compute_geo_detail,
 )
 from formatters import fmt_number, fmt_pct, fmt_currency, fmt_yoy
-from digital_server import digital_server, _plain_table, _heatmap_table
+from digital_server import digital_server, _plain_table, _heatmap_table, _add_minmax_labels, _add_minmax_labels_all
 
 # ── Carnegie brand colors for Plotly ─────────────────────────
 
@@ -758,6 +758,9 @@ def server_logic(input, output, session):
             )
 
         fig.update_layout(**layout)
+        # Add min/max labels on the 2025-26 line in monthly mode
+        if mode == "monthly" and len(fig.data) > 0:
+            _add_minmax_labels(fig, trace_idx=0, color="#EA332D")
         return _plotly_html(fig)
 
     # --- Funnel at a Glance ---
@@ -1242,6 +1245,7 @@ def server_logic(input, output, session):
             font=dict(family="Manrope, sans-serif", size=10.5),
         )
         fig.update_layout(**layout)
+        _add_minmax_labels_all(fig)
         return _plotly_html(fig)
 
     # --- Conversion Rates by Source (Q2) ---
@@ -1544,6 +1548,7 @@ def server_logic(input, output, session):
             showgrid=False, title="",
         )
         fig.update_layout(**layout)
+        _add_minmax_labels(fig, trace_idx=0, color="#EA332D")
         return _plotly_html(fig)
 
     @render.ui
