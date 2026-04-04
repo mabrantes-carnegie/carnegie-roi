@@ -1,26 +1,27 @@
 institution_name,term_year,term_semester,lead_source,campaign_service,campaign_funnel_target,campaign_attributable,total_cost,total_inquiries,total_app_starts,total_app_submits,total_admits,total_deposits,total_net_deposits,total_enrolled
-Central Washington University,2025,Fall,Paid Search,DS: PPC (Fee/CPM) / Google,Enrollment,false,110624.08,929,1406,1376,1309,1181,965,1259
-Central Washington University,2026,Fall,Paid Search,DS: PPC (CPM) / Google,Enrollment,false,84486.28,831,1193,1144,1107,1051,1017,1075
-Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: IP Targeting / Semcasting,Enrollment,false,39020.39,921,1289,1258,1217,1115,886,1182
-Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: Display Retargeting (CPM) / Google DV360,Enrollment,false,38125.8,1358,1991,1951,1865,1684,1363,1801
-Central Washington University,2026,Fall,Programmatic Display & Streaming,DS: IP Targeting / Viant,Enrollment,false,36357.42,763,1110,1065,1028,977,946,999
-Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: Mobile Location Targeting / The Trade Desk,Enrollment,false,30798,534,923,911,838,753,648,798
-Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: Mobile Footprint / Semcasting,Enrollment,false,28320,94,126,125,121,104,82,117
-Central Washington University,2026,Fall,Clarity,DS: Clarity (Services) / Carnegie,Enrollment,false,26778,844,1210,1161,1124,1064,1029,1089
-Central Washington University,2025,Fall,Clarity,DS: Clarity / Carnegie,Enrollment,false,23778,718,1024,998,968,880,703,936
-Central Washington University,2026,Fall,Programmatic Display & Streaming,DS: Spotify (CPM) / Spotify,Enrollment,false,23600,380,530,505,489,466,447,478
-Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: Spotify (CPM) / Spotify,Enrollment,false,20650,316,411,405,394,353,277,387
-Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: YouTube Outreach (CPM) / Google DV360,Enrollment,false,19824,428,584,574,555,503,398,541
-Central Washington University,2026,Fall,Programmatic Display & Streaming,DS: YouTube Outreach (CPM) / Google DV360,Enrollment,false,18880,380,530,505,489,466,447,478
-Central Washington University,2026,Fall,Clarity,DS: Clarity (Licensing Fee - Medium Pricing) / BlueConic,Enrollment,false,15954.75,832,1195,1146,1109,1052,1017,1076
-Central Washington University,2025,Fall,Clarity,DS: Clarity (Licensing Fee - Small Pricing) / BlueConic,Enrollment,false,14472,718,1024,998,968,880,703,936
-Central Washington University,2026,Fall,Programmatic Display & Streaming,DS: Display Retargeting (CPM) / Google DV360,Enrollment,false,12619,831,1193,1144,1107,1051,1017,1075
-Central Washington University,2025,Fall,Analytics,DS: Analytics (Google Analytics 4 Advanced Consulting Package) / Carnegie,Enrollment,false,12500,138,181,180,174,148,117,170
+Central Washington University,2025,Fall,Paid Search,DS: PPC (Fee/CPM) / Google,Enrollment,false,110624.08,1861,3453,3366,3136,2812,2270,3022
+Central Washington University,2026,Fall,Paid Search,DS: PPC (CPM) / Google,Enrollment,false,95202.92,1499,2647,2498,2387,2253,2190,2307
+Central Washington University,2026,Fall,Programmatic Display & Streaming,DS: IP Targeting / Viant,Enrollment,false,40126.71,1381,2465,2322,2215,2093,2037,2141
+Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: IP Targeting / Semcasting,Enrollment,false,39020.39,1709,2841,2771,2666,2432,1855,2605
+Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: Display Retargeting (CPM) / Google DV360,Enrollment,false,38125.8,2679,4769,4652,4370,3929,3117,4229
+Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: Mobile Location Targeting / The Trade Desk,Enrollment,false,30798,1155,2446,2396,2148,1901,1657,2044
+Central Washington University,2026,Fall,Clarity,DS: Clarity (Services) / Carnegie,Enrollment,false,29670,1525,2689,2539,2426,2284,2220,2342
+Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: Mobile Footprint / Semcasting,Enrollment,false,28320,195,316,307,291,261,200,284
+Central Washington University,2025,Fall,Clarity,DS: Clarity / Carnegie,Enrollment,false,23778,1375,2356,2290,2182,1984,1537,2124
+Central Washington University,2026,Fall,Programmatic Display & Streaming,DS: Spotify (CPM) / Spotify,Enrollment,false,23600,690,1147,1091,1048,1001,964,1025
+Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: Spotify (CPM) / Spotify,Enrollment,false,20650,611,955,932,894,802,604,877
+Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: YouTube Outreach (CPM) / Google DV360,Enrollment,false,19824,817,1315,1285,1233,1117,847,1206
+Central Washington University,2026,Fall,Programmatic Display & Streaming,DS: YouTube Outreach (CPM) / Google DV360,Enrollment,false,18880,690,1147,1091,1048,1001,964,1025
+Central Washington University,2026,Fall,Clarity,DS: Clarity (Licensing Fee - Medium Pricing) / BlueConic,Enrollment,false,17727.5,1508,2667,2517,2404,2266,2202,2322
+Central Washington University,2025,Fall,Clarity,DS: Clarity (Licensing Fee - Small Pricing) / BlueConic,Enrollment,false,14472,1375,2356,2290,2182,1984,1537,2124
+Central Washington University,2026,Fall,Programmatic Display & Streaming,DS: Display Retargeting (CPM) / Google DV360,Enrollment,false,14243.25,1499,2647,2498,2387,2253,2190,2307
+Central Washington University,2025,Fall,Analytics,DS: Analytics (Google Analytics 4 Advanced Consulting Package) / Carnegie,Enrollment,false,12500,282,442,431,411,364,276,402
 Central Washington University,2025,Fall,Analytics,DS: Analytics (Google Analytics 4 Virtual Workshop) / Carnegie,Enrollment,false,12000,0,0,0,0,0,0,0
-Central Washington University,2025,Fall,Clarity,DS: Clarity (Services) / Carnegie,Enrollment,false,8676,280,554,550,477,394,352,441
-Central Washington University,2025,Fall,Clarity,DS: Clarity (Licensing Fee - Medium Pricing) / BlueConic,Enrollment,false,5318.25,280,554,550,477,394,352,441
-Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: Mobile Location Targeting / Semcasting,Enrollment,false,4053.3,219,283,278,269,237,187,263
-Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: IP Targeting / The Trade Desk,Enrollment,false,3962.03,239,393,386,369,338,283,353
+Central Washington University,2025,Fall,Clarity,DS: Clarity (Services) / Carnegie,Enrollment,false,8676,699,1816,1782,1510,1195,1090,1387
+Central Washington University,2025,Fall,Clarity,DS: Clarity (Licensing Fee - Medium Pricing) / BlueConic,Enrollment,false,5318.25,699,1816,1782,1510,1195,1090,1387
+Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: Mobile Location Targeting / Semcasting,Enrollment,false,4053.3,420,655,636,606,538,406,595
+Central Washington University,2025,Fall,Programmatic Display & Streaming,DS: IP Targeting / The Trade Desk,Enrollment,false,3962.03,478,930,910,841,762,643,804
 Central Washington University,2025,Fall,Paid Digital,DS: Renewal Set Up Cost / Carnegie,Enrollment,false,3500,0,0,0,0,0,0,0
-Central Washington University,2026,Fall,Paid Search,DS: PPC Set Up Cost / Carnegie,Enrollment,false,3000,12,15,15,15,12,12,13
-Central Washington University,2026,Fall,Paid Digital,DS: Integration Set up Cost / Carnegie,Enrollment,false,3000,12,15,15,15,12,12,13
+Central Washington University,2025,Fall,Paid Digital,DS: Integration Set up Cost / Carnegie,Enrollment,false,3000,0,0,0,0,0,0,0
+Central Washington University,2026,Fall,Paid Digital,DS: Integration Set up Cost / Carnegie,Enrollment,false,3000,17,22,22,22,18,18,20
+Central Washington University,2026,Fall,Paid Search,DS: PPC Set Up Cost / Carnegie,Enrollment,false,3000,17,22,22,22,18,18,20

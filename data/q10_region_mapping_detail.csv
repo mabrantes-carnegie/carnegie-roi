@@ -1,401 +1,401 @@
 region,region_original,rows,impressions
 AK,Alaska,10,14591
-AK,Alaska (State),27,21532
-AK,Anchorage AK,3,3090
-AK,Fairbanks AK,3,220
-AK,Juneau AK,3,318
+AK,Alaska (State),28,21616
+AK,Anchorage AK,4,3446
+AK,Fairbanks AK,4,249
+AK,Juneau AK,4,347
 AK,US:ak,4,840
 AK,ak,2,98719
 AL,Alabama,4,8672
-AL,Alabama (State),28,12564
-AL,Birmingham AL,3,616
-AL,Dothan AL,2,91
-AL,Huntsville-Decatur (Florence) AL,3,361
-AL,Mobile AL-Pensacola (Ft. Walton,3,946
-AL,Montgomery (Selma) AL,3,201
+AL,Alabama (State),29,12628
+AL,Birmingham AL,4,689
+AL,Dothan AL,3,95
+AL,Huntsville-Decatur (Florence) AL,4,400
+AL,Mobile AL-Pensacola (Ft. Walton,4,1059
+AL,Montgomery (Selma) AL,4,213
 AL,US:al,4,566
 AR,Arkansas,4,3669
-AR,Arkansas (State),33,220277
-AR,Ft. Smith-Fayetteville-Springdal,3,371
-AR,Jonesboro AR,2,227
-AR,Little Rock-Pine Bluff AR,3,758
+AR,Arkansas (State),34,220315
+AR,Ft. Smith-Fayetteville-Springdal,4,381
+AR,Jonesboro AR,3,248
+AR,Little Rock-Pine Bluff AR,4,787
 AR,US:ar,4,395
 AZ,Arizona,4,33856
-AZ,Arizona (State),29,72529
-AZ,Phoenix AZ,3,6552
-AZ,Tucson (Sierra Vista) AZ,3,1632
+AZ,Arizona (State),30,72967
+AZ,Phoenix AZ,4,7135
+AZ,Tucson (Sierra Vista) AZ,4,1797
 AZ,US:Arizona,1,1
 AZ,US:az,4,2090
-AZ,Yuma AZ-El Centro CA,3,133
-CA,Bakersfield CA,3,779
+AZ,Yuma AZ-El Centro CA,4,158
+CA,Bakersfield CA,4,848
 CA,CA,1,1
 CA,California,10,246667
-CA,California (State),34,3820885
-CA,Chico-Redding CA,3,296
-CA,Eureka CA,3,263
-CA,Fresno-Visalia CA,3,1418
-CA,Los Angeles CA,3,20328
-CA,Monterey-Salinas CA,3,1050
-CA,Palm Springs CA,3,1456
-CA,Sacramento-Stockton-Modesto CA,3,5282
-CA,San Diego CA,3,4185
+CA,California (State),35,3822874
+CA,Chico-Redding CA,4,327
+CA,Eureka CA,4,320
+CA,Fresno-Visalia CA,4,1488
+CA,Los Angeles CA,4,22348
+CA,Monterey-Salinas CA,4,1116
+CA,Palm Springs CA,4,1619
+CA,Sacramento-Stockton-Modesto CA,4,5978
+CA,San Diego CA,4,4510
 CA,San Francisco Bay Area,8,12784
 CA,"San Francisco Bay Area,California,United States",13,32185
-CA,San Francisco-Oakland-San Jose C,3,13181
+CA,San Francisco-Oakland-San Jose C,4,14602
 CA,San Francisco-Oakland-San Jose CA,1,0
-CA,Santa Barbara-Santa Maria-San Lu,3,857
+CA,Santa Barbara-Santa Maria-San Lu,4,929
 CA,Silicon Valley,6,4097
 CA,US:California,1,11
 CA,US:ca,4,13985
 CA,ca,2,213656
 CO,Colorado,10,33190
-CO,Colorado (State),34,358472
-CO,Colorado Springs-Pueblo CO,3,1236
-CO,Denver CO,3,6125
-CO,Grand Junction-Montrose CO,3,341
+CO,Colorado (State),35,358826
+CO,Colorado Springs-Pueblo CO,4,1297
+CO,Denver CO,4,6641
+CO,Grand Junction-Montrose CO,4,381
 CO,US:Colorado,1,3
 CO,US:co,4,1594
 CO,co,2,136020
 CT,Connecticut,4,7826
-CT,Connecticut (State),29,12984
-CT,Hartford & New Haven CT,3,2138
+CT,Connecticut (State),30,13035
+CT,Hartford & New Haven CT,4,2413
 CT,US:ct,4,609
 DC,District of Columbia,27,7817
-DC,District of Columbia (State),7,1301
+DC,District of Columbia (State),8,1344
 DC,US:dc,4,110
-DC,Washington DC (Hagerstown MD),3,5634
+DC,Washington DC (Hagerstown MD),4,6218
 DE,DE:HE,1,1
 DE,Delaware,4,2065
-DE,Delaware (State),27,3690
+DE,Delaware (State),28,3750
 DE,US:de,4,211
 FL,Florida,4,40698
-FL,Florida (State),29,80176
-FL,Ft. Myers-Naples FL,3,1247
-FL,Gainesville FL,3,246
-FL,Jacksonville FL,3,942
-FL,Miami-Ft. Lauderdale FL,3,2323
-FL,Orlando-Daytona Beach-Melbourne,3,2514
-FL,Panama City FL,3,248
-FL,Tallahassee FL-Thomasville GA,3,258
-FL,Tampa-St. Petersburg (Sarasota),3,2754
+FL,Florida (State),30,80688
+FL,Ft. Myers-Naples FL,4,1443
+FL,Gainesville FL,4,266
+FL,Jacksonville FL,4,1043
+FL,Miami-Ft. Lauderdale FL,4,2542
+FL,Orlando-Daytona Beach-Melbourne,4,2716
+FL,Panama City FL,4,303
+FL,Tallahassee FL-Thomasville GA,4,286
+FL,Tampa-St. Petersburg (Sarasota),4,2971
 FL,US:US-FL,1,2
 FL,US:fl,4,2536
-FL,West Palm Beach-Ft. Pierce FL,3,1406
-GA,Albany GA,2,12
-GA,Atlanta GA,3,2765
-GA,Augusta GA,3,247
-GA,Columbus GA,3,227
+FL,West Palm Beach-Ft. Pierce FL,4,1574
+GA,Albany GA,3,16
+GA,Atlanta GA,4,3044
+GA,Augusta GA,4,255
+GA,Columbus GA,4,250
 GA,Georgia,4,16151
-GA,Georgia (State),29,38337
-GA,Macon GA,3,193
-GA,Savannah GA,3,399
+GA,Georgia (State),30,38497
+GA,Macon GA,4,216
+GA,Savannah GA,4,445
 GA,US:Georgia,1,3
 GA,US:ga,4,1470
 HI,Hawaii,4,15497
-HI,Hawaii (State),29,29717
-HI,Honolulu HI,3,4900
+HI,Hawaii (State),30,29911
+HI,Honolulu HI,4,5321
 HI,US:hi,4,1136
 HI,hi,2,18232
-IA,Cedar Rapids-Waterloo-Iowa City,3,761
-IA,Davenport IA-Rock Island-Moline,3,481
-IA,Des Moines-Ames IA,3,621
+IA,Cedar Rapids-Waterloo-Iowa City,4,845
+IA,Davenport IA-Rock Island-Moline,4,520
+IA,Des Moines-Ames IA,4,749
 IA,Iowa,4,7213
-IA,Iowa (State),28,13750
-IA,Ottumwa IA-Kirksville MO,3,39
-IA,Sioux City IA,3,75
+IA,Iowa (State),29,13795
+IA,Ottumwa IA-Kirksville MO,4,44
+IA,Sioux City IA,4,76
 IA,US:ia,4,594
-ID,Boise ID,3,2416
-ID,ID,1,400
-ID,Idaho,31,64948
-ID,Idaho (State),48,436337
-ID,Idaho Falls-Pocatello ID,3,855
-ID,Twin Falls ID,3,247
+ID,Boise ID,4,2731
+ID,ID,2,1135
+ID,Idaho,32,64966
+ID,Idaho (State),49,436721
+ID,Idaho Falls-Pocatello ID,4,913
+ID,Twin Falls ID,4,283
 ID,US:id,4,3888
 ID,id,10,511196
-IL,Champaign & Springfield-Decatur,3,682
-IL,Chicago IL,3,4133
+IL,Champaign & Springfield-Decatur,4,782
+IL,Chicago IL,4,4615
 IL,Illinois,4,27406
-IL,Illinois (State),29,58744
-IL,Peoria-Bloomington IL,3,455
-IL,Quincy IL-Hannibal MO-Keokuk IA,3,230
-IL,Rockford IL,3,252
+IL,Illinois (State),30,58983
+IL,Peoria-Bloomington IL,4,474
+IL,Quincy IL-Hannibal MO-Keokuk IA,4,234
+IL,Rockford IL,4,260
 IL,US:il,4,2169
-IN,Evansville IN,3,234
-IN,Ft. Wayne IN,3,267
+IN,Evansville IN,4,263
+IN,Ft. Wayne IN,4,326
 IN,Indiana,4,13676
-IN,Indiana (State),29,18148
-IN,Indianapolis IN,3,1362
-IN,Lafayette IN,2,129
-IN,South Bend-Elkhart IN,3,437
-IN,Terre Haute IN,3,207
+IN,Indiana (State),30,18248
+IN,Indianapolis IN,4,1459
+IN,Lafayette IN,3,149
+IN,South Bend-Elkhart IN,4,461
+IN,Terre Haute IN,4,242
 IN,US:in,4,976
 International,British Columbia,2,3
 International,"Santo Domingo Province,Dominican Republic",1,1
 KS,Kansas,4,8255
-KS,Kansas (State),28,13585
-KS,Topeka KS,3,397
+KS,Kansas (State),29,13668
+KS,Topeka KS,4,431
 KS,US:ks,4,518
-KS,Wichita-Hutchinson KS,3,608
+KS,Wichita-Hutchinson KS,4,656
 KY,Bowling Green KY,2,61
 KY,Kentucky,4,6819
-KY,Kentucky (State),29,10663
-KY,Lexington KY,3,461
-KY,Louisville KY,3,702
-KY,Paducah KY-Cape Girardeau MO-Har,3,203
+KY,Kentucky (State),30,10738
+KY,Lexington KY,4,529
+KY,Louisville KY,4,757
+KY,Paducah KY-Cape Girardeau MO-Har,4,257
 KY,US:ky,4,569
-LA,Alexandria LA,2,107
-LA,Baton Rouge LA,3,137
-LA,Lafayette LA,3,57
+LA,Alexandria LA,3,122
+LA,Baton Rouge LA,4,156
+LA,Lafayette LA,4,63
 LA,Lake Charles LA,2,155
 LA,Louisiana,4,5464
-LA,Louisiana (State),28,11077
-LA,Monroe LA-El Dorado AR,3,64
-LA,New Orleans LA,3,386
-LA,Shreveport LA,3,129
+LA,Louisiana (State),29,11097
+LA,Monroe LA-El Dorado AR,4,64
+LA,New Orleans LA,4,428
+LA,Shreveport LA,4,142
 LA,US:la,4,549
-MA,Boston MA-Manchester NH,3,4412
+MA,Boston MA-Manchester NH,4,5022
 MA,Massachusetts,4,13593
-MA,Massachusetts (State),29,32811
-MA,Springfield-Holyoke MA,3,351
+MA,Massachusetts (State),30,33034
+MA,Springfield-Holyoke MA,4,385
 MA,US:ma,4,949
-MD,Baltimore MD,3,2389
+MD,Baltimore MD,4,2618
 MD,Maryland,4,12592
-MD,Maryland (State),28,23597
-MD,Salisbury MD,3,643
+MD,Maryland (State),29,23695
+MD,Salisbury MD,4,698
 MD,US:md,4,873
-ME,Bangor ME,3,184
+ME,Bangor ME,4,211
 ME,Maine,4,3951
-ME,Maine (State),29,6613
-ME,Portland-Auburn ME,3,618
-ME,Presque Isle ME,2,83
+ME,Maine (State),30,6677
+ME,Portland-Auburn ME,4,688
+ME,Presque Isle ME,3,85
 ME,US:me,4,276
-MI,Detroit MI,3,2277
-MI,Flint-Saginaw-Bay City MI,2,528
-MI,Grand Rapids-Kalamazoo-Battle Cr,3,1357
-MI,Lansing MI,3,376
+MI,Detroit MI,4,2485
+MI,Flint-Saginaw-Bay City MI,3,567
+MI,Grand Rapids-Kalamazoo-Battle Cr,4,1508
+MI,Lansing MI,4,411
 MI,MI,1,3
-MI,Marquette MI,3,77
+MI,Marquette MI,4,91
 MI,Michigan,4,21385
-MI,Michigan (State),28,30949
-MI,Traverse City-Cadillac MI,3,248
+MI,Michigan (State),29,31140
+MI,Traverse City-Cadillac MI,4,270
 MI,US:mi,4,1472
-MN,Duluth MN-Superior WI,2,377
-MN,Mankato MN,2,57
-MN,Minneapolis-St. Paul MN,3,4757
+MN,Duluth MN-Superior WI,3,463
+MN,Mankato MN,3,67
+MN,Minneapolis-St. Paul MN,4,5293
 MN,Minnesota,4,16205
-MN,Minnesota (State),29,27966
-MN,Rochester MN-Mason City IA-Austi,3,266
+MN,Minnesota (State),30,28118
+MN,Rochester MN-Mason City IA-Austi,4,293
 MN,US:mn,4,844
-MO,Columbia-Jefferson City MO,3,175
-MO,Joplin MO-Pittsburg KS,3,252
-MO,Kansas City MO,3,1455
+MO,Columbia-Jefferson City MO,4,196
+MO,Joplin MO-Pittsburg KS,4,321
+MO,Kansas City MO,4,1670
 MO,Missouri,4,14451
-MO,Missouri (State),29,29939
-MO,Springfield MO,3,362
-MO,St. Joseph MO,2,62
-MO,St. Louis MO,3,1981
+MO,Missouri (State),30,30022
+MO,Springfield MO,4,380
+MO,St. Joseph MO,3,68
+MO,St. Louis MO,4,2118
 MO,US:Missouri,1,4
 MO,US:mo,4,877
-MS,Biloxi-Gulfport MS,2,43
-MS,Columbus-Tupelo-West Point MS,2,255
+MS,Biloxi-Gulfport MS,3,45
+MS,Columbus-Tupelo-West Point MS,3,272
 MS,Greenwood-Greenville MS,2,0
-MS,Hattiesburg-Laurel MS,3,51
-MS,Jackson MS,3,212
+MS,Hattiesburg-Laurel MS,4,61
+MS,Jackson MS,4,235
 MS,Meridian MS,2,4
 MS,Mississippi,4,2740
-MS,Mississippi (State),27,6068
+MS,Mississippi (State),28,6101
 MS,US:ms,4,246
-MT,Billings MT,3,1078
-MT,Butte-Bozeman MT,3,542
-MT,Glendive MT,1,13
-MT,Great Falls MT,3,229
-MT,Helena MT,3,228
-MT,Missoula MT,3,869
+MT,Billings MT,4,1176
+MT,Butte-Bozeman MT,4,580
+MT,Glendive MT,2,39
+MT,Great Falls MT,4,245
+MT,Helena MT,4,273
+MT,Missoula MT,4,953
 MT,Montana,4,12208
-MT,Montana (State),29,24279
+MT,Montana (State),30,24363
 MT,US:mt,4,1016
 MT,mt,2,149963
-NC,Charlotte NC,3,1668
-NC,Greensboro-High Point-Winston Sa,3,1072
-NC,Greenville-New Bern-Washington N,3,239
+NC,Charlotte NC,4,1818
+NC,Greensboro-High Point-Winston Sa,4,1202
+NC,Greenville-New Bern-Washington N,4,267
 NC,North Carolina,4,21697
-NC,North Carolina (State),29,36691
-NC,Raleigh-Durham (Fayetteville) NC,3,1990
+NC,North Carolina (State),30,36889
+NC,Raleigh-Durham (Fayetteville) NC,4,2347
 NC,US:North Carolina,1,2
 NC,US:nc,4,1543
-NC,Wilmington NC,3,467
-ND,Fargo-Valley City ND,3,562
-ND,Minot-Bismarck-Dickinson(Willist,3,420
+NC,Wilmington NC,4,510
+ND,Fargo-Valley City ND,4,582
+ND,Minot-Bismarck-Dickinson(Willist,4,490
 ND,North Dakota,4,1982
-ND,North Dakota (State),28,6920
+ND,North Dakota (State),29,6942
 ND,US:North Dakota,1,3
 ND,US:nd,4,180
-NE,Lincoln & Hastings-Kearney NE,3,494
+NE,Lincoln & Hastings-Kearney NE,4,551
 NE,Nebraska,4,5947
-NE,Nebraska (State),29,9622
+NE,Nebraska (State),30,9673
 NE,North Platte NE,1,0
-NE,Omaha NE,3,444
+NE,Omaha NE,4,477
 NE,US:ne,4,461
 NH,New Hampshire,4,3622
-NH,New Hampshire (State),29,6272
+NH,New Hampshire (State),30,6302
 NH,US:nh,4,386
 NJ,New Jersey,4,15285
-NJ,New Jersey (State),29,25992
+NJ,New Jersey (State),30,26186
 NJ,US:nj,4,1374
-NM,Albuquerque-Santa Fe NM,3,892
+NM,Albuquerque-Santa Fe NM,4,972
 NM,New Mexico,4,4157
-NM,New Mexico (State),28,11565
+NM,New Mexico (State),29,11635
 NM,US:nm,4,312
-NV,Las Vegas NV,3,3305
+NV,Las Vegas NV,4,3588
 NV,Nevada,4,18373
-NV,Nevada (State),29,29352
-NV,Reno NV,3,1331
+NV,Nevada (State),30,29529
+NV,Reno NV,4,1525
 NV,US:nv,4,840
-NY,Albany-Schenectady-Troy NY,3,902
-NY,Binghamton NY,3,148
-NY,Buffalo NY,3,840
-NY,Elmira NY,2,127
+NY,Albany-Schenectady-Troy NY,4,973
+NY,Binghamton NY,4,153
+NY,Buffalo NY,4,939
+NY,Elmira NY,3,130
 NY,New York,4,34317
-NY,New York (State),29,86920
-NY,New York NY,3,8912
-NY,Rochester NY,3,1171
-NY,Syracuse NY,3,904
+NY,New York (State),30,87235
+NY,New York NY,4,10022
+NY,Rochester NY,4,1293
+NY,Syracuse NY,4,1011
 NY,US:ny,4,2511
-NY,Utica NY,3,102
-NY,Watertown NY,2,67
-OH,Cincinnati OH,3,1283
-OH,Cleveland-Akron (Canton) OH,3,2416
-OH,Columbus OH,3,1625
-OH,Dayton OH,3,266
-OH,Lima OH,3,33
+NY,Utica NY,4,106
+NY,Watertown NY,3,75
+OH,Cincinnati OH,4,1433
+OH,Cleveland-Akron (Canton) OH,4,2637
+OH,Columbus OH,4,1769
+OH,Dayton OH,4,309
+OH,Lima OH,4,33
 OH,Ohio,4,25461
-OH,Ohio (State),29,39491
-OH,Toledo OH,3,349
+OH,Ohio (State),30,39730
+OH,Toledo OH,4,391
 OH,US:oh,4,2063
-OH,Youngstown OH,3,226
+OH,Youngstown OH,4,251
 OH,Zanesville OH,2,21
 OK,Oklahoma,4,5270
-OK,Oklahoma (State),28,10841
-OK,Oklahoma City OK,3,866
-OK,Tulsa OK,3,367
+OK,Oklahoma (State),29,10914
+OK,Oklahoma City OK,4,944
+OK,Tulsa OK,4,432
 OK,US:ok,4,415
-OR,Bend OR,3,1521
-OR,Eugene OR,3,4571
-OR,Medford-Klamath Falls OR,3,2285
-OR,OR,1,13472
-OR,Oregon,31,291600
-OR,Oregon (State),50,3258649
-OR,Portland OR,3,33576
+OR,Bend OR,4,1678
+OR,Eugene OR,4,5123
+OR,Medford-Klamath Falls OR,4,2509
+OR,OR,2,37434
+OR,Oregon,32,291708
+OR,Oregon (State),51,3259992
+OR,Portland OR,4,36989
 OR,US:or,4,14703
 OR,or,10,924479
-PA,Erie PA,2,135
-PA,Harrisburg-Lancaster-Lebanon-Yor,3,1580
-PA,Johnstown-Altoona PA,3,512
+PA,Erie PA,3,152
+PA,Harrisburg-Lancaster-Lebanon-Yor,4,1677
+PA,Johnstown-Altoona PA,4,554
 PA,Pennsylvania,4,26407
-PA,Pennsylvania (State),29,42313
-PA,Philadelphia PA,3,4333
-PA,Pittsburgh PA,3,1294
+PA,Pennsylvania (State),30,42412
+PA,Philadelphia PA,4,4832
+PA,Pittsburgh PA,4,1377
 PA,US:pa,4,1833
-PA,Wilkes Barre-Scranton PA,3,520
-RI,Providence RI-New Bedford MA,3,1017
+PA,Wilkes Barre-Scranton PA,4,646
+RI,Providence RI-New Bedford MA,4,1139
 RI,Rhode Island,4,1834
-RI,Rhode Island (State),28,3187
+RI,Rhode Island (State),29,3196
 RI,US:ri,4,173
-SC,Charleston SC,3,724
-SC,Columbia SC,3,391
-SC,Florence-Myrtle Beach SC,3,505
-SC,Greenville-Spartanburg SC-Ashevi,3,935
+SC,Charleston SC,4,801
+SC,Columbia SC,4,413
+SC,Florence-Myrtle Beach SC,4,522
+SC,Greenville-Spartanburg SC-Ashevi,4,1026
 SC,South Carolina,4,9715
-SC,South Carolina (State),29,10879
+SC,South Carolina (State),30,10943
 SC,US:sc,4,777
-SD,Rapid City SD,3,298
-SD,Sioux Falls(Mitchell) SD,3,390
+SD,Rapid City SD,4,308
+SD,Sioux Falls(Mitchell) SD,4,422
 SD,South Dakota,4,2224
-SD,South Dakota (State),27,4152
+SD,South Dakota (State),28,4191
 SD,US:South Dakota,1,1
 SD,US:sd,4,111
-TN,Chattanooga TN,3,379
-TN,Jackson TN,2,79
-TN,Knoxville TN,3,1207
-TN,Memphis TN,3,518
-TN,Nashville TN,3,1194
+TN,Chattanooga TN,4,418
+TN,Jackson TN,3,86
+TN,Knoxville TN,4,1306
+TN,Memphis TN,4,540
+TN,Nashville TN,4,1352
 TN,Tennessee,4,13821
-TN,Tennessee (State),29,22285
-TN,Tri-Cities TN-VA,3,379
+TN,Tennessee (State),30,22415
+TN,Tri-Cities TN-VA,4,445
 TN,US:tn,4,1040
-TX,Abilene-Sweetwater TX,2,182
-TX,Amarillo TX,3,153
-TX,Austin TX,3,1719
-TX,Beaumont-Port Arthur TX,3,244
-TX,Corpus Christi TX,3,197
-TX,Dallas-Ft. Worth TX,3,4542
-TX,El Paso TX,2,298
-TX,Harlingen-Weslaco-Brownsville-Mc,2,126
-TX,Houston TX,3,2906
-TX,Lubbock TX,3,163
-TX,Odessa-Midland TX,2,112
-TX,San Angelo TX,2,54
-TX,San Antonio TX,3,1007
-TX,Sherman TX-Ada OK,2,26
+TX,Abilene-Sweetwater TX,3,182
+TX,Amarillo TX,4,155
+TX,Austin TX,4,1948
+TX,Beaumont-Port Arthur TX,4,251
+TX,Corpus Christi TX,4,206
+TX,Dallas-Ft. Worth TX,4,5020
+TX,El Paso TX,3,321
+TX,Harlingen-Weslaco-Brownsville-Mc,3,163
+TX,Houston TX,4,3252
+TX,Lubbock TX,4,170
+TX,Odessa-Midland TX,3,130
+TX,San Angelo TX,3,55
+TX,San Antonio TX,4,1096
+TX,Sherman TX-Ada OK,3,26
 TX,Texas,4,55650
-TX,Texas (State),29,140980
-TX,Tyler-Longview(Lufkin & Nacogdoc,3,336
+TX,Texas (State),30,141898
+TX,Tyler-Longview(Lufkin & Nacogdoc,4,381
 TX,US:tx,4,4383
-TX,Victoria TX,3,22
-TX,Waco-Temple-Bryan TX,3,398
-TX,Wichita Falls TX & Lawton OK,3,138
-UT,Salt Lake City UT,3,3982
+TX,Victoria TX,4,24
+TX,Waco-Temple-Bryan TX,4,442
+TX,Wichita Falls TX & Lawton OK,4,141
+UT,Salt Lake City UT,4,4235
 UT,US:ut,4,1523
 UT,Utah,4,18984
-UT,Utah (State),29,32777
-Unknown,,85,24231682
+UT,Utah (State),30,32876
+Unknown,,87,24309654
 Unknown,US:?,2,414
 Unknown,US:NA,1,1
 Unknown,US:ON,1,1
 Unknown,US:US,3,22
 Unknown,US:null,2,158
-Unknown,Unknown,6,2288
-VA,Charlottesville VA,3,168
-VA,Harrisonburg VA,2,19
-VA,Norfolk-Portsmouth-Newport News,3,956
-VA,Richmond-Petersburg VA,3,717
-VA,Roanoke-Lynchburg VA,3,741
+Unknown,Unknown,7,2306
+VA,Charlottesville VA,4,204
+VA,Harrisonburg VA,3,21
+VA,Norfolk-Portsmouth-Newport News,4,1042
+VA,Richmond-Petersburg VA,4,820
+VA,Roanoke-Lynchburg VA,4,781
 VA,US:va,4,1310
 VA,Virginia,4,18453
-VA,Virginia (State),28,39152
-VT,Burlington VT-Plattsburgh NY,3,340
+VA,Virginia (State),29,39326
+VT,Burlington VT-Plattsburgh NY,4,364
 VT,US:vt,4,56
 VT,Vermont,4,1368
-VT,Vermont (State),29,2998
-WA,Seattle-Tacoma WA,3,145934
-WA,Spokane WA,3,18090
+VT,Vermont (State),30,3049
+WA,Seattle-Tacoma WA,4,158286
+WA,Spokane WA,4,19469
 WA,US:Washington,1,5
 WA,US:wa,4,77788
-WA,WA,1,33750
-WA,Washington,31,1803600
-WA,Washington (State),56,22568361
-WA,Yakima-Pasco-Richland-Kennewick,3,9400
+WA,WA,2,108175
+WA,Washington,32,1807847
+WA,Washington (State),57,22595156
+WA,Yakima-Pasco-Richland-Kennewick,4,9928
 WA,Yakima-Pasco-Richland-Kennewick WA,2,0
 WA,wa,5,531300
-WI,Green Bay-Appleton WI,3,540
-WI,La Crosse-Eau Claire WI,3,389
-WI,Madison WI,3,582
-WI,Milwaukee WI,3,1743
+WI,Green Bay-Appleton WI,4,604
+WI,La Crosse-Eau Claire WI,4,428
+WI,Madison WI,4,664
+WI,Milwaukee WI,4,1928
 WI,US:Wisconsin,1,1
 WI,US:wi,4,1410
-WI,Wausau-Rhinelander WI,3,249
+WI,Wausau-Rhinelander WI,4,280
 WI,Wisconsin,4,19656
-WI,Wisconsin (State),29,24687
-WV,Bluefield-Beckley-Oak Hill WV,2,125
-WV,Charleston-Huntington WV,3,153
-WV,Clarksburg-Weston WV,2,66
-WV,Parkersburg WV,2,37
+WI,Wisconsin (State),30,24826
+WV,Bluefield-Beckley-Oak Hill WV,3,133
+WV,Charleston-Huntington WV,4,169
+WV,Clarksburg-Weston WV,3,72
+WV,Parkersburg WV,3,39
 WV,US:wv,4,104
 WV,West Virginia,4,2485
-WV,West Virginia (State),29,3885
-WV,Wheeling WV-Steubenville OH,3,76
-WY,Casper-Riverton WY,3,222
-WY,Cheyenne WY-Scottsbluff NE,2,559
+WV,West Virginia (State),30,3892
+WV,Wheeling WV-Steubenville OH,4,83
+WY,Casper-Riverton WY,4,256
+WY,Cheyenne WY-Scottsbluff NE,3,601
 WY,US:wy,4,273
 WY,Wyoming,4,3322
-WY,Wyoming (State),27,6646
+WY,Wyoming (State),28,6696
