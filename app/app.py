@@ -142,6 +142,10 @@ def _page_context_note(page_name: str, question: str, comparison: str, note: str
         ui.tags.span(comparison, style=(
             "font-family:Manrope,sans-serif;font-size:11px;font-weight:500;color:#6b7280;"
         )),
+        dot,
+        ui.tags.span("Semester: Fall", style=(
+            "font-family:Manrope,sans-serif;font-size:11px;font-weight:500;color:#6b7280;"
+        )),
     ]
     if note:
         children.extend([
