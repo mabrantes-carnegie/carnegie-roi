@@ -107,6 +107,7 @@ def _yoy_delta_table(
     rows: list,          # list of dicts: {label, metrics: {col: (value_str, delta_str)}}
     label_col: str,      # header for the first column
     metric_cols: list,   # ordered list of metric names
+    paginated: bool = False,
 ) -> "ui.HTML":
     """
     Render a YoY comparison table: for each metric column show the value then
@@ -210,9 +211,10 @@ def _yoy_delta_table(
         total_cells.append(f'<td style="{td_delta}{bold}">—</td>')
     rows_html_total = "<tr>" + "".join(total_cells) + "</tr>"
 
+    tbl_class = "sortable-table paginated-table" if paginated else "sortable-table"
     html = (
         '<div style="overflow-x:auto;">'
-        '<table class="sortable-table" style="width:100%;border-collapse:collapse;">'
+        f'<table class="{tbl_class}" style="width:100%;border-collapse:collapse;">'
         "<thead><tr>" + "".join(header_cells) + "</tr></thead>"
         "<tbody>" + "".join(rows_html) + "</tbody>"
         "<tfoot>" + rows_html_total + "</tfoot>"
@@ -2006,7 +2008,7 @@ def digital_server(input, output, session):
                 "View-Through Int.":    (f"{round(r['vt']):,}",      _pct_change(r["vt"],      pv_v)),
                 "Total Key Int.":       (f"{round(r['total']):,}",   _pct_change(r["total"],   pv_t)),
             }})
-        return _yoy_delta_table(rows, "Category / Interaction / Strategy / Campaign", metric_cols)
+        return _yoy_delta_table(rows, "Category / Interaction / Strategy / Campaign", metric_cols, paginated=True)
 
     # ══════════════════════════════════════════════════════════
     # TAB 3: GEOGRAPHY
@@ -2265,7 +2267,7 @@ def digital_server(input, output, session):
             }
             rows.append({"label": r["region"], "metrics": metrics_data})
 
-        table = _yoy_delta_table(rows, "Region", col_labels)
+        table = _yoy_delta_table(rows, "Region", col_labels, paginated=True)
         return ui.tags.div(summary_badges, table)
 
     # ══════════════════════════════════════════════════════════

@@ -124,10 +124,10 @@ _CW = (
 
 # --- Page context note component ---
 
-def _page_context_note(page_name: str, question: str, comparison: str):
+def _page_context_note(page_name: str, question: str, comparison: str, note: str | None = None):
     """Compact horizontal context note below filters, above page content."""
     dot = ui.tags.span(" · ", style="color:#d1d0ce;font-size:12px;")
-    return ui.tags.div(
+    children = [
         ui.tags.span(page_name, style=(
             "font-family:Manrope,sans-serif;font-size:12px;font-weight:600;color:#4b5563;"
         )),
@@ -142,6 +142,16 @@ def _page_context_note(page_name: str, question: str, comparison: str):
         ui.tags.span(comparison, style=(
             "font-family:Manrope,sans-serif;font-size:11px;font-weight:500;color:#6b7280;"
         )),
+    ]
+    if note:
+        children.extend([
+            dot,
+            ui.tags.span(note, style=(
+                "font-family:Manrope,sans-serif;font-size:11px;font-weight:500;color:#9b9893;"
+            )),
+        ])
+    return ui.tags.div(
+        *children,
         style=(
             "background:#ffffff;border:1px solid #e5e7eb;border-left:3px solid #94a3b8;"
             "border-radius:8px;padding:12px 16px;margin-bottom:20px;"
@@ -216,6 +226,7 @@ page_overview = ui.nav_panel(
             "ROI Overview",
             "How is overall enrollment marketing performing this academic year?",
             "AY 2025\u201326 vs. AY 2024\u201325",
+            "Goals shown are mock values until client targets are provided.",
         ),
         # Section 1: Funnel health strip (6 cards)
         ui.tags.div(
@@ -223,65 +234,7 @@ page_overview = ui.nav_panel(
             class_="funnel-strip",
         ),
 
-        # Section 3a: Conversion Rates collapsible row
-        ui.tags.div(
-            ui.tags.button(
-                ui.tags.span("Show Conversion Rates", class_="collapsible-btn-label"),
-                ui.tags.span("\u203a", class_="collapsible-btn-chevron"),
-                class_="collapsible-section-btn",
-                onclick=(
-                    "var row=document.getElementById('conv-rates-row');"
-                    "var open=row.classList.contains('collapsible-row--open');"
-                    "row.classList.toggle('collapsible-row--open',!open);"
-                    "this.querySelector('.collapsible-btn-label').textContent=open?'Show Conversion Rates':'Hide Conversion Rates';"
-                    "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
-                ),
-            ),
-            class_="collapsible-section-header",
-        ),
-        ui.tags.div(
-            # Empty placeholders for cols 1-2 (Inquiries, App Starts)
-            ui.tags.div(class_="secondary-badge--empty"),
-            ui.tags.div(class_="secondary-badge--empty"),
-            # Col 3 (App Submits) — empty
-            ui.tags.div(class_="secondary-badge--empty"),
-            # Col 4 (Admits) — Admit Rate
-            ui.tags.div(
-                ui.tags.div("Admit Rate", class_="secondary-label"),
-                ui.tags.div(
-                    ui.tags.div(ui.output_text("kpi_admitted_rate"), class_="secondary-value"),
-                    ui.output_ui("yoy_admitted_rate"),
-                    class_="secondary-value-row",
-                ),
-                class_="secondary-badge secondary-badge--stacked",
-            ),
-            # Col 5 (Deposits) — Yield Rate
-            ui.tags.div(
-                ui.tags.div("Yield Rate", class_="secondary-label"),
-                ui.tags.div(
-                    ui.tags.div(ui.output_text("kpi_yield_rate"), class_="secondary-value"),
-                    ui.output_ui("yoy_yield_rate"),
-                    class_="secondary-value-row",
-                ),
-                class_="secondary-badge secondary-badge--stacked",
-            ),
-            # Col 6 (Net Deposits) — Enrolled + Melt Rate
-            ui.tags.div(
-                ui.tags.div("Enrolled", class_="secondary-label"),
-                ui.tags.div(
-                    ui.tags.div(ui.output_text("kpi_total_enrolled"), class_="secondary-value"),
-                    ui.output_ui("yoy_total_enrolled"),
-                    class_="secondary-value-row",
-                ),
-                ui.output_ui("melt_rate_secondary"),
-                title="Students who completed enrollment. May differ from Net Deposits due to enrollment timing and process variations.",
-                class_="secondary-badge secondary-badge--stacked",
-            ),
-            id="conv-rates-row",
-            class_="secondary-row collapsible-row funnel-aligned-row",
-        ),
-
-        # Section 3b: Cost Metrics collapsible row
+        # Section 3a: Cost Metrics collapsible row
         ui.tags.div(
             ui.tags.button(
                 ui.tags.span("Show Cost Metrics", class_="collapsible-btn-label"),
@@ -299,6 +252,62 @@ page_overview = ui.nav_panel(
         ),
         ui.output_ui("cost_detail_panel"),
 
+        # Section 3b: Conversion Rates collapsible row
+        ui.tags.div(
+            ui.tags.button(
+                ui.tags.span("Show Conversion Rates", class_="collapsible-btn-label"),
+                ui.tags.span("\u203a", class_="collapsible-btn-chevron"),
+                class_="collapsible-section-btn",
+                onclick=(
+                    "var row=document.getElementById('conv-rates-row');"
+                    "var open=row.classList.contains('collapsible-row--open');"
+                    "row.classList.toggle('collapsible-row--open',!open);"
+                    "this.querySelector('.collapsible-btn-label').textContent=open?'Show Conversion Rates':'Hide Conversion Rates';"
+                    "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
+                ),
+            ),
+            class_="collapsible-section-header",
+        ),
+        ui.tags.div(
+            # Left-aligned conversion cards, plus 2 trailing placeholders to preserve 6-card grid
+            # Col 1 (Inquiries) — Admit Rate
+            ui.tags.div(
+                ui.tags.div("Admit Rate", class_="secondary-label"),
+                ui.tags.div(
+                    ui.tags.div(ui.output_text("kpi_admitted_rate"), class_="secondary-value"),
+                    ui.output_ui("yoy_admitted_rate"),
+                    class_="secondary-value-row",
+                ),
+                class_="secondary-badge secondary-badge--stacked",
+            ),
+            # Col 2 (App Starts) — Yield Rate
+            ui.tags.div(
+                ui.tags.div("Yield Rate", class_="secondary-label"),
+                ui.tags.div(
+                    ui.tags.div(ui.output_text("kpi_yield_rate"), class_="secondary-value"),
+                    ui.output_ui("yoy_yield_rate"),
+                    class_="secondary-value-row",
+                ),
+                class_="secondary-badge secondary-badge--stacked",
+            ),
+            # Col 3 (App Submits) — Enrolled
+            ui.tags.div(
+                ui.tags.div("Enrolled", class_="secondary-label"),
+                ui.tags.div(
+                    ui.tags.div(ui.output_text("kpi_total_enrolled"), class_="secondary-value"),
+                    ui.output_ui("yoy_total_enrolled"),
+                    class_="secondary-value-row",
+                ),
+                title="Students who completed enrollment. May differ from Net Deposits due to enrollment timing and process variations.",
+                class_="secondary-badge secondary-badge--stacked",
+            ),
+            # Col 4 (Admits) — Melt Rate
+            ui.output_ui("melt_rate_secondary"),
+            ui.tags.div(class_="secondary-badge--empty"),
+            ui.tags.div(class_="secondary-badge--empty"),
+            id="conv-rates-row",
+            class_="secondary-row collapsible-row funnel-aligned-row",
+        ),
         # Section 4: Main content (side by side)
         ui.tags.div(
             # Left: Trending chart
@@ -688,12 +697,7 @@ page_geography = ui.nav_panel(
                 ui.output_ui("geo_map_title"),
                 _pill_dropdown(
                     "geo_map_metric",
-                    {
-                        "total_inquiries": "Inquiries",
-                        "total_app_submits": "App Submits",
-                        "total_admits": "Admits",
-                        "total_net_deposits": "Net Deposits",
-                    },
+                    PROGRAM_TREND_METRICS,
                     "total_inquiries",
                 ),
                 class_="card-header-row",
@@ -825,6 +829,7 @@ page_programs = ui.nav_panel(
             "Program Breakdown",
             "How are individual programs performing against enrollment goals?",
             "AY 2025\u201326 vs. AY 2024\u201325",
+            "Goals shown are mock values until client targets are provided.",
         ),
         # Program trending vs goal
         ui.tags.div(

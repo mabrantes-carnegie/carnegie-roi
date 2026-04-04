@@ -620,11 +620,41 @@ body > div.container-fluid {
     gap: 4px;
 }
 
+.secondary-badge--nested {
+    width: 100%;
+    margin-top: 10px;
+    padding: 12px 14px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.secondary-badge--nested .secondary-label {
+    flex: 1 1 auto;
+}
+
+.secondary-badge--nested .secondary-value {
+    flex: 0 0 auto;
+}
+
+.secondary-badge--nested .kpi-badge {
+    margin-left: auto;
+}
+
 /* 6-column grid aligned with funnel strip */
 .funnel-aligned-row {
     display: grid !important;
     grid-template-columns: repeat(6, 1fr);
     gap: 12px;
+}
+
+.funnel-aligned-row > * {
+    min-width: 0;
+}
+
+.funnel-aligned-row .secondary-badge {
+    width: 100%;
+    height: 100%;
 }
 
 /* Empty placeholder in funnel-aligned grid */
