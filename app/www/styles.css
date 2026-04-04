@@ -613,6 +613,25 @@ body > div.container-fluid {
     color: var(--carnegie-navy);
 }
 
+/* Stacked secondary badge: label on own line, value+delta below */
+.secondary-badge--stacked {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+/* 6-column grid aligned with funnel strip */
+.funnel-aligned-row {
+    display: grid !important;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+}
+
+/* Empty placeholder in funnel-aligned grid */
+.secondary-badge--empty {
+    visibility: hidden;
+}
+
 /* ════════════════════════════════════════════
    KPI BADGES (YoY)
    ════════════════════════════════════════════ */

@@ -240,18 +240,45 @@ page_overview = ui.nav_panel(
             class_="collapsible-section-header",
         ),
         ui.tags.div(
-            _secondary_badge("Admit Rate", "admitted_rate"),
-            _secondary_badge("Yield Rate", "yield_rate"),
+            # Empty placeholders for cols 1-2 (Inquiries, App Starts)
+            ui.tags.div(class_="secondary-badge--empty"),
+            ui.tags.div(class_="secondary-badge--empty"),
+            # Col 3 (App Submits) — empty
+            ui.tags.div(class_="secondary-badge--empty"),
+            # Col 4 (Admits) — Admit Rate
+            ui.tags.div(
+                ui.tags.div("Admit Rate", class_="secondary-label"),
+                ui.tags.div(
+                    ui.tags.div(ui.output_text("kpi_admitted_rate"), class_="secondary-value"),
+                    ui.output_ui("yoy_admitted_rate"),
+                    class_="secondary-value-row",
+                ),
+                class_="secondary-badge secondary-badge--stacked",
+            ),
+            # Col 5 (Deposits) — Yield Rate
+            ui.tags.div(
+                ui.tags.div("Yield Rate", class_="secondary-label"),
+                ui.tags.div(
+                    ui.tags.div(ui.output_text("kpi_yield_rate"), class_="secondary-value"),
+                    ui.output_ui("yoy_yield_rate"),
+                    class_="secondary-value-row",
+                ),
+                class_="secondary-badge secondary-badge--stacked",
+            ),
+            # Col 6 (Net Deposits) — Enrolled + Melt Rate
             ui.tags.div(
                 ui.tags.div("Enrolled", class_="secondary-label"),
-                ui.tags.div(ui.output_text("kpi_total_enrolled"), class_="secondary-value"),
-                ui.output_ui("yoy_total_enrolled"),
+                ui.tags.div(
+                    ui.tags.div(ui.output_text("kpi_total_enrolled"), class_="secondary-value"),
+                    ui.output_ui("yoy_total_enrolled"),
+                    class_="secondary-value-row",
+                ),
+                ui.output_ui("melt_rate_secondary"),
                 title="Students who completed enrollment. May differ from Net Deposits due to enrollment timing and process variations.",
-                class_="secondary-badge",
+                class_="secondary-badge secondary-badge--stacked",
             ),
-            ui.output_ui("melt_rate_secondary"),
             id="conv-rates-row",
-            class_="secondary-row collapsible-row",
+            class_="secondary-row collapsible-row funnel-aligned-row",
         ),
 
         # Section 3b: Cost Metrics collapsible row
@@ -1554,7 +1581,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=43"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=44"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(src="paginated-tables.js?v=2"),

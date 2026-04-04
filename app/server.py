@@ -505,12 +505,12 @@ def server_logic(input, output, session):
     def cost_detail_panel():
         """All cost metrics in a single collapsible row."""
         _costs = [
-            ("Cost/Net Deposit", "total_net_deposits"),
             ("Cost/Inquiry",     "total_inquiries"),
             ("Cost/App Start",   "total_app_starts"),
             ("Cost/App Submit",  "total_app_submits"),
             ("Cost/Admit",       "total_admits"),
             ("Cost/Deposit",     "total_deposits"),
+            ("Cost/Net Deposit", "total_net_deposits"),
         ]
         total_spend = filtered_q2()["total_cost"].sum()
         prior_spend = prior_q2()["total_cost"].sum()
@@ -536,15 +536,18 @@ def server_logic(input, output, session):
 
             badges.append(ui.tags.div(
                 ui.tags.div(label, class_="secondary-label"),
-                ui.tags.div(value_str, class_="secondary-value"),
-                yoy_el,
-                class_="secondary-badge",
+                ui.tags.div(
+                    ui.tags.div(value_str, class_="secondary-value"),
+                    yoy_el,
+                    class_="secondary-value-row",
+                ),
+                class_="secondary-badge secondary-badge--stacked",
             ))
 
         return ui.tags.div(
             *badges,
             id="cost-metrics-row",
-            class_="secondary-row collapsible-row",
+            class_="secondary-row collapsible-row funnel-aligned-row",
             title="Cost metrics reflect Carnegie campaign spend divided by total funnel volume.",
         )
 
