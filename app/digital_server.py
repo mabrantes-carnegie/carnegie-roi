@@ -3612,7 +3612,7 @@ def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str) -> "
         "view_through_conversions", "in_platform_leads", "total_interactions",
     ]
     col_labels = [
-        "Impressions", "Clicks", "CTR",
+        "Interactions", "Clicks", "CTR",
         "Direct Key Interaction", "View-Through Int.", "In-Platform Leads",
         "Total Interactions", "Interaction Rate",
     ]
@@ -3654,7 +3654,7 @@ def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str) -> "
         ) if p else None
 
         metrics_data = {
-            "Impressions":         (_fmt_int(r["impressions"]),         _pct_change(r["impressions"], p.get("impressions", 0)) if p else "N/A"),
+            "Interactions":        (_fmt_int(r["impressions"]),         _pct_change(r["impressions"], p.get("impressions", 0)) if p else "N/A"),
             "Clicks":              (_fmt_int(r["clicks"]),              _pct_change(r["clicks"], p.get("clicks", 0)) if p else "N/A"),
             "CTR":                 (_fmt_pct(ctr_curr * 100 if ctr_curr is not None else None),
                                     _pct_change(ctr_curr, ctr_prev) if (ctr_curr is not None and ctr_prev is not None) else "N/A"),

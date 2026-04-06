@@ -1003,7 +1003,7 @@ _dig_overview_content = ui.tags.div(
     _page_context_note(
         "Digital Performance \u2014 Overview",
         "How did digital campaigns perform last month?",
-        "March 2026 vs. February 2026 (month-over-month)",
+        "April 2026 vs. March 2026 (month-over-month)",
     ),
     # KPI strip
     ui.tags.div(
@@ -1098,7 +1098,7 @@ _dig_overview_yoy_content = ui.tags.div(
         "AY 2025\u201326 vs. AY 2024\u201325 (year-over-year)",
     ),
     ui.tags.div(
-        _dig_kpi_card("Impressions", "impressions_yoy", "#EA332D"),
+        _dig_kpi_card("Interactions", "impressions_yoy", "#EA332D"),
         _dig_kpi_card("Clicks", "clicks_yoy", "#021326"),
         _dig_kpi_card("CTR", "ctr_yoy", "#C99D44"),
         _dig_kpi_card("Total Key Interactions", "total_conv_yoy", "#021326"),
@@ -1178,7 +1178,7 @@ page_digital = ui.nav_menu(
             _page_context_note(
                 "Digital Performance \u2014 Interactions",
                 "What types of key interactions are campaigns generating?",
-                "March 2026 vs. February 2026 (month-over-month)",
+                "April 2026 vs. March 2026 (month-over-month)",
             ),
             ui.tags.h2("Interaction Filters", class_="section-heading"),
             ui.tags.div(
