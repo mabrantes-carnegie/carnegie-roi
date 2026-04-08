@@ -21,8 +21,4 @@ variable "github_repo" {
   default     = "CarnegieHigherEd/roi-report"
 }
 
-variable "invoker_members" {
-  description = "List of IAM members allowed to invoke the Cloud Run service (e.g. user:x@y.com, group:team@y.com, serviceAccount:sa@project.iam.gserviceaccount.com)"
-  type        = list(string)
-  default     = []
-}
+
