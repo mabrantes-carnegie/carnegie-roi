@@ -889,14 +889,16 @@ def server_logic(input, output, session):
                 arrow = "\u25b2" if yoy_pct >= 0 else "\u25bc"
                 badge_text = f"{arrow} {abs(yoy_pct):.0f}%"
                 rc = "#132B23" if yoy_pct >= 0 else "#560422"
+                bg = "#ddeae5" if yoy_pct >= 0 else "#f9edf1"
             else:
                 rc = "#9B9893"
+                bg = "#f3f4f6"
                 badge_text = "\u2014"
 
             svg_parts.append(
                 f'<rect x="{pill_x:.1f}" y="{center_y - pill_h/2:.1f}" '
                 f'width="{pill_w}" height="{pill_h}" rx="4" '
-                f'fill="white" stroke="{rc}" stroke-width="0.8"/>'
+                f'fill="{bg}" stroke="{rc}" stroke-width="0.8"/>'
             )
             svg_parts.append(
                 f'<text x="{pill_x + pill_w/2:.1f}" y="{center_y:.1f}" '
@@ -939,14 +941,14 @@ def server_logic(input, output, session):
             # Green
             '<span style="display:inline-flex;align-items:center;gap:5px;">'
             '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;'
-            'border:1.5px solid #132B23;background:white;"></span>'
+            'border:1.5px solid #132B23;background:#ddeae5;"></span>'
             '<span style="font-family:Manrope,sans-serif;font-size:10px;color:#6b7280;">'
             'Growing</span>'
             '</span>'
             # Red
             '<span style="display:inline-flex;align-items:center;gap:5px;">'
             '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;'
-            'border:1.5px solid #560422;background:white;"></span>'
+            'border:1.5px solid #560422;background:#f9edf1;"></span>'
             '<span style="font-family:Manrope,sans-serif;font-size:10px;color:#6b7280;">'
             'Declining</span>'
             '</span>'

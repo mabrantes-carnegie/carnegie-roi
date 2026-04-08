@@ -230,7 +230,6 @@ page_overview = ui.nav_panel(
             "ROI Overview",
             "How is overall enrollment marketing performing this academic year?",
             "AY 2025\u201326 vs. AY 2024\u201325",
-            "Goals shown are mock values until client targets are provided.",
         ),
         # Section 1: Funnel health strip (6 cards)
         ui.tags.div(
@@ -833,7 +832,6 @@ page_programs = ui.nav_panel(
             "Program Breakdown",
             "How are individual programs performing against enrollment goals?",
             "AY 2025\u201326 vs. AY 2024\u201325",
-            "Goals shown are mock values until client targets are provided.",
         ),
         # Program trending vs goal
         ui.tags.div(
@@ -869,18 +867,22 @@ page_programs = ui.nav_panel(
 def _digital_filters():
     """Shared filter bar for digital performance page."""
     import calendar
-    # Default: current month (latest available data month).
+    # Default: previous month (one month before latest available data month).
     data_max = _dig_max.date()
-    curr_month_start = date(data_max.year, data_max.month, 1)
-    curr_month_end = data_max.replace(
-        day=calendar.monthrange(data_max.year, data_max.month)[1]
-    )
-    prev_month_start = curr_month_start
+    latest_month_start = date(data_max.year, data_max.month, 1)
+    # Shift back one month for the default
+    if latest_month_start.month == 1:
+        default_month_start = date(latest_month_start.year - 1, 12, 1)
+    else:
+        default_month_start = date(latest_month_start.year, latest_month_start.month - 1, 1)
+    default_month_end_day = calendar.monthrange(default_month_start.year, default_month_start.month)[1]
+    default_month_end = date(default_month_start.year, default_month_start.month, default_month_end_day)
+    prev_month_start = default_month_start
     # month_opts uses "%Y-%m-%d" (first day of month) as values
-    prev_month_val = curr_month_start.strftime("%Y-%m-%d")
-    prev_month_end = curr_month_end
+    prev_month_val = default_month_start.strftime("%Y-%m-%d")
+    prev_month_end = default_month_end
     # End dropdown uses first-of-month value; JS converts to last day on the fly
-    default_end_val = curr_month_start.strftime("%Y-%m-%d")
+    default_end_val = default_month_start.strftime("%Y-%m-%d")
 
     month_opts = _month_options(_dig_min.date(), _dig_max.date())
 
@@ -1018,7 +1020,19 @@ _dig_overview_content = ui.tags.div(
     # Row A: Trending + Key Interaction Categories
     ui.tags.div(
         ui.tags.div(
-            ui.tags.span("Trending Performance", class_="card-heading"),
+            ui.tags.div(
+                ui.tags.span("Trending Performance", class_="card-heading"),
+                _pill_dropdown("dig_trending_metric", {
+                    "clicks": "Clicks",
+                    "ctr": "CTR",
+                    "direct_conversions": "Direct Interactions",
+                    "view_through_conversions": "View-through Interactions",
+                    "in_platform_leads": "In-Platform Leads",
+                    "budget": "Budget",
+                    "cost_per_total_interaction": "Cost Per Total Interaction",
+                }, "clicks"),
+                class_="card-header-row",
+            ),
             ui.output_ui("dig_trending_chart"),
             class_="chart-card",
             style="flex:3;",
@@ -1228,18 +1242,8 @@ page_digital = ui.nav_menu(
             ui.output_ui("dig_int_cost_panel"),
             ui.tags.h2("Key Interaction Category Trending", class_="section-heading"),
             ui.tags.div(
-                ui.tags.div(
-                    ui.output_ui("dig_cat_trend_chart"),
-                    class_="chart-card",
-                    style="flex:3;",
-                ),
-                ui.tags.div(
-                    ui.tags.span("Key Interaction Breakdown", class_="card-heading"),
-                    ui.output_ui("dig_cat_breakdown_chart"),
-                    class_="chart-card",
-                    style="flex:2;",
-                ),
-                class_="main-content-row",
+                ui.output_ui("dig_cat_trend_chart"),
+                class_="chart-card",
             ),
             ui.tags.div(
                 ui.tags.div(
@@ -1266,7 +1270,7 @@ page_digital = ui.nav_menu(
     ),
 
     ui.nav_panel(
-        "Digital Geography",
+        "Geography",
         _dig_page(ui.tags.div(
             _page_context_note(
                 "Digital Performance \u2014 Geography",
@@ -1333,7 +1337,7 @@ page_digital = ui.nav_menu(
             # ── KPI summary strip ──
             ui.tags.div(
                 _dig_kpi_card("Total Creatives", "crv_total", "#EA332D"),
-                _dig_kpi_card("Impressions", "crv_impressions", "#021326"),
+                _dig_kpi_card("Interactions", "crv_impressions", "#021326"),
                 _dig_kpi_card("Avg. CTR", "crv_ctr", "#C99D44"),
                 _dig_kpi_card("Total Interactions", "crv_conversions", "#021326"),
                 class_="funnel-strip",
@@ -1384,7 +1388,10 @@ page_digital = ui.nav_menu(
                     ui.tags.button("CTR", class_="crv-sort-pill",
                                    **{"data-val": "ctr"},
                                    onclick="window._crvSort(this)"),
-                    ui.tags.button("Interactions", class_="crv-sort-pill",
+                    ui.tags.button("View-through Int.", class_="crv-sort-pill",
+                                   **{"data-val": "view_through_conversions"},
+                                   onclick="window._crvSort(this)"),
+                    ui.tags.button("Total Int.", class_="crv-sort-pill",
                                    **{"data-val": "total_conversions"},
                                    onclick="window._crvSort(this)"),
                     ui.tags.button("Int. Rate", class_="crv-sort-pill",
@@ -1393,6 +1400,7 @@ page_digital = ui.nav_menu(
                     class_="crv-sort-pills",
                 ),
                 class_="crv-sort-bar",
+                id="crv-sort-bar",
             ),
             ui.tags.script(
                 "window._crvSort=function(btn){"
@@ -1411,6 +1419,12 @@ page_digital = ui.nav_menu(
                 "  var dir=btn.classList.contains('asc')?'__asc':'';"
                 "  Shiny.setInputValue('crv_sort',val+dir);"
                 "};"
+                "$(document).on('shiny:inputchanged',function(e){"
+                "  if(e.name==='crv_sub'){"
+                "    var bar=document.getElementById('crv-sort-bar');"
+                "    if(bar) bar.style.display=e.value==='ppc'?'none':'';"
+                "  }"
+                "});"
                 "window._crvToggle=function(id,btn){"
                 "  var panel=document.getElementById(id);"
                 "  if(!panel)return;"
