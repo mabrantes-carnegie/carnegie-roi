@@ -1,0 +1,9 @@
+project_id = "carnegie-roi-reports"
+region     = "us-east4"
+image_tag  = "latest"
+
+invoker_members = [
+  "user:your-email@example.com",
+  # "group:team@example.com",
+  # "serviceAccount:portal@other-project.iam.gserviceaccount.com",
+]
