@@ -43,11 +43,13 @@ resource "google_cloud_run_v2_service_iam_member" "iap_sa_invoker" {
   member   = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-iap.iam.gserviceaccount.com"
 }
 
-# Grant the entire @carnegiehighered.com domain access through IAP.
-resource "google_iap_web_cloud_run_service_iam_member" "domain_access" {
-  project                = var.project_id
-  location               = var.region
-  cloud_run_service_name = google_cloud_run_v2_service.app.name
-  role                   = "roles/iap.httpsResourceAccessor"
-  member                 = "domain:carnegiehighered.com"
-}
+# IAP domain access for @carnegiehighered.com — applied via gcloud (one-time)
+# due to provider bug in hashicorp/google (tested on 7.26 and 7.27):
+#
+#   gcloud iap web add-iam-policy-binding \
+#     --resource-type=cloud-run \
+#     --service=roi-reports \
+#     --region=us-east4 \
+#     --member="domain:carnegiehighered.com" \
+#     --role="roles/iap.httpsResourceAccessor" \
+#     --project=carnegie-roi-reports
