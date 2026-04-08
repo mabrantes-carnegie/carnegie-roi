@@ -1,4 +1,44 @@
-"""Carnegie ROI Dashboard — UI layout and app entry point."""
+"""Carnegie ROI Dashboard — UI layout and app entry point.
+
+FILTER ARCHITECTURE
+===================
+
+GLOBAL FILTERS (affect all pages within their group):
+------------------------------------------------------
+Funnel pages (ROI Overview, Program Breakdown, Lead Source, Funnel Geography):
+  - Period (funnel_month_start / funnel_month_end) — synced to geo_period & prog_period
+  - Program (program_name_filter) — synced to geo_program
+  - Student Type (student_type) — synced to geo_student_type
+  - Lead Source (source_filter) — synced to geo_lead_source
+  - Institution (hidden, default: Central Washington University)
+  - Term Year (hidden, default: 2026)
+  - Term Semester (hidden, default: Fall)
+  - Is International (hidden, default: True)
+
+Digital pages (Overview, Overview YoY, Interactions, Geography, Creative, Insights):
+  - Period (dig_month_start / dig_month_end → dig_period)
+  - Group (dig_group)
+  - Subgroup (dig_subgroup)
+  - Product (dig_product)
+  - Campaign (dig_campaign)
+  Note: Period auto-adjusts when switching tabs (MoM tabs reset to last data
+  month; AY tabs reset to Jul-current AY → last data month).
+
+PAGE-SPECIFIC FILTERS:
+----------------------
+  - Interactions page: Interaction Category (dig_interaction_cat),
+    Paid Key Interaction (dig_conversion_name)
+  - Creative page: Search (crv_search), Sort By (crv_sort),
+    Sub-page toggle (crv_sub), Display view toggle (crv_display_view)
+  - Insights page: Milestones only (dig_milestone_only),
+    Note Type (dig_note_type), Search (insights_search)
+  - Funnel Geography: Include international & unknown (include_intl_unknown)
+
+SINGLE-VALUE FILTERS (always show one value, limited utility):
+  - Institution: always "Central Washington University"
+  - Term Semester: always "Fall" (only one semester in data)
+  - Note: These are kept hidden and do not clutter the UI.
+"""
 
 import sys
 from pathlib import Path
@@ -82,6 +122,48 @@ _CW = (
 )
 
 
+# --- Page context note component ---
+
+def _page_context_note(page_name: str, question: str, comparison: str, note: str | None = None):
+    """Compact horizontal context note below filters, above page content."""
+    dot = ui.tags.span(" · ", style="color:#d1d0ce;font-size:12px;")
+    children = [
+        ui.tags.span(page_name, style=(
+            "font-family:Manrope,sans-serif;font-size:12px;font-weight:600;color:#4b5563;"
+        )),
+        dot,
+        ui.tags.span(question, style=(
+            "font-family:Manrope,sans-serif;font-size:12px;font-weight:400;color:#6b7280;"
+        )),
+        dot,
+        ui.tags.span("Comparison: ", style=(
+            "font-family:Manrope,sans-serif;font-size:11px;font-weight:400;color:#9ca3af;"
+        )),
+        ui.tags.span(comparison, style=(
+            "font-family:Manrope,sans-serif;font-size:11px;font-weight:500;color:#6b7280;"
+        )),
+        dot,
+        ui.tags.span("Semester: Fall", style=(
+            "font-family:Manrope,sans-serif;font-size:11px;font-weight:500;color:#6b7280;"
+        )),
+    ]
+    if note:
+        children.extend([
+            dot,
+            ui.tags.span(note, style=(
+                "font-family:Manrope,sans-serif;font-size:11px;font-weight:500;color:#9b9893;"
+            )),
+        ])
+    return ui.tags.div(
+        *children,
+        style=(
+            "background:#ffffff;border:1px solid #e5e7eb;border-left:3px solid #94a3b8;"
+            "border-radius:8px;padding:12px 16px;margin-bottom:20px;"
+            "display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 2px;"
+        ),
+    )
+
+
 # --- Funnel KPI card helper (6 primary cards in a strip) ---
 
 PRIMARY_FUNNEL = [
@@ -144,44 +226,19 @@ CAMPAIGN_METRIC_CHOICES = {
 page_overview = ui.nav_panel(
     "ROI Overview",
     ui.tags.div(
+        _page_context_note(
+            "ROI Overview",
+            "How is overall enrollment marketing performing this academic year?",
+            "AY 2025\u201326 vs. AY 2024\u201325",
+            "Goals shown are mock values until client targets are provided.",
+        ),
         # Section 1: Funnel health strip (6 cards)
         ui.tags.div(
             *[_funnel_kpi_card(label, key, color) for label, key, color in PRIMARY_FUNNEL],
             class_="funnel-strip",
         ),
 
-        # Section 3a: Conversion Rates collapsible row
-        ui.tags.div(
-            ui.tags.button(
-                ui.tags.span("Show Conversion Rates", class_="collapsible-btn-label"),
-                ui.tags.span("\u203a", class_="collapsible-btn-chevron"),
-                class_="collapsible-section-btn",
-                onclick=(
-                    "var row=document.getElementById('conv-rates-row');"
-                    "var open=row.classList.contains('collapsible-row--open');"
-                    "row.classList.toggle('collapsible-row--open',!open);"
-                    "this.querySelector('.collapsible-btn-label').textContent=open?'Show Conversion Rates':'Hide Conversion Rates';"
-                    "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
-                ),
-            ),
-            class_="collapsible-section-header",
-        ),
-        ui.tags.div(
-            _secondary_badge("Admit Rate", "admitted_rate"),
-            _secondary_badge("Yield Rate", "yield_rate"),
-            ui.tags.div(
-                ui.tags.div("Enrolled", class_="secondary-label"),
-                ui.tags.div(ui.output_text("kpi_total_enrolled"), class_="secondary-value"),
-                ui.output_ui("yoy_total_enrolled"),
-                title="Students who completed enrollment. May differ from Net Deposits due to enrollment timing and process variations.",
-                class_="secondary-badge",
-            ),
-            ui.output_ui("melt_rate_secondary"),
-            id="conv-rates-row",
-            class_="secondary-row collapsible-row",
-        ),
-
-        # Section 3b: Cost Metrics collapsible row
+        # Section 3a: Cost Metrics collapsible row
         ui.tags.div(
             ui.tags.button(
                 ui.tags.span("Show Cost Metrics", class_="collapsible-btn-label"),
@@ -199,6 +256,62 @@ page_overview = ui.nav_panel(
         ),
         ui.output_ui("cost_detail_panel"),
 
+        # Section 3b: Conversion Rates collapsible row
+        ui.tags.div(
+            ui.tags.button(
+                ui.tags.span("Show Conversion Rates", class_="collapsible-btn-label"),
+                ui.tags.span("\u203a", class_="collapsible-btn-chevron"),
+                class_="collapsible-section-btn",
+                onclick=(
+                    "var row=document.getElementById('conv-rates-row');"
+                    "var open=row.classList.contains('collapsible-row--open');"
+                    "row.classList.toggle('collapsible-row--open',!open);"
+                    "this.querySelector('.collapsible-btn-label').textContent=open?'Show Conversion Rates':'Hide Conversion Rates';"
+                    "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
+                ),
+            ),
+            class_="collapsible-section-header",
+        ),
+        ui.tags.div(
+            # Left-aligned conversion cards, plus 2 trailing placeholders to preserve 6-card grid
+            # Col 1 (Inquiries) — Admit Rate
+            ui.tags.div(
+                ui.tags.div("Admit Rate", class_="secondary-label"),
+                ui.tags.div(
+                    ui.tags.div(ui.output_text("kpi_admitted_rate"), class_="secondary-value"),
+                    ui.output_ui("yoy_admitted_rate"),
+                    class_="secondary-value-row",
+                ),
+                class_="secondary-badge secondary-badge--stacked",
+            ),
+            # Col 2 (App Starts) — Yield Rate
+            ui.tags.div(
+                ui.tags.div("Yield Rate", class_="secondary-label"),
+                ui.tags.div(
+                    ui.tags.div(ui.output_text("kpi_yield_rate"), class_="secondary-value"),
+                    ui.output_ui("yoy_yield_rate"),
+                    class_="secondary-value-row",
+                ),
+                class_="secondary-badge secondary-badge--stacked",
+            ),
+            # Col 3 (App Submits) — Enrolled
+            ui.tags.div(
+                ui.tags.div("Enrolled", class_="secondary-label"),
+                ui.tags.div(
+                    ui.tags.div(ui.output_text("kpi_total_enrolled"), class_="secondary-value"),
+                    ui.output_ui("yoy_total_enrolled"),
+                    class_="secondary-value-row",
+                ),
+                title="Students who completed enrollment. May differ from Net Deposits due to enrollment timing and process variations.",
+                class_="secondary-badge secondary-badge--stacked",
+            ),
+            # Col 4 (Admits) — Melt Rate
+            ui.output_ui("melt_rate_secondary"),
+            ui.tags.div(class_="secondary-badge--empty"),
+            ui.tags.div(class_="secondary-badge--empty"),
+            id="conv-rates-row",
+            class_="secondary-row collapsible-row funnel-aligned-row",
+        ),
         # Section 4: Main content (side by side)
         ui.tags.div(
             # Left: Trending chart
@@ -256,6 +369,11 @@ page_overview = ui.nav_panel(
 page_funnel = ui.nav_panel(
     "Lead Source",
     ui.tags.div(
+        _page_context_note(
+            "Lead Source",
+            "Which lead sources drive the most enrollment volume and conversion?",
+            "AY 2025\u201326 vs. AY 2024\u201325",
+        ),
         # Section 1: Funnel waterfall
         ui.tags.h2("Enrollment funnel", class_="section-heading"),
         ui.tags.div(
@@ -310,6 +428,7 @@ PROGRAM_TREND_METRICS = {
     "total_inquiries": "Inquiries",
     "total_app_starts": "App Starts",
     "total_app_submits": "App Submits",
+    "total_admits": "Admits",
     "total_deposits": "Deposits",
     "total_net_deposits": "Net Deposits",
 }
@@ -572,17 +691,17 @@ def _geo_filters():
 page_geography = ui.nav_panel(
     "Funnel Geography",
     ui.tags.div(
+        _page_context_note(
+            "Funnel Geography",
+            "Where are prospective students located geographically?",
+            "AY 2025\u201326 vs. AY 2024\u201325",
+        ),
         ui.tags.div(
             ui.tags.div(
                 ui.output_ui("geo_map_title"),
                 _pill_dropdown(
                     "geo_map_metric",
-                    {
-                        "total_inquiries": "Inquiries",
-                        "total_app_submits": "App Submits",
-                        "total_admits": "Admits",
-                        "total_net_deposits": "Net Deposits",
-                    },
+                    PROGRAM_TREND_METRICS,
                     "total_inquiries",
                 ),
                 class_="card-header-row",
@@ -710,6 +829,12 @@ def _programs_filters():
 page_programs = ui.nav_panel(
     "Program Breakdown",
     ui.tags.div(
+        _page_context_note(
+            "Program Breakdown",
+            "How are individual programs performing against enrollment goals?",
+            "AY 2025\u201326 vs. AY 2024\u201325",
+            "Goals shown are mock values until client targets are provided.",
+        ),
         # Program trending vs goal
         ui.tags.div(
             ui.tags.div(
@@ -875,6 +1000,11 @@ def _dig_metric_card(label, output_id):
 
 
 _dig_overview_content = ui.tags.div(
+    _page_context_note(
+        "Digital Performance \u2014 Overview",
+        "How did digital campaigns perform last month?",
+        "April 2026 vs. March 2026 (month-over-month)",
+    ),
     # KPI strip
     ui.tags.div(
         _dig_kpi_card("Key Interactions", "key_interactions", "#EA332D"),
@@ -962,8 +1092,13 @@ def _dig_page(content_div):
 
 # ── Overview YoY tab content (mirrors Overview, _yoy output IDs) ──────────
 _dig_overview_yoy_content = ui.tags.div(
+    _page_context_note(
+        "Digital Performance \u2014 Overview YoY",
+        "How does this academic year compare to last year?",
+        "AY 2025\u201326 vs. AY 2024\u201325 (year-over-year)",
+    ),
     ui.tags.div(
-        _dig_kpi_card("Impressions", "impressions_yoy", "#EA332D"),
+        _dig_kpi_card("Interactions", "impressions_yoy", "#EA332D"),
         _dig_kpi_card("Clicks", "clicks_yoy", "#021326"),
         _dig_kpi_card("CTR", "ctr_yoy", "#C99D44"),
         _dig_kpi_card("Total Key Interactions", "total_conv_yoy", "#021326"),
@@ -1040,6 +1175,11 @@ page_digital = ui.nav_menu(
     ui.nav_panel(
         "Interactions",
         _dig_page(ui.tags.div(
+            _page_context_note(
+                "Digital Performance \u2014 Interactions",
+                "What types of key interactions are campaigns generating?",
+                "April 2026 vs. March 2026 (month-over-month)",
+            ),
             ui.tags.h2("Interaction Filters", class_="section-heading"),
             ui.tags.div(
                 ui.tags.div(
@@ -1066,9 +1206,8 @@ page_digital = ui.nav_menu(
                 _dig_kpi_card("Visit / Events", "cat_visit", "#021326"),
                 _dig_kpi_card("Apply", "cat_apply", "#C99D44"),
                 _dig_kpi_card("Enroll / Deposit", "cat_enroll", "#E8B9A4"),
-                _dig_kpi_card("Other", "cat_other", "#8B1A1A"),
                 class_="funnel-strip",
-                style="grid-template-columns:repeat(5, 1fr);",
+                style="grid-template-columns:repeat(4, 1fr);",
             ),
             # Cost Metrics collapsible row
             ui.tags.div(
@@ -1129,6 +1268,11 @@ page_digital = ui.nav_menu(
     ui.nav_panel(
         "Digital Geography",
         _dig_page(ui.tags.div(
+            _page_context_note(
+                "Digital Performance \u2014 Geography",
+                "Where are digital interactions happening geographically?",
+                "AY 2025\u201326 vs. AY 2024\u201325 (year-over-year)",
+            ),
             ui.tags.div(
                 ui.tags.div(
                     ui.output_ui("dig_geo_map_title"),
@@ -1159,13 +1303,18 @@ page_digital = ui.nav_menu(
     ui.nav_panel(
         "Creative",
         _dig_page(ui.tags.div(
+            _page_context_note(
+                "Digital Performance \u2014 Creative",
+                "Which ad creatives and keywords are performing best?",
+                "AY 2025\u201326 (year-to-date)",
+            ),
             # ── Sub-page tab switcher ──
             ui.tags.div(
                 ui.input_radio_buttons(
                     "crv_sub", None,
                     choices={
                         "display": "Display Creative",
-                        "ppc": "PPC Keyword Performance",
+                        "ppc": "Paid Search Keywords",
                         "meta": "Meta Creative",
                         "linkedin": "LinkedIn Creative",
                         "youtube": "YouTube Creative",
@@ -1317,6 +1466,11 @@ page_digital = ui.nav_menu(
     ui.nav_panel(
         "Insights",
         _dig_page(ui.tags.div(
+            _page_context_note(
+                "Digital Performance \u2014 Insights",
+                "What optimizations and observations have been made?",
+                "AY 2025\u201326 (year-to-date)",
+            ),
             # ── Segmented view switcher ──
             ui.tags.div(
                 ui.input_radio_buttons(
@@ -1436,7 +1590,7 @@ app_ui = ui.page_navbar(
     id="nav",
     header=[
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=43"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=44"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(src="paginated-tables.js?v=2"),

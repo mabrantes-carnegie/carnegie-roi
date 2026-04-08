@@ -214,6 +214,8 @@ def _load_q9() -> pd.DataFrame:
                 "in_platform_leads", "total_interactions", "cost", "budget"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    # Merge "Campus Visit" into "Visit/Event"
+    df["interaction_category"] = df["interaction_category"].replace("Campus Visit", "Visit/Event")
     return df
 
 

@@ -13,7 +13,15 @@ from metrics import (
     compute_geo_detail,
 )
 from formatters import fmt_number, fmt_pct, fmt_currency, fmt_yoy
-from digital_server import digital_server, _plain_table, _heatmap_table
+from digital_server import (
+    digital_server,
+    _plain_table,
+    _heatmap_table,
+    _add_minmax_labels,
+    _add_minmax_labels_all,
+    _yoy_delta_table,
+    _pct_change,
+)
 
 # ── Carnegie brand colors for Plotly ─────────────────────────
 
@@ -201,9 +209,16 @@ def server_logic(input, output, session):
         return df
 
     @reactive.calc
-    def filtered_geo():
-        """Q6 filtered by global filters + Geography page-specific Period, Program, Student Type, Lead Source."""
-        df = _apply_global_filters(Q6.copy())
+    def prior_q3():
+        """Prior-year Q3 for city-level detail."""
+        df = Q3.copy()
+        df = df[df["institution_name"] == input.institution()]
+        df = df[df["term_year"] == int(input.term_year()) - 1]
+        df = df[df["term_semester"] == input.term_semester()]
+        return df
+
+    def _apply_geo_page_filters(df):
+        """Apply Geography page-specific filters to either Q6 or Q3 shaped data."""
         try:
             period = input.geo_period()
             if period and len(period) == 2 and "event_date" in df.columns:
@@ -213,23 +228,29 @@ def server_logic(input, output, session):
             pass
         try:
             prog = input.geo_program()
-            if prog and len(prog) > 0:
+            if prog and len(prog) > 0 and "program_name" in df.columns:
                 df = df[df["program_name"].isin(prog)]
         except Exception:
             pass
         try:
             st = input.geo_student_type()
-            if st and len(st) > 0:
+            if st and len(st) > 0 and "student_type" in df.columns:
                 df = df[df["student_type"].isin(st)]
         except Exception:
             pass
         try:
             src = input.geo_lead_source()
-            if src and len(src) > 0:
+            if src and len(src) > 0 and "origin_source_first" in df.columns:
                 df = df[df["origin_source_first"].isin(src)]
         except Exception:
             pass
         return df
+
+    @reactive.calc
+    def filtered_geo():
+        """Q6 filtered by global filters + Geography page-specific Period, Program, Student Type, Lead Source."""
+        df = _apply_global_filters(Q6.copy())
+        return _apply_geo_page_filters(df)
 
     # ── Update filter choices ─────────────────────────────────
 
@@ -505,12 +526,12 @@ def server_logic(input, output, session):
     def cost_detail_panel():
         """All cost metrics in a single collapsible row."""
         _costs = [
-            ("Cost/Net Deposit", "total_net_deposits"),
             ("Cost/Inquiry",     "total_inquiries"),
             ("Cost/App Start",   "total_app_starts"),
             ("Cost/App Submit",  "total_app_submits"),
             ("Cost/Admit",       "total_admits"),
             ("Cost/Deposit",     "total_deposits"),
+            ("Cost/Net Deposit", "total_net_deposits"),
         ]
         total_spend = filtered_q2()["total_cost"].sum()
         prior_spend = prior_q2()["total_cost"].sum()
@@ -536,15 +557,18 @@ def server_logic(input, output, session):
 
             badges.append(ui.tags.div(
                 ui.tags.div(label, class_="secondary-label"),
-                ui.tags.div(value_str, class_="secondary-value"),
-                yoy_el,
-                class_="secondary-badge",
+                ui.tags.div(
+                    ui.tags.div(value_str, class_="secondary-value"),
+                    yoy_el,
+                    class_="secondary-value-row",
+                ),
+                class_="secondary-badge secondary-badge--stacked",
             ))
 
         return ui.tags.div(
             *badges,
             id="cost-metrics-row",
-            class_="secondary-row collapsible-row",
+            class_="secondary-row collapsible-row funnel-aligned-row",
             title="Cost metrics reflect Carnegie campaign spend divided by total funnel volume.",
         )
 
@@ -758,6 +782,9 @@ def server_logic(input, output, session):
             )
 
         fig.update_layout(**layout)
+        # Add min/max labels on the 2025-26 line in monthly mode
+        if mode == "monthly" and len(fig.data) > 0:
+            _add_minmax_labels(fig, trace_idx=0, color="#EA332D")
         return _plotly_html(fig)
 
     # --- Funnel at a Glance ---
@@ -1002,15 +1029,22 @@ def server_logic(input, output, session):
 
             return ui.tags.div(
                 ui.tags.div("Melt Rate", class_="secondary-label"),
-                ui.tags.div(f"{melt:.1f}%", class_=f"secondary-value {melt_cls}"),
-                yoy_el,
+                ui.tags.div(
+                    ui.tags.div(f"{melt:.1f}%", class_=f"secondary-value {melt_cls}"),
+                    yoy_el,
+                    class_="secondary-value-row",
+                ),
                 title="Percentage of deposited students who withdrew before enrollment.",
-                class_="secondary-badge",
+                class_="secondary-badge secondary-badge--stacked",
             )
         return ui.tags.div(
             ui.tags.div("Melt Rate", class_="secondary-label"),
-            ui.tags.div("—", class_="secondary-value"),
-            class_="secondary-badge",
+            ui.tags.div(
+                ui.tags.div("—", class_="secondary-value"),
+                ui.tags.span("N/A", class_="kpi-badge kpi-badge--na"),
+                class_="secondary-value-row",
+            ),
+            class_="secondary-badge secondary-badge--stacked",
         )
 
     # ══════════════════════════════════════════════════════════
@@ -1096,20 +1130,6 @@ def server_logic(input, output, session):
                     font=dict(family="Manrope, sans-serif", size=11, color=font_color),
                     xanchor="center", yanchor="middle",
                 ))
-
-        # "Same period" note — bottom-left, below the legend
-        current_month_name = date.today().strftime("%b")
-        note_text = (
-            f"Same period compared: Jul – {current_month_name} &nbsp;|&nbsp; "
-            f"{curr_label} vs {prior_label}"
-        )
-        annotations.append(dict(
-            x=0, y=-0.18, xref="paper", yref="paper",
-            text=note_text,
-            showarrow=False,
-            font=dict(family="Manrope, sans-serif", size=10, color=CARNEGIE_GRAY_TEXT),
-            xanchor="left",
-        ))
 
         layout = _base_chart_layout(420)
         layout["barmode"] = "group"
@@ -1242,6 +1262,7 @@ def server_logic(input, output, session):
             font=dict(family="Manrope, sans-serif", size=10.5),
         )
         fig.update_layout(**layout)
+        _add_minmax_labels_all(fig)
         return _plotly_html(fig)
 
     # --- Conversion Rates by Source (Q2) ---
@@ -1544,6 +1565,7 @@ def server_logic(input, output, session):
             showgrid=False, title="",
         )
         fig.update_layout(**layout)
+        _add_minmax_labels(fig, trace_idx=0, color="#EA332D")
         return _plotly_html(fig)
 
     @render.ui
@@ -1675,15 +1697,19 @@ def server_logic(input, output, session):
 
     _GEO_METRIC_LABELS = {
         "total_inquiries": "Student inquiries by state",
+        "total_app_starts": "App starts by state",
         "total_app_submits": "App submits by state",
         "total_admits": "Admits by state",
+        "total_deposits": "Deposits by state",
         "total_net_deposits": "Net deposits by state",
     }
 
     _GEO_METRIC_SHORT = {
         "total_inquiries": "Inquiries",
+        "total_app_starts": "App Starts",
         "total_app_submits": "App Submits",
         "total_admits": "Admits",
+        "total_deposits": "Deposits",
         "total_net_deposits": "Net Deposits",
     }
 
@@ -1854,29 +1880,61 @@ def server_logic(input, output, session):
 
     @render.ui
     def geo_detail_table():
-        df = filtered_q3()
+        df = _apply_geo_page_filters(filtered_q3())
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
+        df_p = _apply_geo_page_filters(prior_q3())
         # Filter to US only by default; include_intl toggle if present
         include_all = getattr(input, "include_intl_unknown", lambda: False)()
         if not include_all:
             df = df[df["location_type"] == "US"]
+            if not df_p.empty and "location_type" in df_p.columns:
+                df_p = df_p[df_p["location_type"] == "US"]
         detail = compute_geo_detail(df)
         if detail.empty:
             return ui.tags.div("No data available.", class_="empty-state")
-        display = detail.rename(columns={
-            "student_state": "State",
-            "student_city": "City",
-            "total_inquiries": "Inquiries",
-            "total_app_starts": "App Starts",
-            "total_app_submits": "App Submits",
-            "total_deposits": "Deposits",
-            "total_net_deposits": "Net Deposits",
-        })
-        show_cols = ["State", "City", "Inquiries", "App Starts",
-                     "App Submits", "Deposits", "Net Deposits"]
-        heatmap_cols = [c for c in show_cols if c not in ("State", "City")]
-        return _heatmap_table(display[show_cols], heatmap_cols, paginated=True)
+        prior_detail = compute_geo_detail(df_p) if not df_p.empty else pd.DataFrame()
+
+        metric_cols = ["Inquiries", "App Starts", "App Submits", "Deposits", "Net Deposits"]
+        prev_map = {}
+        if not prior_detail.empty:
+            prev_map = {
+                (row["student_state"], row["student_city"]): row
+                for _, row in prior_detail.iterrows()
+            }
+
+        rows = []
+        for _, row in detail.iterrows():
+            key = (row["student_state"], row["student_city"])
+            prev = prev_map.get(key)
+            label = f"{row['student_state']} | {row['student_city']}"
+            rows.append({
+                "label": label,
+                "metrics": {
+                    "Inquiries": (
+                        f"{round(row['total_inquiries']):,}",
+                        _pct_change(row["total_inquiries"], prev.get("total_inquiries", 0)) if prev is not None else "N/A",
+                    ),
+                    "App Starts": (
+                        f"{round(row['total_app_starts']):,}",
+                        _pct_change(row["total_app_starts"], prev.get("total_app_starts", 0)) if prev is not None else "N/A",
+                    ),
+                    "App Submits": (
+                        f"{round(row['total_app_submits']):,}",
+                        _pct_change(row["total_app_submits"], prev.get("total_app_submits", 0)) if prev is not None else "N/A",
+                    ),
+                    "Deposits": (
+                        f"{round(row['total_deposits']):,}",
+                        _pct_change(row["total_deposits"], prev.get("total_deposits", 0)) if prev is not None else "N/A",
+                    ),
+                    "Net Deposits": (
+                        f"{round(row['total_net_deposits']):,}",
+                        _pct_change(row["total_net_deposits"], prev.get("total_net_deposits", 0)) if prev is not None else "N/A",
+                    ),
+                },
+            })
+
+        return _yoy_delta_table(rows, "State / City", metric_cols, paginated=True)
 
     # ══════════════════════════════════════════════════════════
     # PAGE 4: DIGITAL PERFORMANCE
