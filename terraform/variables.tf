@@ -49,9 +49,3 @@ variable "memory" {
   type        = string
   default     = "512Mi"
 }
-
-variable "github_repo" {
-  description = "GitHub repo (org/name) allowed to authenticate via WIF"
-  type        = string
-  default     = "CarnegieHigherEd/roi-report"
-}
