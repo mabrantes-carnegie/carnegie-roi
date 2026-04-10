@@ -9,6 +9,8 @@
 terraform {
   backend "gcs" {
     bucket = "carnegie-roi-reports-tfstate"
-    prefix = "roi-report/terraform/state"
+    # prefix is set at init time via -backend-config:
+    #   prod: roi-report/terraform/state/prod
+    #   dev:  roi-report/terraform/state/dev
   }
 }

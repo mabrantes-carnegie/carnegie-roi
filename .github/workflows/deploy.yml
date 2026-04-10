@@ -4,12 +4,12 @@ on:
   push:
     branches:
       - main
+      - dev
       - feature/gcp_deploy
 
 env:
   PROJECT_ID: carnegie-roi-reports
   REGION: us-east4
-  IMAGE: us-east4-docker.pkg.dev/carnegie-roi-reports/roi-reports/roi-reports-app
 
 jobs:
   deploy:
@@ -22,6 +22,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set environment
+        id: env
+        run: |
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "environment=prod" >> "$GITHUB_OUTPUT"
+            echo "repo_name=roi-reports" >> "$GITHUB_OUTPUT"
+            echo "service_name=roi-reports" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=dev" >> "$GITHUB_OUTPUT"
+            echo "repo_name=roi-reports-dev" >> "$GITHUB_OUTPUT"
+            echo "service_name=roi-reports-dev" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Authenticate to GCP (Workload Identity Federation)
         uses: google-github-actions/auth@v2
@@ -39,11 +52,11 @@ jobs:
         run: |
           docker build \
             -f app/Dockerfile \
-            -t ${{ env.IMAGE }}:latest \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ steps.env.outputs.repo_name }}/roi-reports-app:latest \
             .
 
       - name: Push Docker image
-        run: docker push ${{ env.IMAGE }}:latest
+        run: docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ steps.env.outputs.repo_name }}/roi-reports-app:latest
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
@@ -52,13 +65,23 @@ jobs:
 
       - name: Terraform Init
         working-directory: terraform
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config="prefix=roi-report/terraform/state/${{ steps.env.outputs.environment }}"
 
       - name: Terraform Apply
         working-directory: terraform
         run: |
           terraform apply -auto-approve \
-            -var="image_tag=latest"
+            -var="image_tag=latest" \
+            -var="environment=${{ steps.env.outputs.environment }}"
+
+      - name: Force new Cloud Run revision
+        run: |
+          gcloud run services update ${{ steps.env.outputs.service_name }} \
+            --region=${{ env.REGION }} \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ steps.env.outputs.repo_name }}/roi-reports-app:latest \
+            --project=${{ env.PROJECT_ID }}
 
       - name: Output Cloud Run URL
         working-directory: terraform
