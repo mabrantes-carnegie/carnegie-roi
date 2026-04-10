@@ -1,6 +1,4 @@
-environment  = "prod"
-service_name = "roi-reports"
-repo_name    = "roi-reports"
+environment = "prod"
 
 # Cloud Run
 min_instances = 0

@@ -1,6 +1,4 @@
-environment  = "dev"
-service_name = "roi-reports-dev"
-repo_name    = "roi-reports-dev"
+environment = "dev"
 
 # Cloud Run
 min_instances = 0

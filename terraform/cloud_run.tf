@@ -3,7 +3,7 @@ data "google_project" "current" {
 }
 
 resource "google_cloud_run_v2_service" "app" {
-  name        = var.service_name
+  name        = local.service_name
   location    = var.region
   ingress     = "INGRESS_TRAFFIC_ALL"
   iap_enabled = true
@@ -46,19 +46,10 @@ resource "google_cloud_run_v2_service_iam_member" "iap_sa_invoker" {
 # IAP domain access for @carnegiehighered.com — applied via gcloud (one-time per service)
 # due to provider bug in hashicorp/google (tested on 7.26 and 7.27):
 #
-#   # prod
+#   # Run once per environment:
 #   gcloud iap web add-iam-policy-binding \
 #     --resource-type=cloud-run \
-#     --service=roi-reports \
-#     --region=us-east4 \
-#     --member="domain:carnegiehighered.com" \
-#     --role="roles/iap.httpsResourceAccessor" \
-#     --project=carnegie-roi-reports
-#
-#   # dev
-#   gcloud iap web add-iam-policy-binding \
-#     --resource-type=cloud-run \
-#     --service=roi-reports-dev \
+#     --service=roi-reports-{ENV} \
 #     --region=us-east4 \
 #     --member="domain:carnegiehighered.com" \
 #     --role="roles/iap.httpsResourceAccessor" \

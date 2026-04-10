@@ -26,16 +26,6 @@ variable "environment" {
   }
 }
 
-variable "service_name" {
-  description = "Cloud Run service name"
-  type        = string
-}
-
-variable "repo_name" {
-  description = "Artifact Registry repository name"
-  type        = string
-}
-
 variable "min_instances" {
   description = "Minimum Cloud Run instances"
   type        = number
@@ -64,8 +54,4 @@ variable "github_repo" {
   description = "GitHub repo (org/name) allowed to authenticate via WIF"
   type        = string
   default     = "CarnegieHigherEd/roi-report"
-}
-
-locals {
-  image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.repo_name}/roi-reports-app:${var.image_tag}"
 }

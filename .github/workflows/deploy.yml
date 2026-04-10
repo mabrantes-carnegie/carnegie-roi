@@ -31,13 +31,9 @@ jobs:
             ENV="dev"
           fi
           echo "ENVIRONMENT=${ENV}" >> "$GITHUB_ENV"
-
-          # Read service_name and repo_name from tfvars
-          SERVICE_NAME=$(grep 'service_name' terraform/envs/${ENV}.tfvars | cut -d'"' -f2)
-          REPO_NAME=$(grep 'repo_name' terraform/envs/${ENV}.tfvars | cut -d'"' -f2)
-          echo "SERVICE_NAME=${SERVICE_NAME}" >> "$GITHUB_ENV"
-          echo "REPO_NAME=${REPO_NAME}" >> "$GITHUB_ENV"
-          echo "IMAGE=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${REPO_NAME}/roi-reports-app" >> "$GITHUB_ENV"
+          echo "SERVICE_NAME=roi-reports-${ENV}" >> "$GITHUB_ENV"
+          echo "REPO_NAME=roi-reports-${ENV}" >> "$GITHUB_ENV"
+          echo "IMAGE=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/roi-reports-${ENV}/roi-reports-app" >> "$GITHUB_ENV"
 
       - name: Authenticate to GCP (Workload Identity Federation)
         uses: google-github-actions/auth@v2
