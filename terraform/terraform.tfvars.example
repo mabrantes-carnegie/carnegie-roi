@@ -1,3 +1,3 @@
-project_id = "carnegie-roi-reports"
-region     = "us-east4"
-image_tag  = "latest"
+# Use envs/dev.tfvars or envs/prod.tfvars instead.
+# Example for local plan:
+#   terraform plan -var-file="envs/dev.tfvars"

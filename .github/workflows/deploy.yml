@@ -26,18 +26,18 @@ jobs:
       - name: Set environment
         run: |
           if [[ "${{ github.ref_name }}" == "main" ]]; then
-            echo "ENVIRONMENT=prod" >> "$GITHUB_ENV"
-            echo "REPO_NAME=roi-reports" >> "$GITHUB_ENV"
-            echo "SERVICE_NAME=roi-reports" >> "$GITHUB_ENV"
+            ENV="prod"
           else
-            echo "ENVIRONMENT=dev" >> "$GITHUB_ENV"
-            echo "REPO_NAME=roi-reports-dev" >> "$GITHUB_ENV"
-            echo "SERVICE_NAME=roi-reports-dev" >> "$GITHUB_ENV"
+            ENV="dev"
           fi
+          echo "ENVIRONMENT=${ENV}" >> "$GITHUB_ENV"
 
-      - name: Set image path
-        run: |
-          echo "IMAGE=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/roi-reports-app" >> "$GITHUB_ENV"
+          # Read service_name and repo_name from tfvars
+          SERVICE_NAME=$(grep 'service_name' terraform/envs/${ENV}.tfvars | cut -d'"' -f2)
+          REPO_NAME=$(grep 'repo_name' terraform/envs/${ENV}.tfvars | cut -d'"' -f2)
+          echo "SERVICE_NAME=${SERVICE_NAME}" >> "$GITHUB_ENV"
+          echo "REPO_NAME=${REPO_NAME}" >> "$GITHUB_ENV"
+          echo "IMAGE=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${REPO_NAME}/roi-reports-app" >> "$GITHUB_ENV"
 
       - name: Authenticate to GCP (Workload Identity Federation)
         uses: google-github-actions/auth@v2
@@ -72,8 +72,8 @@ jobs:
         working-directory: terraform
         run: |
           terraform apply -auto-approve \
-            -var="image_tag=latest" \
-            -var="environment=${{ env.ENVIRONMENT }}"
+            -var-file="envs/${{ env.ENVIRONMENT }}.tfvars" \
+            -var="image_tag=latest"
 
       - name: Force new Cloud Run revision
         run: |

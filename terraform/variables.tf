@@ -11,14 +11,14 @@ variable "region" {
 }
 
 variable "image_tag" {
-  description = "Docker image tag to deploy (typically the Git SHA)"
+  description = "Docker image tag to deploy"
   type        = string
+  default     = "latest"
 }
 
 variable "environment" {
   description = "Deployment environment (dev or prod)"
   type        = string
-  default     = "prod"
 
   validation {
     condition     = contains(["dev", "prod"], var.environment)
@@ -26,10 +26,38 @@ variable "environment" {
   }
 }
 
-locals {
-  service_name = var.environment == "prod" ? "roi-reports" : "roi-reports-${var.environment}"
-  repo_name    = var.environment == "prod" ? "roi-reports" : "roi-reports-${var.environment}"
-  image        = "${var.region}-docker.pkg.dev/${var.project_id}/${local.repo_name}/roi-reports-app:${var.image_tag}"
+variable "service_name" {
+  description = "Cloud Run service name"
+  type        = string
+}
+
+variable "repo_name" {
+  description = "Artifact Registry repository name"
+  type        = string
+}
+
+variable "min_instances" {
+  description = "Minimum Cloud Run instances"
+  type        = number
+  default     = 0
+}
+
+variable "max_instances" {
+  description = "Maximum Cloud Run instances"
+  type        = number
+  default     = 1
+}
+
+variable "cpu" {
+  description = "Cloud Run CPU limit"
+  type        = string
+  default     = "1"
+}
+
+variable "memory" {
+  description = "Cloud Run memory limit"
+  type        = string
+  default     = "512Mi"
 }
 
 variable "github_repo" {
@@ -38,4 +66,6 @@ variable "github_repo" {
   default     = "CarnegieHigherEd/roi-report"
 }
 
-
+locals {
+  image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.repo_name}/roi-reports-app:${var.image_tag}"
+}

@@ -3,7 +3,7 @@ data "google_project" "current" {
 }
 
 resource "google_cloud_run_v2_service" "app" {
-  name        = local.service_name
+  name        = var.service_name
   location    = var.region
   ingress     = "INGRESS_TRAFFIC_ALL"
   iap_enabled = true
@@ -18,15 +18,15 @@ resource "google_cloud_run_v2_service" "app" {
 
       resources {
         limits = {
-          memory = "512Mi"
-          cpu    = "1"
+          memory = var.memory
+          cpu    = var.cpu
         }
       }
     }
 
     scaling {
-      min_instance_count = 0
-      max_instance_count = 1
+      min_instance_count = var.min_instances
+      max_instance_count = var.max_instances
     }
   }
 
