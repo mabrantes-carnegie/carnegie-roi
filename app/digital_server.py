@@ -793,14 +793,44 @@ def digital_server(input, output, session):
         if df_curr.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        # Daily aggregation — one row per day in the selected period
-        curr_daily = (
-            df_curr.groupby("day")["total_interactions"].sum()
-            .reset_index()
-            .sort_values("day")
-        )
+        # Determine selected metric
+        try:
+            metric_key = input.dig_trending_metric()
+        except Exception:
+            metric_key = "clicks"
 
-        # Build full date spine for the selected period so every day shows on x-axis
+        _METRIC_LABELS = {
+            "clicks": "Clicks",
+            "ctr": "CTR",
+            "direct_conversions": "Direct Interactions",
+            "view_through_conversions": "View-through Interactions",
+            "in_platform_leads": "In-Platform Leads",
+            "budget": "Budget",
+            "cost_per_total_interaction": "Cost Per Total Interaction",
+        }
+        metric_label = _METRIC_LABELS.get(metric_key, metric_key)
+
+        # Derived metrics need special aggregation
+        is_rate = metric_key == "ctr"
+        is_cost = metric_key in ("budget", "cost_per_total_interaction")
+        is_derived = metric_key in ("ctr", "cost_per_total_interaction")
+
+        def _aggregate_daily(df):
+            agg_cols = {"impressions": "sum", "clicks": "sum",
+                        "direct_conversions": "sum", "view_through_conversions": "sum",
+                        "in_platform_leads": "sum", "total_interactions": "sum",
+                        "budget": "sum"}
+            daily = df.groupby("day").agg(agg_cols).reset_index().sort_values("day")
+            # Derived columns
+            daily["ctr"] = daily.apply(
+                lambda r: (r["clicks"] / r["impressions"] * 100) if r["impressions"] > 0 else 0, axis=1)
+            daily["cost_per_total_interaction"] = daily.apply(
+                lambda r: (r["budget"] / r["total_interactions"]) if r["total_interactions"] > 0 else 0, axis=1)
+            return daily
+
+        curr_daily = _aggregate_daily(df_curr)
+
+        # Build full date spine
         period = input.dig_period()
         if period and len(period) == 2:
             start_dt = pd.Timestamp(period[0])
@@ -812,39 +842,61 @@ def digital_server(input, output, session):
         all_days = pd.DataFrame({"day": pd.date_range(start_dt, end_dt, freq="D")})
         curr_daily = all_days.merge(curr_daily, on="day", how="left").fillna(0)
 
-        # x = actual dates so hover fires on every day; tick labels only on odd days
+        # Tick labels on odd days
         odd_days = curr_daily[curr_daily["day"].dt.day % 2 == 1]["day"]
         tickvals = odd_days.tolist()
         ticktext = [pd.Timestamp(d).strftime("%b ") + str(pd.Timestamp(d).day) for d in odd_days]
 
+        # Format hover values based on metric type
+        if is_rate:
+            hover_fmt = f"%{{x|%b %e}}<br>{metric_label}: %{{y:.2f}}%<extra></extra>"
+        elif metric_key == "budget":
+            hover_fmt = f"%{{x|%b %e}}<br>{metric_label}: $%{{y:,.0f}}<extra></extra>"
+        elif metric_key == "cost_per_total_interaction":
+            hover_fmt = f"%{{x|%b %e}}<br>{metric_label}: $%{{y:,.2f}}<extra></extra>"
+        else:
+            hover_fmt = f"%{{x|%b %e}}<br>{metric_label}: %{{y:,.0f}}<extra></extra>"
+
         fig = go.Figure()
         fig.add_trace(go.Scatter(
-            x=curr_daily["day"], y=curr_daily["total_interactions"],
-            mode="lines+markers", name="Total Key Interactions",
+            x=curr_daily["day"], y=curr_daily[metric_key],
+            mode="lines+markers", name=metric_label,
             line=dict(color="#EA332D", width=2),
             marker=dict(color="#EA332D", size=4),
-            hovertemplate="%{x|%b %e}<br>Total Key Interactions: %{y:,.0f}<extra></extra>",
+            hovertemplate=hover_fmt,
         ))
 
         if not df_prior.empty:
-            prior_daily = (
-                df_prior.groupby("day")["total_interactions"].sum()
-                .reset_index()
-                .sort_values("day")
-            )
-            # Align prior days to same day-of-month positions as current period
+            prior_daily = _aggregate_daily(df_prior)
             prior_daily["day_num"] = prior_daily["day"].dt.day
             curr_daily["day_num"] = curr_daily["day"].dt.day
             merged = curr_daily[["day", "day_num"]].merge(
-                prior_daily[["day_num", "total_interactions"]], on="day_num", how="left"
+                prior_daily[["day_num", metric_key]], on="day_num", how="left"
             ).fillna(0)
+
+            if is_rate:
+                hover_fmt_prior = f"%{{x|%b %e}}<br>{metric_label} (prev month): %{{y:.2f}}%<extra></extra>"
+            elif metric_key == "budget":
+                hover_fmt_prior = f"%{{x|%b %e}}<br>{metric_label} (prev month): $%{{y:,.0f}}<extra></extra>"
+            elif metric_key == "cost_per_total_interaction":
+                hover_fmt_prior = f"%{{x|%b %e}}<br>{metric_label} (prev month): $%{{y:,.2f}}<extra></extra>"
+            else:
+                hover_fmt_prior = f"%{{x|%b %e}}<br>{metric_label} (prev month): %{{y:,.0f}}<extra></extra>"
+
             fig.add_trace(go.Scatter(
-                x=merged["day"], y=merged["total_interactions"],
-                mode="lines+markers", name="Total Key Interactions (previous month)",
+                x=merged["day"], y=merged[metric_key],
+                mode="lines+markers", name=f"{metric_label} (previous month)",
                 line=dict(color="#C99D44", width=1.8, dash="dash"),
                 marker=dict(color="#C99D44", size=3),
-                hovertemplate="%{x|%b %e}<br>Total Key Interactions (prev month): %{y:,.0f}<extra></extra>",
+                hovertemplate=hover_fmt_prior,
             ))
+
+        # Y-axis formatting
+        yaxis_opts = dict(showgrid=True, gridcolor="#F0EEEA")
+        if is_rate:
+            yaxis_opts["ticksuffix"] = "%"
+        elif is_cost or metric_key == "budget":
+            yaxis_opts["tickprefix"] = "$"
 
         layout = _base_layout(320)
         layout["xaxis"] = dict(
@@ -852,6 +904,7 @@ def digital_server(input, output, session):
             tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
             showgrid=False, title="", tickangle=0,
         )
+        layout["yaxis"] = {**layout.get("yaxis", {}), **yaxis_opts}
         fig.update_layout(**layout)
         _add_minmax_labels(fig, trace_idx=0, color="#EA332D")
         return _plotly_html(fig)
@@ -3139,7 +3192,7 @@ def digital_server(input, output, session):
             "clicks": "Clicks",
             "ctr": "CTR",
             "cost_per_click": "Cost Per Click",
-            "total_conversions": "Total Int.",
+            "total_conversions": "Direct Int.",
             "cost_per_conversion": "Cost Per Direct Int.",
             "conv_rate": "Int. Rate",
         }
