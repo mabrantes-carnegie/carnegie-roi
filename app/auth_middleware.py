@@ -60,7 +60,9 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             except jwt.InvalidTokenError:
                 return HTMLResponse("Invalid link.", status_code=401)
 
-            response = RedirectResponse(url="/", status_code=302)
+            client = request.query_params.get("client", "")
+            redirect_url = f"/?client={client}" if client else "/"
+            response = RedirectResponse(url=redirect_url, status_code=302)
             _set_session_cookie(response, payload["email"])
             return response
 
