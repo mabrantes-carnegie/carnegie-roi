@@ -9,6 +9,8 @@ resource "google_cloud_run_v2_service" "app" {
   iap_enabled = true
 
   template {
+    service_account = google_service_account.cloud_run_sa.email
+
     containers {
       image = local.image
 
@@ -20,6 +22,26 @@ resource "google_cloud_run_v2_service" "app" {
         limits = {
           memory = var.memory
           cpu    = var.cpu
+        }
+      }
+
+      env {
+        name = "JWT_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.jwt_secret.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "COOKIE_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.cookie_secret.secret_id
+            version = "latest"
+          }
         }
       }
     }
