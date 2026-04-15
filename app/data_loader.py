@@ -1,11 +1,15 @@
-"""Load and clean CSV data once at startup."""
+"""Load and clean data from BigQuery once at startup."""
 
 import re
 from datetime import date
 from pathlib import Path
 import pandas as pd
+from google.cloud import bigquery
 
+_QUERY_DIR = Path(__file__).parent.parent / "data" / "queries"
 _DATA_DIR = Path(__file__).parent.parent / "data"
+
+_BQ_ROI = bigquery.Client(project="unified-data-platform-prod")
 
 # Valid US state/territory 2-letter codes
 VALID_US_STATES = frozenset({
@@ -24,9 +28,14 @@ MONTH_LABELS = {1: "Jul", 2: "Aug", 3: "Sep", 4: "Oct", 5: "Nov", 6: "Dec",
                 7: "Jan", 8: "Feb", 9: "Mar", 10: "Apr", 11: "May", 12: "Jun"}
 
 
+def _run_query(sql_file: str) -> pd.DataFrame:
+    sql = (_QUERY_DIR / sql_file).read_text()
+    return _BQ_ROI.query(sql).to_dataframe()
+
+
 def _load_q6() -> pd.DataFrame:
     """Load Q6 Source of Truth (funnel_benchmark_current monthly)."""
-    df = pd.read_csv(_DATA_DIR / "q6_fbc_monthly.csv")
+    df = _run_query("ROI_Principal.sql")
     df["student_type"] = df["student_type"].fillna("Unknown").replace("", "Unknown")
     df["is_international"] = df["is_international"].astype(bool)
     df["term_year"] = df["term_year"].astype(int)
@@ -40,25 +49,22 @@ def _load_q6() -> pd.DataFrame:
     df.loc[mask, "student_state"] = "International"
     # Location type for easy filtering
     df["location_type"] = df["student_state"].apply(
-        lambda s: "US" if s in VALID_US_STATES else s  # "Unknown" or "International"
+        lambda s: "US" if s in VALID_US_STATES else s
     )
-
     # Academic month position and label
     df["acad_pos"] = df["event_month"].map(ACAD_ORDER)
     df["month_label"] = df["acad_pos"].map(MONTH_LABELS)
-
     # Event date for filtering future months
     df["event_date"] = pd.to_datetime(
         df["event_year"].astype(str) + "-" + df["event_month"].astype(str).str.zfill(2) + "-01"
     )
     today_first = pd.Timestamp(date.today().replace(day=1))
     df = df[df["event_date"] <= today_first]
-
     return df.reset_index(drop=True)
 
 
 def _load_q2() -> pd.DataFrame:
-    df = pd.read_csv(_DATA_DIR / "q2_campaign_cost.csv")
+    df = _run_query("ROI_Campaign_Cost.sql")
     df["term_year"] = df["term_year"].astype(int)
     for col in ["institution_name", "lead_source", "campaign_service",
                 "campaign_funnel_target"]:
@@ -70,7 +76,6 @@ def _clean_city(city: str, state: str) -> str:
     """Clean city name: remove trailing state abbreviation, title case."""
     if not city or city == "Unknown":
         return city
-    # Remove trailing state code case-insensitively (e.g., "Centralia WA", "centralia wa")
     if state and state in VALID_US_STATES:
         city = re.sub(r"\s+" + re.escape(state) + r"$", "", city, flags=re.IGNORECASE)
     result = city.strip()
@@ -79,16 +84,14 @@ def _clean_city(city: str, state: str) -> str:
 
 def _load_q3() -> pd.DataFrame:
     """Load city-level geography detail."""
-    df = pd.read_csv(_DATA_DIR / "q3_geography.csv")
+    df = _run_query("ROI_Geography.sql")
     df["student_state"] = df["student_state"].fillna("").str.strip()
     df.loc[df["student_state"] == "", "student_state"] = "Unknown"
     mask = ~df["student_state"].isin(VALID_US_STATES | {"Unknown"})
     df.loc[mask, "student_state"] = "International"
-    # Location type
     df["location_type"] = df["student_state"].apply(
         lambda s: "US" if s in VALID_US_STATES else s
     )
-    # City cleaning — clean before title case (title case is applied in _clean_city)
     df["student_city"] = df["student_city"].fillna("").str.strip()
     df.loc[df["student_city"] == "", "student_city"] = "Unknown"
     df["student_city"] = df.apply(
