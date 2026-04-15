@@ -1,12 +1,7 @@
-data "google_project" "current" {
-  project_id = var.project_id
-}
-
 resource "google_cloud_run_v2_service" "app" {
-  name        = local.service_name
-  location    = var.region
-  ingress     = "INGRESS_TRAFFIC_ALL"
-  iap_enabled = true
+  name     = local.service_name
+  location = var.region
+  ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
     service_account = google_service_account.cloud_run_sa.email
@@ -26,10 +21,10 @@ resource "google_cloud_run_v2_service" "app" {
       }
 
       env {
-        name = "JWT_SECRET"
+        name = "JWT_PUBLIC_KEY"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.jwt_secret.secret_id
+            secret  = google_secret_manager_secret.jwt_public_key.secret_id
             version = "latest"
           }
         }
@@ -55,24 +50,11 @@ resource "google_cloud_run_v2_service" "app" {
   depends_on = [google_artifact_registry_repository.app]
 }
 
-# Grant the IAP service agent invoker access so it can forward
-# authenticated requests to Cloud Run on behalf of users.
-resource "google_cloud_run_v2_service_iam_member" "iap_sa_invoker" {
+# Allow unauthenticated requests — JWT middleware handles auth
+resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.app.name
   role     = "roles/run.invoker"
-  member   = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-iap.iam.gserviceaccount.com"
+  member   = "allUsers"
 }
-
-# IAP domain access for @carnegiehighered.com — applied via gcloud (one-time per service)
-# due to provider bug in hashicorp/google (tested on 7.26 and 7.27):
-#
-#   # Run once per environment:
-#   gcloud iap web add-iam-policy-binding \
-#     --resource-type=cloud-run \
-#     --service=roi-reports-{ENV} \
-#     --region=us-east4 \
-#     --member="domain:carnegiehighered.com" \
-#     --role="roles/iap.httpsResourceAccessor" \
-#     --project=carnegie-roi-reports
