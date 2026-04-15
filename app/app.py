@@ -104,13 +104,6 @@ def _pill_dropdown(input_id: str, choices: dict, selected: str):
         ),
     )
 
-from data_loader import (
-    get_institutions, get_term_years, get_term_semesters, get_student_types,
-)
-from digital_data import (
-    get_digital_date_range, get_digital_groups, get_digital_subgroups,
-    get_digital_products, get_digital_campaigns,
-)
 from server import server_logic
 
 # --- Carnegie content width wrapper ---
@@ -185,7 +178,7 @@ _COST_METRICS = [
 
 
 def _funnel_kpi_card(label: str, key: str, border_color: str = "#EA332D"):
-    """Compact funnel KPI card with value, YoY delta (inline), goal text, and progress bar."""
+    """Compact funnel KPI card with value, YoY delta, goal, progress, and inline cost."""
     return ui.tags.div(
         ui.tags.div(label, class_="funnel-label"),
         ui.tags.div(
@@ -195,6 +188,8 @@ def _funnel_kpi_card(label: str, key: str, border_color: str = "#EA332D"):
         ),
         ui.output_ui(f"goal_text_{key}"),
         ui.output_ui(f"progress_{key}"),
+        # Inline cost metric
+        ui.output_ui(f"cost_inline_{key}"),
         class_="funnel-card",
         style=f"border-top:3px solid {border_color};",
     )
@@ -237,38 +232,12 @@ page_overview = ui.nav_panel(
             class_="funnel-strip",
         ),
 
-        # Section 3a: Cost Metrics collapsible row
+        # Conversion Rates (always visible)
         ui.tags.div(
-            ui.tags.button(
-                ui.tags.span("Show Cost Metrics", class_="collapsible-btn-label"),
-                ui.tags.span("\u203a", class_="collapsible-btn-chevron"),
-                class_="collapsible-section-btn",
-                onclick=(
-                    "var row=document.getElementById('cost-metrics-row');"
-                    "var open=row.classList.contains('collapsible-row--open');"
-                    "row.classList.toggle('collapsible-row--open',!open);"
-                    "this.querySelector('.collapsible-btn-label').textContent=open?'Show Cost Metrics':'Hide Cost Metrics';"
-                    "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
-                ),
-            ),
-            class_="collapsible-section-header",
-        ),
-        ui.output_ui("cost_detail_panel"),
-
-        # Section 3b: Conversion Rates collapsible row
-        ui.tags.div(
-            ui.tags.button(
-                ui.tags.span("Show Conversion Rates", class_="collapsible-btn-label"),
-                ui.tags.span("\u203a", class_="collapsible-btn-chevron"),
-                class_="collapsible-section-btn",
-                onclick=(
-                    "var row=document.getElementById('conv-rates-row');"
-                    "var open=row.classList.contains('collapsible-row--open');"
-                    "row.classList.toggle('collapsible-row--open',!open);"
-                    "this.querySelector('.collapsible-btn-label').textContent=open?'Show Conversion Rates':'Hide Conversion Rates';"
-                    "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
-                ),
-            ),
+            ui.tags.div("Conversion Rates", class_="section-label",
+                        style="font-family:Manrope,sans-serif;font-size:11px;font-weight:600;"
+                              "color:#9B9893;text-transform:uppercase;letter-spacing:0.05em;"
+                              "margin-bottom:4px;"),
             class_="collapsible-section-header",
         ),
         ui.tags.div(
@@ -309,7 +278,7 @@ page_overview = ui.nav_panel(
             ui.tags.div(class_="secondary-badge--empty"),
             ui.tags.div(class_="secondary-badge--empty"),
             id="conv-rates-row",
-            class_="secondary-row collapsible-row funnel-aligned-row",
+            class_="secondary-row collapsible-row collapsible-row--open funnel-aligned-row",
         ),
         # Section 4: Main content (side by side)
         ui.tags.div(
@@ -434,8 +403,11 @@ PROGRAM_TREND_METRICS = {
 
 
 # --- Shared date range and month helpers (used by Geography, Programs, Digital) ---
+# Default date range — server updates pickers reactively once session data loads.
 
-_dig_min, _dig_max = get_digital_date_range()
+from datetime import datetime
+_dig_min = datetime(2024, 1, 1)
+_dig_max = datetime.today()
 
 
 def _month_options(min_dt, max_dt):
@@ -529,18 +501,18 @@ def _funnel_filters():
         ui.tags.div(
             ui.input_select(
                 "term_year", "Period",
-                choices=get_term_years(),
+                choices=["2027", "2026", "2025", "2024", "2023"],
                 selected="2026",
             ),
             ui.input_select(
                 "term_semester", "Term Semester",
-                choices=get_term_semesters(),
+                choices=["Fall", "Spring", "Summer"],
                 selected="Fall",
             ),
             ui.input_select(
                 "institution", "Institution",
-                choices=get_institutions(),
-                selected="Central Washington University",
+                choices=[],
+                selected=None,
             ),
             ui.input_switch(
                 "is_international", "Include International",
@@ -927,7 +899,7 @@ def _digital_filters():
         ui.tags.div(
             ui.input_selectize(
                 "dig_group", "Group",
-                choices=get_digital_groups(),
+                choices=[],
                 multiple=True,
                 options={"placeholder": "All"},
             ),
@@ -936,7 +908,7 @@ def _digital_filters():
         ui.tags.div(
             ui.input_selectize(
                 "dig_subgroup", "Subgroup",
-                choices=get_digital_subgroups(),
+                choices=[],
                 multiple=True,
                 options={"placeholder": "All"},
             ),
@@ -945,7 +917,7 @@ def _digital_filters():
         ui.tags.div(
             ui.input_selectize(
                 "dig_product", "Product",
-                choices=get_digital_products(),
+                choices=[],
                 multiple=True,
                 options={"placeholder": "All"},
             ),
@@ -954,7 +926,7 @@ def _digital_filters():
         ui.tags.div(
             ui.input_selectize(
                 "dig_campaign", "Campaign",
-                choices=get_digital_campaigns(),
+                choices=[],
                 multiple=True,
                 options={"placeholder": "All"},
             ),
@@ -977,12 +949,17 @@ def _digital_filters():
     )
 
 
-def _dig_kpi_card(label, output_id, border_color="#EA332D"):
-    """Digital KPI card with colored top border."""
-    return ui.tags.div(
+def _dig_kpi_card(label, output_id, border_color="#EA332D", cost_id=None):
+    """Digital KPI card with colored top border and optional inline cost."""
+    children = [
         ui.tags.div(label, class_="funnel-label"),
         ui.tags.div(ui.output_text(f"dig_{output_id}"), class_="funnel-value"),
         ui.output_ui(f"dig_{output_id}_delta"),
+    ]
+    if cost_id:
+        children.append(ui.output_ui(f"dig_{cost_id}"))
+    return ui.tags.div(
+        *children,
         class_="funnel-card",
         style=f"border-top:3px solid {border_color};",
     )
@@ -1009,11 +986,11 @@ _dig_overview_content = ui.tags.div(
     ),
     # KPI strip
     ui.tags.div(
-        _dig_kpi_card("Key Interactions", "key_interactions", "#EA332D"),
-        _dig_kpi_card("Cost per Interaction", "cpi", "#021326"),
-        _dig_kpi_card("Inquiry Interactions", "inquiry_int", "#C99D44"),
-        _dig_kpi_card("Visit Interactions", "visit_int", "#E8B9A4"),
-        _dig_kpi_card("Apply Interactions", "apply_int", "#8B1A1A"),
+        _dig_kpi_card("Budget", "budget_kpi", "#EA332D"),
+        _dig_kpi_card("Key Interactions", "key_interactions", "#021326", cost_id="cost_key_int"),
+        _dig_kpi_card("Inquiry Interactions", "inquiry_int", "#C99D44", cost_id="cost_inquiry_int"),
+        _dig_kpi_card("Visit Interactions", "visit_int", "#6B8F71", cost_id="cost_visit_int"),
+        _dig_kpi_card("Apply Interactions", "apply_int", "#8B7355", cost_id="cost_apply_int"),
         class_="funnel-strip",
         style="grid-template-columns:repeat(5, 1fr);",
     ),
@@ -1050,7 +1027,7 @@ _dig_overview_content = ui.tags.div(
         ui.tags.div(
             ui.tags.span("Engagement & Spend", class_="card-heading"),
             ui.tags.div(
-                _dig_metric_card("Budget", "budget"),
+                _dig_metric_card("Clicks", "clicks"),
                 _dig_metric_card("Cost per Click", "cpc"),
                 _dig_metric_card("Direct Key Interactions", "direct_conv"),
                 _dig_metric_card("Cost per Direct Key Int.", "cpdc"),
@@ -1073,12 +1050,36 @@ _dig_overview_content = ui.tags.div(
     # Strategy section
     ui.tags.div(
         ui.tags.div(
-            ui.tags.span("Performance By Strategy", class_="card-heading"),
+            ui.tags.div(
+                ui.tags.span("Performance By Strategy", class_="card-heading"),
+                _pill_dropdown("dig_strategy_bar_metric", {
+                    "total_interactions": "Total Interactions",
+                    "clicks": "Clicks",
+                    "direct_conversions": "Direct Interactions",
+                    "view_through_conversions": "View-through Interactions",
+                    "in_platform_leads": "In-Platform Leads",
+                    "budget": "Budget",
+                }, "total_interactions"),
+                class_="card-header-row",
+            ),
             ui.output_ui("dig_strategy_bar"),
             class_="chart-card",
         ),
         ui.tags.div(
-            ui.tags.span("Strategy Trend", class_="card-heading"),
+            ui.tags.div(
+                ui.tags.span("Strategy Trend", class_="card-heading"),
+                _pill_dropdown("dig_strategy_trend_metric", {
+                    "total_interactions": "Total Interactions",
+                    "clicks": "Clicks",
+                    "ctr": "CTR",
+                    "direct_conversions": "Direct Interactions",
+                    "view_through_conversions": "View-through Interactions",
+                    "in_platform_leads": "In-Platform Leads",
+                    "budget": "Budget",
+                    "cost_per_total_interaction": "Cost Per Total Interaction",
+                }, "total_interactions"),
+                class_="card-header-row",
+            ),
             ui.output_ui("dig_strategy_trend"),
             class_="chart-card",
         ),
@@ -1112,13 +1113,14 @@ _dig_overview_yoy_content = ui.tags.div(
         "AY 2025\u201326 vs. AY 2024\u201325 (year-over-year)",
     ),
     ui.tags.div(
-        _dig_kpi_card("Interactions", "impressions_yoy", "#EA332D"),
-        _dig_kpi_card("Clicks", "clicks_yoy", "#021326"),
-        _dig_kpi_card("CTR", "ctr_yoy", "#C99D44"),
-        _dig_kpi_card("Total Key Interactions", "total_conv_yoy", "#021326"),
-        _dig_kpi_card("Key Interaction Rate", "conv_rate_yoy", "#C99D44"),
+        _dig_kpi_card("Budget", "budget_yoy_kpi", "#EA332D"),
+        _dig_kpi_card("Interactions", "impressions_yoy", "#021326", cost_id="cost_interactions_yoy"),
+        _dig_kpi_card("Clicks", "clicks_yoy", "#C99D44", cost_id="cost_clicks_yoy"),
+        _dig_kpi_card("CTR", "ctr_yoy", "#6B8F71"),
+        _dig_kpi_card("Total Key Interactions", "total_conv_yoy", "#8B7355", cost_id="cost_total_conv_yoy"),
+        _dig_kpi_card("Key Interaction Rate", "conv_rate_yoy", "#5B7C99"),
         class_="funnel-strip",
-        style="grid-template-columns:repeat(5, 1fr);",
+        style="grid-template-columns:repeat(6, 1fr);",
     ),
     ui.tags.div(
         ui.tags.div(
@@ -1130,15 +1132,14 @@ _dig_overview_yoy_content = ui.tags.div(
         ui.tags.div(
             ui.tags.span("Engagement & Spend", class_="card-heading"),
             ui.tags.div(
-                _dig_metric_card("Budget", "budget_yoy"),
-                _dig_metric_card("Cost per Click", "cpc_yoy"),
                 _dig_metric_card("Direct Key Interactions", "direct_conv_yoy"),
                 _dig_metric_card("Cost per Direct Key Int.", "cpdc_yoy"),
                 _dig_metric_card("In-Platform Leads", "ipl_yoy"),
                 _dig_metric_card("Cost per In-Plat. Lead", "cpipl_yoy"),
                 _dig_metric_card("View-through Int.", "vtc_yoy"),
-                _dig_metric_card("Cost per Total Key Int.", "cptc_yoy"),
+                _dig_metric_card("Cost per View-through Int.", "cpvtc_yoy"),
                 class_="dig-metric-grid",
+                style="grid-template-columns:repeat(2, 1fr);grid-template-rows:repeat(3, auto);",
             ),
             class_="chart-card",
             style="flex:2;",
@@ -1147,13 +1148,37 @@ _dig_overview_yoy_content = ui.tags.div(
     ),
     ui.tags.div(
         ui.tags.div(
-            ui.tags.span("Performance By Strategy", class_="card-heading"),
+            ui.tags.div(
+                ui.tags.span("Performance By Strategy", class_="card-heading"),
+                _pill_dropdown("dig_strategy_bar_metric_yoy", {
+                    "total_interactions": "Total Interactions",
+                    "clicks": "Clicks",
+                    "direct_conversions": "Direct Interactions",
+                    "view_through_conversions": "View-through Interactions",
+                    "in_platform_leads": "In-Platform Leads",
+                    "budget": "Budget",
+                }, "total_interactions"),
+                class_="card-header-row",
+            ),
             ui.output_ui("dig_strategy_bar_yoy"),
             class_="chart-card",
             style="flex:1;",
         ),
         ui.tags.div(
-            ui.tags.span("Strategy Trend", class_="card-heading"),
+            ui.tags.div(
+                ui.tags.span("Strategy Trend", class_="card-heading"),
+                _pill_dropdown("dig_strategy_trend_metric_yoy", {
+                    "total_interactions": "Total Interactions",
+                    "clicks": "Clicks",
+                    "ctr": "CTR",
+                    "direct_conversions": "Direct Interactions",
+                    "view_through_conversions": "View-through Interactions",
+                    "in_platform_leads": "In-Platform Leads",
+                    "budget": "Budget",
+                    "cost_per_total_interaction": "Cost Per Total Interaction",
+                }, "total_interactions"),
+                class_="card-header-row",
+            ),
             ui.output_ui("dig_strategy_trend_yoy"),
             class_="chart-card",
             style="flex:1;",
@@ -1216,30 +1241,14 @@ page_digital = ui.nav_menu(
                 style="flex-wrap:wrap; gap:12px;",
             ),
             ui.tags.div(
-                _dig_kpi_card("RFI / Lead Gen", "cat_rfi", "#EA332D"),
-                _dig_kpi_card("Visit / Events", "cat_visit", "#021326"),
-                _dig_kpi_card("Apply", "cat_apply", "#C99D44"),
-                _dig_kpi_card("Enroll / Deposit", "cat_enroll", "#E8B9A4"),
+                _dig_kpi_card("Key Interactions", "cat_total", "#EA332D", cost_id="cost_cat_total"),
+                _dig_kpi_card("RFI / Lead Gen", "cat_rfi", "#021326", cost_id="cost_cat_rfi"),
+                _dig_kpi_card("Visit / Events", "cat_visit", "#C99D44", cost_id="cost_cat_visit"),
+                _dig_kpi_card("Apply", "cat_apply", "#6B8F71", cost_id="cost_cat_apply"),
+                _dig_kpi_card("Enroll / Deposit", "cat_enroll", "#E8B9A4", cost_id="cost_cat_enroll"),
                 class_="funnel-strip",
-                style="grid-template-columns:repeat(4, 1fr);",
+                style="grid-template-columns:repeat(5, 1fr);",
             ),
-            # Cost Metrics collapsible row
-            ui.tags.div(
-                ui.tags.button(
-                    ui.tags.span("Show Cost Metrics", class_="collapsible-btn-label"),
-                    ui.tags.span("\u203a", class_="collapsible-btn-chevron"),
-                    class_="collapsible-section-btn",
-                    onclick=(
-                        "var row=document.getElementById('int-cost-metrics-row');"
-                        "var open=row.classList.contains('collapsible-row--open');"
-                        "row.classList.toggle('collapsible-row--open',!open);"
-                        "this.querySelector('.collapsible-btn-label').textContent=open?'Show Cost Metrics':'Hide Cost Metrics';"
-                        "this.querySelector('.collapsible-btn-chevron').style.transform=open?'rotate(0deg)':'rotate(90deg)';"
-                    ),
-                ),
-                class_="collapsible-section-header",
-            ),
-            ui.output_ui("dig_int_cost_panel"),
             ui.tags.h2("Key Interaction Category Trending", class_="section-heading"),
             ui.tags.div(
                 ui.output_ui("dig_cat_trend_chart"),
@@ -1636,12 +1645,16 @@ app_ui = ui.page_navbar(
     return p[0] + '-' + p[1] + '-' + String(ld).padStart(2, '0');
   }
 
-  // Data-month range: both start and end = last available data month
-  // Used for Overview & Interactions
+  // Data-month range: previous month relative to last available data month
+  // Used for Overview & Interactions (current/open month should not be default)
   function _dataMonthRange() {
     var sel = _lastDataMonth();
     if (!sel) return null;
-    return {start: sel, end: _lastDayOf(sel), startSel: sel, endSel: sel};
+    var p = sel.split('-'); var y = +p[0]; var m = +p[1];
+    // Go back one month
+    if (m === 1) { y -= 1; m = 12; } else { m -= 1; }
+    var prev = y + '-' + String(m).padStart(2, '0') + '-01';
+    return {start: prev, end: _lastDayOf(prev), startSel: prev, endSel: prev};
   }
 
   // Academic-year range: Jul of current AY → last data month

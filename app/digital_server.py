@@ -6,8 +6,12 @@ from shiny import render, reactive, ui, req
 import plotly.graph_objects as go
 from urllib.request import urlopen, Request
 
-from digital_data import Q8, Q9, Q10, Q11_CREATIVE, Q11_KEYWORDS, Q11_YOUTUBE, Q12
-from formatters import fmt_number, fmt_currency, fmt_compact
+from formatters import (
+    fmt_number,
+    fmt_currency,
+    fmt_compact,
+    resolve_line_label_layout,
+)
 
 # ── Image cache: URL → base64 data URI (fetched once, reused) ────
 _IMAGE_CACHE: dict[str, str | None] = {}
@@ -382,6 +386,37 @@ def _add_bar_labels(fig):
             trace.outsidetextfont = dict(color="#021326", size=10, family="Manrope, sans-serif")
 
 
+def _add_line_label_annotations(fig, series_defs, chart_height=320, min_gap_px=20):
+    """Render stacked line labels as annotations with explicit pixel spacing."""
+    layout_map = resolve_line_label_layout(
+        series_defs,
+        chart_height=chart_height,
+        min_gap_px=min_gap_px,
+    )
+    for series in series_defs:
+        s_idx = series["series_idx"]
+        xs = list(series["xs"])
+        ys = list(series["ys"])
+        texts = list(series["texts"])
+        color = series.get("color", "#021326")
+        font_size = series.get("font_size", 9)
+        for x_val, y_val, text in zip(xs, ys, texts):
+            spec = layout_map.get(s_idx, {}).get(x_val, {"show": bool(text), "yshift": 14, "xshift": 0})
+            if not text or not spec.get("show", True):
+                continue
+            fig.add_annotation(
+                x=x_val,
+                y=y_val,
+                text=text,
+                showarrow=False,
+                yshift=spec.get("yshift", 0),
+                xshift=spec.get("xshift", 0),
+                xanchor="center",
+                yanchor="middle",
+                font=dict(family="Manrope, sans-serif", size=font_size, color=color),
+            )
+
+
 def _base_layout(height=360):
     return dict(
         font=dict(family="Manrope, sans-serif", color=CARNEGIE_NAVY, size=10.5),
@@ -434,7 +469,7 @@ def _fmt_digital_count(n, compact=False):
     return f"{rounded:,}"
 
 
-def _fmt_delta(curr, prev, invert=False, label="vs. PY"):
+def _fmt_delta(curr, prev, invert=False, label="YoY"):
     """Build a YoY/MoM delta badge. invert=True means down is good (cost)."""
     if prev is None or prev == 0 or curr is None:
         return ui.tags.span("N/A", class_="kpi-badge kpi-badge--na")
@@ -452,8 +487,19 @@ def _fmt_delta(curr, prev, invert=False, label="vs. PY"):
     )
 
 
-def digital_server(input, output, session):
+def digital_server(
+    input, output, session, *,
+    get_q8, get_q9, get_q10,
+    get_q11_creative, get_q11_keywords, get_q11_youtube, get_q12,
+):
     """Register all digital performance outputs."""
+    Q8 = get_q8
+    Q9 = get_q9
+    Q10 = get_q10
+    Q11_CREATIVE = get_q11_creative
+    Q11_KEYWORDS = get_q11_keywords
+    Q11_YOUTUBE = get_q11_youtube
+    Q12 = get_q12
 
     # ══════════════════════════════════════════════════════════
     # SHARED FILTERS
@@ -514,12 +560,12 @@ def digital_server(input, output, session):
 
     @reactive.calc
     def _dig_q8():
-        return _apply_dig_filters(Q8.copy())
+        return _apply_dig_filters(Q8())
 
     @reactive.calc
     def _dig_q8_prior():
         """Prior period for Q8 — previous month (MoM comparison)."""
-        df = Q8.copy()
+        df = Q8()
         period = input.dig_period()
         if period and len(period) == 2:
             start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
@@ -546,12 +592,12 @@ def digital_server(input, output, session):
 
     @reactive.calc
     def _dig_q9():
-        return _apply_dig_filters(Q9.copy())
+        return _apply_dig_filters(Q9())
 
     @reactive.calc
     def _dig_q9_prior():
         """Prior period for Q9 — previous month (MoM comparison)."""
-        df = Q9.copy()
+        df = Q9()
         period = input.dig_period()
         if period and len(period) == 2:
             start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
@@ -578,7 +624,7 @@ def digital_server(input, output, session):
     @reactive.calc
     def _dig_q8_yoy():
         """Fixed prior academic year Jul 2024 – Jun 2025 for YoY comparison."""
-        df = Q8.copy()
+        df = Q8()
         yoy_start = pd.Timestamp("2024-07-01")
         yoy_end = pd.Timestamp("2025-06-30")
         df = df[(df["day"] >= yoy_start) & (df["day"] <= yoy_end)]
@@ -599,7 +645,7 @@ def digital_server(input, output, session):
     @reactive.calc
     def _dig_q9_yoy():
         """Fixed prior academic year Jul 2024 – Jun 2025 for YoY comparison (Q9)."""
-        df = Q9.copy()
+        df = Q9()
         yoy_start = pd.Timestamp("2024-07-01")
         yoy_end = pd.Timestamp("2025-06-30")
         df = df[(df["day"] >= yoy_start) & (df["day"] <= yoy_end)]
@@ -632,7 +678,7 @@ def digital_server(input, output, session):
     def dig_key_interactions_delta():
         curr = _dig_q8()["total_interactions"].sum()
         prev = _dig_q8_prior()["total_interactions"].sum()
-        return _fmt_delta(curr, prev, label="vs. PM")
+        return _fmt_delta(curr, prev, label="MoM")
 
     @render.text
     def dig_cpi():
@@ -644,7 +690,7 @@ def digital_server(input, output, session):
         df_c, df_p = _dig_q8(), _dig_q8_prior()
         curr = _safe_div(df_c["budget"].sum(), df_c["total_interactions"].sum())
         prev = _safe_div(df_p["budget"].sum(), df_p["total_interactions"].sum())
-        return _fmt_delta(curr, prev, invert=True, label="vs. PM")
+        return _fmt_delta(curr, prev, invert=True, label="MoM")
 
     @render.text
     def dig_inquiry_int():
@@ -656,7 +702,7 @@ def digital_server(input, output, session):
         curr = _dig_q9()[_dig_q9()["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum()
         prev = _dig_q9_prior()
         prev_v = prev[prev["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum() if not prev.empty else 0
-        return _fmt_delta(curr, prev_v, label="vs. PM")
+        return _fmt_delta(curr, prev_v, label="MoM")
 
     @render.text
     def dig_visit_int():
@@ -668,7 +714,7 @@ def digital_server(input, output, session):
         curr = _dig_q9()[_dig_q9()["interaction_category"] == "Visit/Event"]["total_interactions"].sum()
         prev = _dig_q9_prior()
         prev_v = prev[prev["interaction_category"] == "Visit/Event"]["total_interactions"].sum() if not prev.empty else 0
-        return _fmt_delta(curr, prev_v, label="vs. PM")
+        return _fmt_delta(curr, prev_v, label="MoM")
 
     @render.text
     def dig_apply_int():
@@ -680,7 +726,7 @@ def digital_server(input, output, session):
         curr = _dig_q9()[_dig_q9()["interaction_category"] == "Apply"]["total_interactions"].sum()
         prev = _dig_q9_prior()
         prev_v = prev[prev["interaction_category"] == "Apply"]["total_interactions"].sum() if not prev.empty else 0
-        return _fmt_delta(curr, prev_v, label="vs. PM")
+        return _fmt_delta(curr, prev_v, label="MoM")
 
     # --- Engagement & Spend metrics ---
 
@@ -690,7 +736,7 @@ def digital_server(input, output, session):
 
     @render.ui
     def dig_budget_delta():
-        return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_prior()["budget"].sum(), invert=True, label="vs. PM")
+        return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_prior()["budget"].sum(), invert=True, label="MoM")
 
     @render.text
     def dig_cpc():
@@ -703,7 +749,7 @@ def digital_server(input, output, session):
         return _fmt_delta(
             _safe_div(df_c["budget"].sum(), df_c["clicks"].sum()),
             _safe_div(df_p["budget"].sum(), df_p["clicks"].sum()),
-            invert=True, label="vs. PM",
+            invert=True, label="MoM",
         )
 
     @render.text
@@ -715,7 +761,7 @@ def digital_server(input, output, session):
         return _fmt_delta(
             _dig_q8()["direct_conversions"].sum(),
             _dig_q8_prior()["direct_conversions"].sum(),
-            label="vs. PM",
+            label="MoM",
         )
 
     @render.text
@@ -729,7 +775,7 @@ def digital_server(input, output, session):
         return _fmt_delta(
             _safe_div(df_c["budget"].sum(), df_c["direct_conversions"].sum()),
             _safe_div(df_p["budget"].sum(), df_p["direct_conversions"].sum()),
-            invert=True, label="vs. PM",
+            invert=True, label="MoM",
         )
 
     @render.text
@@ -741,7 +787,7 @@ def digital_server(input, output, session):
         return _fmt_delta(
             _dig_q8()["in_platform_leads"].sum(),
             _dig_q8_prior()["in_platform_leads"].sum(),
-            label="vs. PM",
+            label="MoM",
         )
 
     @render.text
@@ -755,7 +801,7 @@ def digital_server(input, output, session):
         return _fmt_delta(
             _safe_div(df_c["budget"].sum(), df_c["in_platform_leads"].sum()),
             _safe_div(df_p["budget"].sum(), df_p["in_platform_leads"].sum()),
-            invert=True, label="vs. PM",
+            invert=True, label="MoM",
         )
 
     @render.text
@@ -767,7 +813,7 @@ def digital_server(input, output, session):
         return _fmt_delta(
             _dig_q8()["view_through_conversions"].sum(),
             _dig_q8_prior()["view_through_conversions"].sum(),
-            label="vs. PM",
+            label="MoM",
         )
 
     @render.text
@@ -781,8 +827,78 @@ def digital_server(input, output, session):
         return _fmt_delta(
             _safe_div(df_c["budget"].sum(), df_c["total_interactions"].sum()),
             _safe_div(df_p["budget"].sum(), df_p["total_interactions"].sum()),
-            invert=True, label="vs. PM",
+            invert=True, label="MoM",
         )
+
+    # --- Budget KPI card (Overview top strip) ---
+
+    @render.text
+    def dig_budget_kpi():
+        return fmt_currency(_dig_q8()["budget"].sum())
+
+    @render.ui
+    def dig_budget_kpi_delta():
+        return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_prior()["budget"].sum(), invert=True, label="MoM")
+
+    # --- Clicks metric card (Engagement & Spend grid) ---
+
+    @render.text
+    def dig_clicks():
+        return _fmt_digital_count(_dig_q8()["clicks"].sum(), compact=True)
+
+    @render.ui
+    def dig_clicks_delta():
+        return _fmt_delta(_dig_q8()["clicks"].sum(), _dig_q8_prior()["clicks"].sum(), label="MoM")
+
+    # --- Inline cost outputs for Overview KPI cards ---
+
+    def _dig_cost_inline(curr_metric_val, prev_metric_val, cost_label, label="MoM"):
+        """Generic inline cost element for a digital KPI card."""
+        budget_c = _dig_q8()["budget"].sum()
+        budget_p = _dig_q8_prior()["budget"].sum()
+        curr_val = _safe_div(budget_c, curr_metric_val)
+        prev_val = _safe_div(budget_p, prev_metric_val)
+        value_str = fmt_currency(curr_val) if curr_val is not None else "\u2014"
+        yoy_el = _fmt_delta(curr_val, prev_val, invert=True, label=label)
+        return ui.tags.div(
+            ui.tags.div(
+                ui.tags.span(cost_label, style="font-size:10px;color:#9B9893;font-weight:600;"),
+                ui.tags.span(value_str, style="font-size:12px;font-weight:700;color:#021326;margin-left:6px;"),
+                yoy_el,
+                style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;",
+            ),
+            style="margin-top:6px;padding-top:6px;border-top:1px solid #e5e1dc;",
+        )
+
+    @render.ui
+    def dig_cost_key_int():
+        c = _dig_q8()["total_interactions"].sum()
+        p = _dig_q8_prior()["total_interactions"].sum()
+        return _dig_cost_inline(c, p, "Cost/Int.")
+
+    @render.ui
+    def dig_cost_inquiry_int():
+        q9_c = _dig_q9()
+        q9_p = _dig_q9_prior()
+        c = q9_c[q9_c["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum()
+        p = q9_p[q9_p["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum() if not q9_p.empty else 0
+        return _dig_cost_inline(c, p, "Cost/Inquiry Int.")
+
+    @render.ui
+    def dig_cost_visit_int():
+        q9_c = _dig_q9()
+        q9_p = _dig_q9_prior()
+        c = q9_c[q9_c["interaction_category"] == "Visit/Event"]["total_interactions"].sum()
+        p = q9_p[q9_p["interaction_category"] == "Visit/Event"]["total_interactions"].sum() if not q9_p.empty else 0
+        return _dig_cost_inline(c, p, "Cost/Visit Int.")
+
+    @render.ui
+    def dig_cost_apply_int():
+        q9_c = _dig_q9()
+        q9_p = _dig_q9_prior()
+        c = q9_c[q9_c["interaction_category"] == "Apply"]["total_interactions"].sum()
+        p = q9_p[q9_p["interaction_category"] == "Apply"]["total_interactions"].sum() if not q9_p.empty else 0
+        return _dig_cost_inline(c, p, "Cost/Apply Int.")
 
     # --- Trending Chart ---
 
@@ -857,6 +973,39 @@ def digital_server(input, output, session):
         else:
             hover_fmt = f"%{{x|%b %e}}<br>{metric_label}: %{{y:,.0f}}<extra></extra>"
 
+        def _fmt_text(vals, mk):
+            if mk == "ctr":
+                return [f"{v:.1f}%" for v in vals]
+            elif mk in ("budget", "cost_per_total_interaction"):
+                return [f"${v:,.0f}" if v >= 1 else f"${v:.2f}" for v in vals]
+            else:
+                return [f"{v:,.0f}" for v in vals]
+
+        # Compute prior series first so we can resolve label collisions for both
+        _merged = None
+        if not df_prior.empty:
+            prior_daily = _aggregate_daily(df_prior)
+            prior_daily["day_num"] = prior_daily["day"].dt.day
+            curr_daily["day_num"] = curr_daily["day"].dt.day
+            _merged = curr_daily[["day", "day_num"]].merge(
+                prior_daily[["day_num", metric_key]], on="day_num", how="left"
+            ).fillna(0)
+
+        _series_defs = [{
+            "series_idx": 0,
+            "xs": curr_daily["day"].tolist(),
+            "ys": curr_daily[metric_key].tolist(),
+            "texts": _fmt_text(curr_daily[metric_key].tolist(), metric_key),
+            "default_pos": "top center",
+        }]
+        if _merged is not None:
+            _series_defs.append({
+                "series_idx": 1,
+                "xs": _merged["day"].tolist(),
+                "ys": _merged[metric_key].tolist(),
+                "texts": _fmt_text(_merged[metric_key].tolist(), metric_key),
+                "default_pos": "bottom center",
+            })
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             x=curr_daily["day"], y=curr_daily[metric_key],
@@ -866,14 +1015,7 @@ def digital_server(input, output, session):
             hovertemplate=hover_fmt,
         ))
 
-        if not df_prior.empty:
-            prior_daily = _aggregate_daily(df_prior)
-            prior_daily["day_num"] = prior_daily["day"].dt.day
-            curr_daily["day_num"] = curr_daily["day"].dt.day
-            merged = curr_daily[["day", "day_num"]].merge(
-                prior_daily[["day_num", metric_key]], on="day_num", how="left"
-            ).fillna(0)
-
+        if _merged is not None:
             if is_rate:
                 hover_fmt_prior = f"%{{x|%b %e}}<br>{metric_label} (prev month): %{{y:.2f}}%<extra></extra>"
             elif metric_key == "budget":
@@ -884,7 +1026,7 @@ def digital_server(input, output, session):
                 hover_fmt_prior = f"%{{x|%b %e}}<br>{metric_label} (prev month): %{{y:,.0f}}<extra></extra>"
 
             fig.add_trace(go.Scatter(
-                x=merged["day"], y=merged[metric_key],
+                x=_merged["day"], y=_merged[metric_key],
                 mode="lines+markers", name=f"{metric_label} (previous month)",
                 line=dict(color="#C99D44", width=1.8, dash="dash"),
                 marker=dict(color="#C99D44", size=3),
@@ -906,7 +1048,12 @@ def digital_server(input, output, session):
         )
         layout["yaxis"] = {**layout.get("yaxis", {}), **yaxis_opts}
         fig.update_layout(**layout)
-        _add_minmax_labels(fig, trace_idx=0, color="#EA332D")
+        _series_defs[0]["color"] = "#EA332D"
+        _series_defs[0]["font_size"] = 9
+        if len(_series_defs) > 1:
+            _series_defs[1]["color"] = "#C99D44"
+            _series_defs[1]["font_size"] = 9
+        _add_line_label_annotations(fig, _series_defs, chart_height=320, min_gap_px=20)
         return _plotly_html(fig)
 
     # --- Key Interaction Categories bar chart ---
@@ -977,14 +1124,16 @@ def digital_server(input, output, session):
         tickvals = odd_days.tolist()
         ticktext = [pd.Timestamp(d).strftime("%b ") + str(pd.Timestamp(d).day) for d in odd_days]
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=curr_daily["day"], y=curr_daily["cptc"],
-            mode="lines+markers", name="Cost Per Total Key Interaction",
-            line=dict(color="#EA332D", width=2),
-            marker=dict(color="#EA332D", size=4),
-            hovertemplate="%{x|%b %e}<br>Cost/Conv: $%{y:,.2f}<extra></extra>",
-        ))
+        _curr_texts = [f"${v:,.0f}" if v and v >= 1 else "" for v in curr_daily["cptc"]]
+        _series_defs = [{
+            "series_idx": 0,
+            "xs": curr_daily["day"].tolist(),
+            "ys": curr_daily["cptc"].tolist(),
+            "texts": _curr_texts,
+            "default_pos": "top center",
+        }]
+        _prior_texts = None
+        merged = None
 
         if not df_prior.empty:
             prior_daily = (
@@ -999,6 +1148,25 @@ def digital_server(input, output, session):
             merged = curr_daily[["day", "day_num"]].merge(
                 prior_daily[["day_num", "cptc"]], on="day_num", how="left"
             )
+            _prior_texts = [f"${v:,.0f}" if pd.notna(v) and v and v >= 1 else "" for v in merged["cptc"]]
+            _series_defs.append({
+                "series_idx": 1,
+                "xs": merged["day"].tolist(),
+                "ys": merged["cptc"].tolist(),
+                "texts": _prior_texts,
+                "default_pos": "bottom center",
+            })
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=curr_daily["day"], y=curr_daily["cptc"],
+            mode="lines+markers", name="Cost Per Total Key Interaction",
+            line=dict(color="#EA332D", width=2),
+            marker=dict(color="#EA332D", size=4),
+            hovertemplate="%{x|%b %e}<br>Cost/Conv: $%{y:,.2f}<extra></extra>",
+        ))
+
+        if merged is not None:
             fig.add_trace(go.Scatter(
                 x=merged["day"], y=merged["cptc"],
                 mode="lines+markers", name="Cost Per Total Key Int. (previous month)",
@@ -1015,7 +1183,12 @@ def digital_server(input, output, session):
             showgrid=False, title="", tickangle=0,
         )
         fig.update_layout(**layout)
-        _add_minmax_labels(fig, trace_idx=0, color="#EA332D", prefix="$", fmt=",.2f")
+        _series_defs[0]["color"] = "#EA332D"
+        _series_defs[0]["font_size"] = 9
+        if len(_series_defs) > 1:
+            _series_defs[1]["color"] = "#C99D44"
+            _series_defs[1]["font_size"] = 9
+        _add_line_label_annotations(fig, _series_defs, chart_height=320, min_gap_px=20)
         return _plotly_html(fig)
 
     # ══════════════════════════════════════════════════════════
@@ -1227,6 +1400,68 @@ def digital_server(input, output, session):
             invert=True,
         )
 
+    # --- Budget KPI card (YoY top strip) ---
+
+    @render.text
+    def dig_budget_yoy_kpi():
+        return fmt_currency(_dig_q8()["budget"].sum())
+
+    @render.ui
+    def dig_budget_yoy_kpi_delta():
+        return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_yoy()["budget"].sum(), invert=True)
+
+    # --- Inline cost outputs for YoY KPI cards ---
+
+    def _dig_cost_inline_yoy(curr_metric_val, prev_metric_val, cost_label):
+        budget_c = _dig_q8()["budget"].sum()
+        budget_p = _dig_q8_yoy()["budget"].sum()
+        curr_val = _safe_div(budget_c, curr_metric_val)
+        prev_val = _safe_div(budget_p, prev_metric_val)
+        value_str = fmt_currency(curr_val) if curr_val is not None else "\u2014"
+        yoy_el = _fmt_delta(curr_val, prev_val, invert=True)
+        return ui.tags.div(
+            ui.tags.div(
+                ui.tags.span(cost_label, style="font-size:10px;color:#9B9893;font-weight:600;"),
+                ui.tags.span(value_str, style="font-size:12px;font-weight:700;color:#021326;margin-left:6px;"),
+                yoy_el,
+                style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;",
+            ),
+            style="margin-top:6px;padding-top:6px;border-top:1px solid #e5e1dc;",
+        )
+
+    @render.ui
+    def dig_cost_interactions_yoy():
+        return _dig_cost_inline_yoy(
+            _dig_q8()["impressions"].sum(), _dig_q8_yoy()["impressions"].sum(), "Cost/Int.")
+
+    @render.ui
+    def dig_cost_clicks_yoy():
+        return _dig_cost_inline_yoy(
+            _dig_q8()["clicks"].sum(), _dig_q8_yoy()["clicks"].sum(), "Cost/Click")
+
+    @render.ui
+    def dig_cost_total_conv_yoy():
+        df_c, df_p = _dig_q8(), _dig_q8_yoy()
+        c = df_c["direct_conversions"].sum() + df_c["view_through_conversions"].sum() + df_c["in_platform_leads"].sum()
+        p = df_p["direct_conversions"].sum() + df_p["view_through_conversions"].sum() + df_p["in_platform_leads"].sum()
+        return _dig_cost_inline_yoy(c, p, "Cost/Key Int.")
+
+    # --- Cost per View-through Int. (YoY Engagement & Spend) ---
+
+    @render.text
+    def dig_cpvtc_yoy():
+        df = _dig_q8()
+        return fmt_currency(_safe_div(df["budget"].sum(), df["view_through_conversions"].sum()))
+
+    @render.ui
+    def dig_cpvtc_yoy_delta():
+        df_c, df_p = _dig_q8(), _dig_q8_yoy()
+        return _fmt_delta(
+            _safe_div(df_c["budget"].sum(), df_c["view_through_conversions"].sum()),
+            _safe_div(df_p["budget"].sum(), df_p["view_through_conversions"].sum()),
+            invert=True,
+        )
+
     @render.ui
     def dig_trending_chart_yoy():
         df_curr = _dig_q8()
@@ -1247,14 +1482,13 @@ def digital_server(input, output, session):
         curr_monthly = curr_monthly.reset_index(drop=True)
         curr_monthly["month_pos"] = curr_monthly.index
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=curr_monthly["month_dt"], y=curr_monthly["total_interactions"],
-            mode="lines+markers", name="Total Interactions",
-            line=dict(color="#EA332D", width=2),
-            marker=dict(color="#EA332D", size=4),
-            hovertemplate="%{x|%b %y}<br>Total Interactions: %{y:,.0f}<extra></extra>",
-        ))
+        _series_defs = [{
+            "series_idx": 0,
+            "xs": curr_monthly["month_dt"].tolist(),
+            "ys": curr_monthly["total_interactions"].tolist(),
+            "texts": [f"{v:,.0f}" for v in curr_monthly["total_interactions"]],
+            "default_pos": "top center",
+        }]
 
         if not df_prior.empty:
             df_prior = df_prior.copy()
@@ -1264,13 +1498,32 @@ def digital_server(input, output, session):
                 .reset_index().sort_values("month")
             ).reset_index(drop=True)
             prior_monthly["month_pos"] = prior_monthly.index
-            # Align prior months to current month positions on x-axis
             prior_monthly["prior_label"] = prior_monthly["month"].dt.strftime("%b %y")
             merged = curr_monthly[["month_dt", "month_pos"]].merge(
                 prior_monthly[["month_pos", "total_interactions", "prior_label"]], on="month_pos", how="left"
             )
             merged["total_interactions"] = merged["total_interactions"].fillna(0)
             merged["prior_label"] = merged["prior_label"].fillna("")
+            _series_defs.append({
+                "series_idx": 1,
+                "xs": merged["month_dt"].tolist(),
+                "ys": merged["total_interactions"].tolist(),
+                "texts": [f"{v:,.0f}" for v in merged["total_interactions"]],
+                "default_pos": "bottom center",
+            })
+        else:
+            merged = None
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=curr_monthly["month_dt"], y=curr_monthly["total_interactions"],
+            mode="lines+markers", name="Total Interactions",
+            line=dict(color="#EA332D", width=2),
+            marker=dict(color="#EA332D", size=4),
+            hovertemplate="%{x|%b %y}<br>Total Interactions: %{y:,.0f}<extra></extra>",
+        ))
+
+        if merged is not None:
             fig.add_trace(go.Scatter(
                 x=merged["month_dt"], y=merged["total_interactions"],
                 customdata=merged["prior_label"],
@@ -1288,7 +1541,12 @@ def digital_server(input, output, session):
             showgrid=False, title="", tickangle=0,
         )
         fig.update_layout(**layout)
-        _add_minmax_labels(fig, trace_idx=0, color="#EA332D")
+        _series_defs[0]["color"] = "#EA332D"
+        _series_defs[0]["font_size"] = 9
+        if len(_series_defs) > 1:
+            _series_defs[1]["color"] = "#C99D44"
+            _series_defs[1]["font_size"] = 9
+        _add_line_label_annotations(fig, _series_defs, chart_height=320, min_gap_px=20)
         return _plotly_html(fig)
 
     @render.ui
@@ -1296,23 +1554,34 @@ def digital_server(input, output, session):
         df = _dig_q8()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
-        strat = df.groupby("product_name")["total_interactions"].sum().sort_values(ascending=True).reset_index()
-        strat = strat[strat["total_interactions"] > 0]
+
+        try:
+            metric_key = input.dig_strategy_bar_metric_yoy()
+        except Exception:
+            metric_key = "total_interactions"
+        metric_label = _STRATEGY_METRIC_LABELS.get(metric_key, metric_key)
+
+        strat = df.groupby("product_name")[metric_key].sum().sort_values(ascending=True).reset_index()
+        strat = strat[strat[metric_key] > 0]
         if strat.empty:
             return ui.tags.div("No data available.", class_="empty-state")
-        total = strat["total_interactions"].sum()
-        strat["pct"] = (strat["total_interactions"] / total * 100).round(1)
-        x_max = strat["total_interactions"].max() * 1.28
+        total = strat[metric_key].sum()
+        strat["pct"] = (strat[metric_key] / total * 100).round(1)
+        x_max = strat[metric_key].max() * 1.28
+        is_currency = metric_key == "budget"
+        hover_fmt = f"<b>%{{y}}</b><br>{metric_label}: %{{x:$,.0f}}<extra></extra>" if is_currency else f"<b>%{{y}}</b><br>{metric_label}: %{{x:,}}<extra></extra>"
         fig = go.Figure(go.Bar(
-            x=strat["total_interactions"], y=strat["product_name"],
+            x=strat[metric_key], y=strat["product_name"],
             orientation="h", marker_color=CHART_COLORS[0],
             text=[f"{p:.1f}%" for p in strat["pct"]], textposition="outside",
             textfont=dict(family="Manrope, sans-serif", size=10, color=CARNEGIE_NAVY),
-            hovertemplate="<b>%{y}</b><br>Total Interactions: %{x:,}<extra></extra>",
+            hovertemplate=hover_fmt,
         ))
         layout = _base_layout(max(260, len(strat) * 28 + 60))
         layout["margin"] = dict(l=8, r=8, t=8, b=24, autoexpand=True)
         layout["xaxis"] = dict(showgrid=True, gridcolor="#F0EEEA", title="", range=[0, x_max])
+        if is_currency:
+            layout["xaxis"]["tickprefix"] = "$"
         layout["yaxis"] = dict(showgrid=False, title="", automargin=True)
         fig.update_layout(**layout)
         return _plotly_html(fig)
@@ -1322,6 +1591,13 @@ def digital_server(input, output, session):
         df = _dig_q8()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
+
+        try:
+            metric_key = input.dig_strategy_trend_metric_yoy()
+        except Exception:
+            metric_key = "total_interactions"
+        metric_label = _STRATEGY_TREND_METRIC_LABELS.get(metric_key, metric_key)
+
         top5 = df.groupby("product_name")["total_interactions"].sum().nlargest(5).index.tolist()
         df_top = df[df["product_name"].isin(top5)].copy()
 
@@ -1331,22 +1607,55 @@ def digital_server(input, output, session):
         all_months_dt = [m.to_timestamp() for m in all_months]
         ticktext = [m.strftime("%b %y") for m in all_months_dt]
 
-        fig = go.Figure()
+        if metric_key == "ctr":
+            agg_cols = {"clicks": "sum", "impressions": "sum"}
+        elif metric_key == "cost_per_total_interaction":
+            agg_cols = {"budget": "sum", "total_interactions": "sum"}
+        else:
+            agg_cols = {metric_key: "sum"}
+
+        is_rate = metric_key == "ctr"
+        is_currency = metric_key in ("budget", "cost_per_total_interaction")
+
+        _series_defs = []
+        _series_payloads = []
         for i, prod in enumerate(top5):
             sub = (
                 df_top[df_top["product_name"] == prod]
-                .groupby("month")["total_interactions"].sum()
+                .groupby("month").agg(agg_cols)
                 .reset_index()
             )
             sub["month_dt"] = sub["month"].dt.to_timestamp()
             spine = pd.DataFrame({"month_dt": all_months_dt})
-            sub = spine.merge(sub[["month_dt", "total_interactions"]], on="month_dt", how="left").fillna(0)
+            merge_cols = ["month_dt"] + [c for c in agg_cols]
+            sub = spine.merge(sub[merge_cols], on="month_dt", how="left").fillna(0)
+            if metric_key == "ctr":
+                sub["_val"] = sub.apply(lambda r: (r["clicks"] / r["impressions"] * 100) if r["impressions"] > 0 else 0, axis=1)
+            elif metric_key == "cost_per_total_interaction":
+                sub["_val"] = sub.apply(lambda r: (r["budget"] / r["total_interactions"]) if r["total_interactions"] > 0 else 0, axis=1)
+            else:
+                sub["_val"] = sub[metric_key]
+
+            hover_fmt_val = "$%{y:,.2f}" if is_currency else "%{y:.2f}%" if is_rate else "%{y:,.0f}"
+            _txt = [f"${v:,.0f}" for v in sub["_val"]] if is_currency else [f"{v:.1f}%" for v in sub["_val"]] if is_rate else [f"{v:,.0f}" for v in sub["_val"]]
+            _clr = _STRATEGY_TREND_COLORS[i % len(_STRATEGY_TREND_COLORS)]
+            _series_defs.append({
+                "series_idx": i,
+                "xs": sub["month_dt"].tolist(),
+                "ys": sub["_val"].tolist(),
+                "texts": _txt,
+                "default_pos": "top center" if i % 2 == 0 else "bottom center",
+            })
+            _series_payloads.append((prod, sub.copy(), _clr, hover_fmt_val))
+
+        fig = go.Figure()
+        for i, (prod, sub, _clr, hover_fmt_val) in enumerate(_series_payloads):
             fig.add_trace(go.Scatter(
-                x=sub["month_dt"], y=sub["total_interactions"],
+                x=sub["month_dt"], y=sub["_val"],
                 mode="lines+markers", name=prod,
-                line=dict(color=_STRATEGY_TREND_COLORS[i % len(_STRATEGY_TREND_COLORS)], width=2),
-                marker=dict(color=_STRATEGY_TREND_COLORS[i % len(_STRATEGY_TREND_COLORS)], size=4),
-                hovertemplate=f"<b>{prod}</b><br>%{{x|%b %y}}<br>Total Interactions: %{{y:,.0f}}<extra></extra>",
+                line=dict(color=_clr, width=2),
+                marker=dict(color=_clr, size=4),
+                hovertemplate=f"<b>{prod}</b><br>%{{x|%b %y}}<br>{metric_label}: {hover_fmt_val}<extra></extra>",
             ))
 
         layout = _base_layout(320)
@@ -1355,8 +1664,15 @@ def digital_server(input, output, session):
             tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
             showgrid=False, title="", tickangle=0,
         )
+        if is_rate:
+            layout["yaxis"]["ticksuffix"] = "%"
+        elif is_currency:
+            layout["yaxis"]["tickprefix"] = "$"
         fig.update_layout(**layout)
-        _add_minmax_labels_all(fig)
+        for i, (_, _, _clr, _) in enumerate(_series_payloads):
+            _series_defs[i]["color"] = _clr
+            _series_defs[i]["font_size"] = 9
+        _add_line_label_annotations(fig, _series_defs, chart_height=320, min_gap_px=20)
         return _plotly_html(fig)
 
     @render.ui
@@ -1385,32 +1701,52 @@ def digital_server(input, output, session):
 
     # --- Strategy bar chart ---
 
+    _STRATEGY_METRIC_LABELS = {
+        "total_interactions": "Total Interactions",
+        "clicks": "Clicks",
+        "direct_conversions": "Direct Interactions",
+        "view_through_conversions": "View-through Interactions",
+        "in_platform_leads": "In-Platform Leads",
+        "budget": "Budget",
+    }
+
     @render.ui
     def dig_strategy_bar():
         df = _dig_q8()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        strat = df.groupby("product_name")["total_interactions"].sum().sort_values(ascending=True).reset_index()
-        strat = strat[strat["total_interactions"] > 0]
+        try:
+            metric_key = input.dig_strategy_bar_metric()
+        except Exception:
+            metric_key = "total_interactions"
+        metric_label = _STRATEGY_METRIC_LABELS.get(metric_key, metric_key)
+
+        strat = df.groupby("product_name")[metric_key].sum().sort_values(ascending=True).reset_index()
+        strat = strat[strat[metric_key] > 0]
         if strat.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        total = strat["total_interactions"].sum()
-        strat["pct"] = (strat["total_interactions"] / total * 100).round(1)
-        x_max = strat["total_interactions"].max() * 1.28
+        total = strat[metric_key].sum()
+        strat["pct"] = (strat[metric_key] / total * 100).round(1)
+        x_max = strat[metric_key].max() * 1.28
+
+        is_currency = metric_key == "budget"
+        hover_fmt = f"<b>%{{y}}</b><br>{metric_label}: %{{x:$,.0f}}<extra></extra>" if is_currency else f"<b>%{{y}}</b><br>{metric_label}: %{{x:,}}<extra></extra>"
 
         fig = go.Figure(go.Bar(
-            x=strat["total_interactions"], y=strat["product_name"],
+            x=strat[metric_key], y=strat["product_name"],
             orientation="h", marker_color=CHART_COLORS[0],
             text=[f"{p:.1f}%" for p in strat["pct"]],
             textposition="outside",
             textfont=dict(family="Manrope, sans-serif", size=10, color=CARNEGIE_NAVY),
-            hovertemplate="<b>%{y}</b><br>Total Interactions: %{x:,}<extra></extra>",
+            hovertemplate=hover_fmt,
         ))
         layout = _base_layout(max(260, len(strat) * 28 + 60))
         layout["margin"] = dict(l=8, r=8, t=8, b=24, autoexpand=True)
         layout["xaxis"] = dict(showgrid=True, gridcolor="#F0EEEA", title="", range=[0, x_max])
+        if is_currency:
+            layout["xaxis"]["tickprefix"] = "$"
         layout["yaxis"] = dict(showgrid=False, title="", automargin=True)
         fig.update_layout(**layout)
         return _plotly_html(fig)
@@ -1419,12 +1755,30 @@ def digital_server(input, output, session):
 
     _STRATEGY_TREND_COLORS = ["#A4B9D3", "#FBCFB1", "#E9DBF6", "#B3C7BD", "#FFF8B4"]
 
+    _STRATEGY_TREND_METRIC_LABELS = {
+        "total_interactions": "Total Interactions",
+        "clicks": "Clicks",
+        "ctr": "CTR",
+        "direct_conversions": "Direct Interactions",
+        "view_through_conversions": "View-through Interactions",
+        "in_platform_leads": "In-Platform Leads",
+        "budget": "Budget",
+        "cost_per_total_interaction": "Cost Per Total Interaction",
+    }
+
     @render.ui
     def dig_strategy_trend():
         df = _dig_q8()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
+        try:
+            metric_key = input.dig_strategy_trend_metric()
+        except Exception:
+            metric_key = "total_interactions"
+        metric_label = _STRATEGY_TREND_METRIC_LABELS.get(metric_key, metric_key)
+
+        # Determine top 5 strategies by total_interactions
         top5 = df.groupby("product_name")["total_interactions"].sum().nlargest(5).index.tolist()
         df_top = df[df["product_name"].isin(top5)].copy()
 
@@ -1438,30 +1792,68 @@ def digital_server(input, output, session):
 
         all_days = pd.date_range(start_dt, end_dt, freq="D")
         odd_days = [d for d in all_days if d.day % 2 == 1]
-        tickvals = odd_days
-        ticktext = [d.strftime("%b ") + str(d.day) for d in odd_days]
 
-        fig = go.Figure()
+        # Determine which raw columns to aggregate
+        if metric_key == "ctr":
+            agg_cols = {"clicks": "sum", "impressions": "sum"}
+        elif metric_key == "cost_per_total_interaction":
+            agg_cols = {"budget": "sum", "total_interactions": "sum"}
+        else:
+            agg_cols = {metric_key: "sum"}
+
+        is_rate = metric_key == "ctr"
+        is_currency = metric_key in ("budget", "cost_per_total_interaction")
+
+        _series_defs = []
+        _series_payloads = []
         for i, prod in enumerate(top5):
-            sub = df_top[df_top["product_name"] == prod].groupby("day")["total_interactions"].sum().reset_index()
+            sub = df_top[df_top["product_name"] == prod].groupby("day").agg(agg_cols).reset_index()
             spine = pd.DataFrame({"day": all_days})
             sub = spine.merge(sub, on="day", how="left").fillna(0)
+            if metric_key == "ctr":
+                sub["_val"] = sub.apply(lambda r: (r["clicks"] / r["impressions"] * 100) if r["impressions"] > 0 else 0, axis=1)
+            elif metric_key == "cost_per_total_interaction":
+                sub["_val"] = sub.apply(lambda r: (r["budget"] / r["total_interactions"]) if r["total_interactions"] > 0 else 0, axis=1)
+            else:
+                sub["_val"] = sub[metric_key]
+
+            hover_fmt_val = "$%{y:,.2f}" if is_currency else "%{y:.2f}%" if is_rate else "%{y:,.0f}"
+            _txt = [f"${v:,.0f}" for v in sub["_val"]] if is_currency else [f"{v:.1f}%" for v in sub["_val"]] if is_rate else [f"{v:,.0f}" for v in sub["_val"]]
+            _clr = _STRATEGY_TREND_COLORS[i % len(_STRATEGY_TREND_COLORS)]
+            _series_defs.append({
+                "series_idx": i,
+                "xs": sub["day"].tolist(),
+                "ys": sub["_val"].tolist(),
+                "texts": _txt,
+                "default_pos": "top center" if i % 2 == 0 else "bottom center",
+            })
+            _series_payloads.append((prod, sub.copy(), _clr, hover_fmt_val))
+
+        fig = go.Figure()
+        for i, (prod, sub, _clr, hover_fmt_val) in enumerate(_series_payloads):
             fig.add_trace(go.Scatter(
-                x=sub["day"], y=sub["total_interactions"],
+                x=sub["day"], y=sub["_val"],
                 mode="lines+markers", name=prod,
-                line=dict(color=_STRATEGY_TREND_COLORS[i % len(_STRATEGY_TREND_COLORS)], width=2),
-                marker=dict(color=_STRATEGY_TREND_COLORS[i % len(_STRATEGY_TREND_COLORS)], size=4),
-                hovertemplate=f"<b>{prod}</b><br>%{{x|%b %e}}<br>Total Interactions: %{{y:,.0f}}<extra></extra>",
+                line=dict(color=_clr, width=2),
+                marker=dict(color=_clr, size=4),
+                hovertemplate=f"<b>{prod}</b><br>%{{x|%b %e}}<br>{metric_label}: {hover_fmt_val}<extra></extra>",
             ))
 
         layout = _base_layout(320)
         layout["xaxis"] = dict(
-            tickvals=tickvals, ticktext=ticktext,
+            tickvals=odd_days, ticktext=[d.strftime("%b ") + str(d.day) for d in odd_days],
             tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
             showgrid=False, title="", tickangle=0,
         )
+        if is_rate:
+            layout["yaxis"]["ticksuffix"] = "%"
+        elif is_currency:
+            layout["yaxis"]["tickprefix"] = "$"
         fig.update_layout(**layout)
-        _add_minmax_labels_all(fig)
+        for i, (_, _, _clr, _) in enumerate(_series_payloads):
+            _series_defs[i]["color"] = _clr
+            _series_defs[i]["font_size"] = 9
+        _add_line_label_annotations(fig, _series_defs, chart_height=320, min_gap_px=20)
         return _plotly_html(fig)
 
     # --- Subgroup performance table ---
@@ -1489,7 +1881,7 @@ def digital_server(input, output, session):
     @render.ui
     def dig_interactions_by_month():
         # Apply only non-date filters so all years/months are always visible
-        df = Q8.copy()
+        df = Q8()
         grp = input.dig_group()
         if grp and len(grp) > 0:
             df = df[df["group_name"].isin(grp)]
@@ -1538,7 +1930,7 @@ def digital_server(input, output, session):
     @render.ui
     def dig_interactions_by_strategy_month():
         # Bypass date filter — always show last 12 months available in data
-        df = Q8.copy()
+        df = Q8()
         grp = input.dig_group()
         if grp and len(grp) > 0:
             df = df[df["group_name"].isin(grp)]
@@ -1622,8 +2014,18 @@ def digital_server(input, output, session):
             df = df[df["conversion_name"].isin(cn)]
         return df
 
-    # Category KPI cards
     # Category KPI cards (explicit definitions for Shiny compatibility)
+
+    @render.text
+    def dig_cat_total():
+        return _fmt_digital_count(_dig_q9()["total_interactions"].sum(), compact=True)
+
+    @render.ui
+    def dig_cat_total_delta():
+        c = _dig_q9()["total_interactions"].sum()
+        p = _dig_q9_prior()
+        pv = p["total_interactions"].sum() if not p.empty else 0
+        return _fmt_delta(c, pv, label="MoM")
 
     @render.text
     def dig_cat_rfi():
@@ -1634,7 +2036,7 @@ def digital_server(input, output, session):
         c = _dig_q9()[_dig_q9()["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum()
         p = _dig_q9_prior()
         pv = p[p["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum() if not p.empty else 0
-        return _fmt_delta(c, pv, label="vs. PM")
+        return _fmt_delta(c, pv, label="MoM")
 
     @render.text
     def dig_cat_visit():
@@ -1645,7 +2047,7 @@ def digital_server(input, output, session):
         c = _dig_q9()[_dig_q9()["interaction_category"] == "Visit/Event"]["total_interactions"].sum()
         p = _dig_q9_prior()
         pv = p[p["interaction_category"] == "Visit/Event"]["total_interactions"].sum() if not p.empty else 0
-        return _fmt_delta(c, pv, label="vs. PM")
+        return _fmt_delta(c, pv, label="MoM")
 
     @render.text
     def dig_cat_apply():
@@ -1656,7 +2058,7 @@ def digital_server(input, output, session):
         c = _dig_q9()[_dig_q9()["interaction_category"] == "Apply"]["total_interactions"].sum()
         p = _dig_q9_prior()
         pv = p[p["interaction_category"] == "Apply"]["total_interactions"].sum() if not p.empty else 0
-        return _fmt_delta(c, pv, label="vs. PM")
+        return _fmt_delta(c, pv, label="MoM")
 
     @render.text
     def dig_cat_enroll():
@@ -1667,7 +2069,7 @@ def digital_server(input, output, session):
         c = _dig_q9()[_dig_q9()["interaction_category"] == "Enroll/Deposit"]["total_interactions"].sum()
         p = _dig_q9_prior()
         pv = p[p["interaction_category"] == "Enroll/Deposit"]["total_interactions"].sum() if not p.empty else 0
-        return _fmt_delta(c, pv, label="vs. PM")
+        return _fmt_delta(c, pv, label="MoM")
 
     @render.text
     def dig_cat_other():
@@ -1678,7 +2080,7 @@ def digital_server(input, output, session):
         c = _dig_q9()[_dig_q9()["interaction_category"] == "Other"]["total_interactions"].sum()
         p = _dig_q9_prior()
         pv = p[p["interaction_category"] == "Other"]["total_interactions"].sum() if not p.empty else 0
-        return _fmt_delta(c, pv, label="vs. PM")
+        return _fmt_delta(c, pv, label="MoM")
 
     # --- Cost Metrics panel (Interactions page) ---
 
@@ -1712,7 +2114,7 @@ def digital_server(input, output, session):
             prev_val = _safe_div(budget_p, prev_int)
 
             value_str = fmt_currency(curr_val) if curr_val is not None else "\u2014"
-            yoy_el = _fmt_delta(curr_val, prev_val, invert=True, label="vs. PM")
+            yoy_el = _fmt_delta(curr_val, prev_val, invert=True, label="MoM")
 
             badges.append(ui.tags.div(
                 ui.tags.div(label, class_="secondary-label"),
@@ -1731,6 +2133,54 @@ def digital_server(input, output, session):
             style="display:grid; grid-template-columns:repeat(5, 1fr);",
             title="Cost metrics use total campaign budget divided by category interaction volume.",
         )
+
+    # --- Inline cost metrics for Interactions KPI cards ---
+
+    def _cost_inline_cat(cat_filter, cost_label):
+        """Render inline cost for an interaction category card."""
+        budget_c = _dig_q8()["budget"].sum()
+        budget_p = _dig_q8_prior()["budget"].sum()
+        q9_c = _dig_q9()
+        q9_p = _dig_q9_prior()
+        if cat_filter:
+            curr_int = q9_c[q9_c["interaction_category"] == cat_filter]["total_interactions"].sum()
+            prev_int = q9_p[q9_p["interaction_category"] == cat_filter]["total_interactions"].sum() if not q9_p.empty else 0
+        else:
+            curr_int = q9_c["total_interactions"].sum()
+            prev_int = q9_p["total_interactions"].sum() if not q9_p.empty else 0
+        curr_val = _safe_div(budget_c, curr_int)
+        prev_val = _safe_div(budget_p, prev_int)
+        value_str = fmt_currency(curr_val) if curr_val is not None else "\u2014"
+        yoy_el = _fmt_delta(curr_val, prev_val, invert=True, label="MoM")
+        return ui.tags.div(
+            ui.tags.div(
+                ui.tags.span(cost_label, style="font-size:10px;color:#9B9893;font-weight:600;"),
+                ui.tags.span(value_str, style="font-size:12px;font-weight:700;color:#021326;margin-left:6px;"),
+                yoy_el,
+                style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;",
+            ),
+            style="margin-top:6px;padding-top:6px;border-top:1px solid #e5e1dc;",
+        )
+
+    @render.ui
+    def dig_cost_cat_total():
+        return _cost_inline_cat(None, "Cost/Key Int.")
+
+    @render.ui
+    def dig_cost_cat_rfi():
+        return _cost_inline_cat("RFI/Lead Gen", "Cost/RFI")
+
+    @render.ui
+    def dig_cost_cat_visit():
+        return _cost_inline_cat("Visit/Event", "Cost/Visit")
+
+    @render.ui
+    def dig_cost_cat_apply():
+        return _cost_inline_cat("Apply", "Cost/Apply")
+
+    @render.ui
+    def dig_cost_cat_enroll():
+        return _cost_inline_cat("Enroll/Deposit", "Cost/Enroll")
 
     # --- Category trend chart ---
 
@@ -1755,7 +2205,8 @@ def digital_server(input, output, session):
         tickvals = odd_days
         ticktext = [d.strftime("%b ") + str(d.day) for d in odd_days]
 
-        fig = go.Figure()
+        _series_defs = []
+        _series_payloads = []
         for i, cat in enumerate(cats):
             sub = (
                 df[df["interaction_category"] == cat]
@@ -1764,11 +2215,23 @@ def digital_server(input, output, session):
             )
             spine = pd.DataFrame({"day": all_days})
             sub = spine.merge(sub, on="day", how="left").fillna(0)
+            _clr = STRATEGY_COLORS[i % len(STRATEGY_COLORS)]
+            _series_defs.append({
+                "series_idx": i,
+                "xs": sub["day"].tolist(),
+                "ys": sub["total_interactions"].tolist(),
+                "texts": [f"{v:,.0f}" for v in sub["total_interactions"]],
+                "default_pos": "top center" if i % 2 == 0 else "bottom center",
+            })
+            _series_payloads.append((cat, sub.copy(), _clr))
+
+        fig = go.Figure()
+        for i, (cat, sub, _clr) in enumerate(_series_payloads):
             fig.add_trace(go.Scatter(
                 x=sub["day"], y=sub["total_interactions"],
                 mode="lines+markers", name=cat,
-                line=dict(color=STRATEGY_COLORS[i % len(STRATEGY_COLORS)], width=2),
-                marker=dict(size=4),
+                line=dict(color=_clr, width=2),
+                marker=dict(size=4, color=_clr),
                 hovertemplate=f"<b>{cat}</b><br>%{{x|%b %e}}<br>Interactions: %{{y:,.0f}}<extra></extra>",
             ))
 
@@ -1779,7 +2242,10 @@ def digital_server(input, output, session):
             showgrid=False, title="", tickangle=0,
         )
         fig.update_layout(**layout)
-        _add_minmax_labels_all(fig)
+        for i, (_, _, _clr) in enumerate(_series_payloads):
+            _series_defs[i]["color"] = _clr
+            _series_defs[i]["font_size"] = 9
+        _add_line_label_annotations(fig, _series_defs, chart_height=340, min_gap_px=20)
         return _plotly_html(fig)
 
     # --- Key Interaction Breakdown bar chart (Interactions page) ---
@@ -1955,7 +2421,7 @@ def digital_server(input, output, session):
     @render.ui
     def dig_interactions_month_table():
         # Always show last 12 months regardless of page date filter
-        df_full = Q9.copy()
+        df_full = Q9()
         # Apply only non-date global filters
         grp = input.dig_group()
         if grp and len(grp) > 0:
@@ -2128,7 +2594,7 @@ def digital_server(input, output, session):
 
     @render.ui
     def dig_geo_map():
-        df = _apply_dig_filters_monthly(Q10.copy())
+        df = _apply_dig_filters_monthly(Q10())
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
@@ -2225,7 +2691,7 @@ def digital_server(input, output, session):
     @reactive.calc
     def _dig_q10_yoy():
         """Fixed prior academic year Jul 2024 – Jun 2025 for YoY comparison (Q10)."""
-        df = Q10.copy()
+        df = Q10()
         df["_month_start"] = pd.to_datetime(
             df["event_year"].astype(str) + "-" + df["event_month"].astype(str).str.zfill(2) + "-01"
         )
@@ -2246,7 +2712,7 @@ def digital_server(input, output, session):
 
     @render.ui
     def dig_geo_table():
-        df = _apply_dig_filters_monthly(Q10.copy())
+        df = _apply_dig_filters_monthly(Q10())
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
@@ -2418,13 +2884,13 @@ def digital_server(input, output, session):
         sub = _crv_sub_tab()
         if sub == "ppc":
             # PPC uses keyword data
-            df = _apply_dig_filters_monthly(Q11_KEYWORDS.copy())
+            df = _apply_dig_filters_monthly(Q11_KEYWORDS())
             # Exclude Reddit
             df = df[~df["product_name"].str.contains("Reddit", case=False, na=False)]
             return df
         if sub == "youtube":
             # YouTube uses its own daily-grain CSV
-            df = Q11_YOUTUBE.copy()
+            df = Q11_YOUTUBE()
             period = input.dig_period()
             if period and len(period) == 2:
                 start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
@@ -2443,7 +2909,7 @@ def digital_server(input, output, session):
                 df = df[df["campaign_name"].isin(camp)]
             return df
         # All other subs use creative data
-        df = _apply_dig_filters_monthly(Q11_CREATIVE.copy())
+        df = _apply_dig_filters_monthly(Q11_CREATIVE())
         products = _CRV_SUB_PRODUCT_MAP.get(sub)
         if products:
             df = df[df["product_name"].isin(products)]
@@ -2461,7 +2927,7 @@ def digital_server(input, output, session):
         """Prior period for creative data — shift date range back by 1 month (MoM)."""
         sub_tab = _crv_sub_tab()
         if sub_tab == "youtube":
-            df = Q11_YOUTUBE.copy()
+            df = Q11_YOUTUBE()
             period = input.dig_period()
             if period and len(period) == 2:
                 start, end = pd.Timestamp(period[0]), pd.Timestamp(period[1])
@@ -2471,7 +2937,7 @@ def digital_server(input, output, session):
             else:
                 df = df.iloc[0:0]
         else:
-            source = Q11_KEYWORDS.copy() if sub_tab == "ppc" else Q11_CREATIVE.copy()
+            source = Q11_KEYWORDS() if sub_tab == "ppc" else Q11_CREATIVE()
             df = source
             period = input.dig_period()
             if period and len(period) == 2:
@@ -3322,7 +3788,7 @@ def digital_server(input, output, session):
 
     @reactive.calc
     def _dig_notes():
-        df = Q12.copy()
+        df = Q12()
         # Apply date filter
         period = input.dig_period()
         if period and len(period) == 2:
