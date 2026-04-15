@@ -38,15 +38,6 @@ def _valid_session(request: Request) -> bool:
 
 class JWTAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        path = request.url.path
-
-        # Health check — always allow
-        if path == "/health":
-            return await call_next(request)
-
-        client_name = request.query_params.get("client", "")
-        print(f"[auth] path={path!r}  client={client_name!r}")
-
         # Token present — validate and set session cookie
         token = request.query_params.get("token", "")
         if token:
