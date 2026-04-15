@@ -1597,7 +1597,7 @@ navbar_title = ui.tags.div(
         style="width: 139px; vertical-align: middle; margin-right: 16px;",
     ),
     # Title
-    ui.tags.span("ROI Report - Central Washington University", class_="navbar-title-text"),
+    ui.output_ui("navbar_title"),
     style="display: flex; align-items: center;",
 )
 

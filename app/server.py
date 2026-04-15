@@ -231,6 +231,12 @@ def server_logic(input, output, session):
         if name:
             ui.update_select("institution", choices=[name], selected=name)
 
+    @render.ui
+    def navbar_title():
+        name = _institution_name()
+        label = f"ROI Report — {name}" if name else "ROI Report"
+        return ui.tags.span(label, class_="navbar-title-text")
+
     # Update term_year choices from session Q6 + Q2
     @reactive.effect
     def _sync_term_year():
