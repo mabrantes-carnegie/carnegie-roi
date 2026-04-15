@@ -48,7 +48,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 
-from shiny import App, ui, reactive
+from shiny import App, ui
 
 from datetime import date
 
@@ -1753,20 +1753,6 @@ app_ui = ui.page_navbar(
 )
 
 from auth_middleware import JWTAuthMiddleware
-from urllib.parse import parse_qs
 
-
-def _server(input, output, session):
-    @reactive.effect
-    def _log_client_param():
-        search = session.input[".clientdata_url_search"]()
-        params = parse_qs(search.lstrip("?"))
-        client = params.get("client", [None])[0]
-        if client:
-            print(f"[CLIENT PARAM] client={client}", flush=True)
-
-    server_logic(input, output, session)
-
-
-_base_app = App(app_ui, _server, static_assets=str(Path(__file__).parent / "www"))
+_base_app = App(app_ui, server_logic, static_assets=str(Path(__file__).parent / "www"))
 app = JWTAuthMiddleware(_base_app)
