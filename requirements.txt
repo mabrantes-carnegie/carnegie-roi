@@ -5,4 +5,3 @@ shinyswatch>=0.7.0
 us>=3.0.0
 PyJWT>=2.8.0
 cryptography>=42.0.0
-itsdangerous>=2.1.0
