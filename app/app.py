@@ -994,35 +994,25 @@ _dig_overview_content = ui.tags.div(
         class_="funnel-strip",
         style="grid-template-columns:repeat(5, 1fr);",
     ),
-    # Row A: Trending + Key Action Categories
+    # Row A: Trending Performance (full width)
     ui.tags.div(
         ui.tags.div(
-            ui.tags.div(
-                ui.tags.span("Trending Performance", class_="card-heading"),
-                _pill_dropdown("dig_trending_metric", {
-                    "clicks": "Clicks",
-                    "ctr": "CTR",
-                    "direct_conversions": "Direct Actions",
-                    "view_through_conversions": "View-through Actions",
-                    "in_platform_leads": "In-Platform Leads",
-                    "budget": "Budget",
-                    "cost_per_total_interaction": "Cost Per Total Action",
-                }, "clicks"),
-                class_="card-header-row",
-            ),
-            ui.output_ui("dig_trending_chart"),
-            class_="chart-card",
-            style="flex:3;",
+            ui.tags.span("Trending Performance", class_="card-heading"),
+            _pill_dropdown("dig_trending_metric", {
+                "clicks": "Clicks",
+                "ctr": "CTR",
+                "direct_conversions": "Direct Actions",
+                "view_through_conversions": "View-through Actions",
+                "in_platform_leads": "In-Platform Leads",
+                "budget": "Budget",
+                "cost_per_total_interaction": "Cost Per Total Action",
+            }, "clicks"),
+            class_="card-header-row",
         ),
-        ui.tags.div(
-            ui.tags.span("Key Action Categories", class_="card-heading"),
-            ui.output_ui("dig_key_interaction_categories"),
-            class_="chart-card",
-            style="flex:2;",
-        ),
-        class_="main-content-row",
+        ui.output_ui("dig_trending_chart"),
+        class_="chart-card",
     ),
-    # Row B: Engagement & spend (narrow=42fr) + Cost Per Total Action (wide=58fr)
+    # Row B: Engagement & Spend + Key Action Categories
     ui.tags.div(
         ui.tags.div(
             ui.tags.span("Engagement & Spend", class_="card-heading"),
@@ -1040,8 +1030,8 @@ _dig_overview_content = ui.tags.div(
             class_="chart-card",
         ),
         ui.tags.div(
-            ui.tags.span("Cost Per Total Key Action", class_="card-heading"),
-            ui.output_ui("dig_cost_per_total_conv"),
+            ui.tags.span("Key Action Categories", class_="card-heading"),
+            ui.output_ui("dig_key_interaction_categories"),
             class_="chart-card",
         ),
         class_="main-content-row",
