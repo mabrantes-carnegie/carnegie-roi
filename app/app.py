@@ -1598,6 +1598,54 @@ page_digital = ui.nav_menu(
             ),
         )),
     ),
+
+    ui.nav_panel(
+        "Media Plan",
+        _dig_page(ui.tags.div(
+            _page_context_note(
+                "Digital Performance — Media Plan",
+                "How is budget being allocated and spent?",
+                "Current period vs. prior period (month-over-month)",
+            ),
+            ui.tags.p(
+                "Filters above apply to this page. Use the global digital filters to refine.",
+                style="font-family:Manrope,sans-serif;font-size:12px;color:#6b7280;margin:0 0 12px 0;",
+            ),
+            # ── KPI strip ──
+            ui.tags.div(
+                _dig_kpi_card("Total Budget", "dig_media_budget", "#021326"),
+                _dig_kpi_card("Total Spent", "dig_media_spent", "#EA332D"),
+                _dig_kpi_card("Remaining Budget", "dig_media_remaining", "#C99D44"),
+                _dig_kpi_card("% Spent", "dig_media_pct_spent", "#6B8F71"),
+                class_="funnel-strip",
+            ),
+            # ── Main table ──
+            ui.tags.h2("Budget & Spend by Campaign", class_="section-heading"),
+            ui.tags.div(ui.output_ui("media_plan_table"), class_="carnegie-table-card"),
+            # ── Charts row ──
+            ui.tags.div(
+                ui.tags.div(
+                    ui.tags.span("Budget Allocation by Strategy & Month", class_="card-heading"),
+                    ui.output_ui("media_plan_stacked_bar"),
+                    class_="chart-card",
+                    style="flex:1;",
+                ),
+                ui.tags.div(
+                    ui.tags.span("Budget Allocation by Strategy", class_="card-heading"),
+                    ui.output_ui("media_plan_strategy_pie"),
+                    class_="chart-card",
+                    style="flex:1;",
+                ),
+                ui.tags.div(
+                    ui.tags.span("Campaign Status Breakdown", class_="card-heading"),
+                    ui.output_ui("media_plan_status_pie"),
+                    class_="chart-card",
+                    style="flex:1;",
+                ),
+                class_="main-content-row",
+            ),
+        )),
+    ),
 )
 
 
@@ -1647,7 +1695,7 @@ app_ui = ui.page_navbar(
             # Show/hide digital filters based on active tab (uses Shiny nav input)
             ui.tags.script("""
 (function() {
-  var DIG_TABS  = ['Overview','Overview YoY','Actions','dig_geography','Creative','Insights'];
+  var DIG_TABS  = ['Overview','Overview YoY','Actions','dig_geography','Creative','Insights','Media Plan'];
   var FUNNEL_TABS = ['ROI Overview','Program Breakdown','Lead Source','Funnel Geography'];
   // Tabs that default to academic-year start → current month
   var ACAD_TABS = ['Overview YoY', 'dig_geography', 'Creative'];

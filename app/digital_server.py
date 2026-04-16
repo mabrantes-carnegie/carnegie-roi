@@ -4336,6 +4336,196 @@ def digital_server(
     def insights_pag_buttons():
         return _insights_pag_buttons_cache()
 
+    # ══════════════════════════════════════════════════════════════
+    # MEDIA PLAN PAGE
+    # ══════════════════════════════════════════════════════════════
+
+    @render.ui
+    def dig_media_budget():
+        df = _dig_q8()
+        req(len(df) > 0)
+        return ui.HTML(f'<span class="kpi-value">{fmt_currency(df["budget"].sum())}</span>')
+
+    @render.ui
+    def dig_media_spent():
+        df = _dig_q8()
+        req(len(df) > 0)
+        return ui.HTML(f'<span class="kpi-value">{fmt_currency(df["cost"].sum())}</span>')
+
+    @render.ui
+    def dig_media_remaining():
+        df = _dig_q8()
+        req(len(df) > 0)
+        remaining = df["budget"].sum() - df["cost"].sum()
+        return ui.HTML(f'<span class="kpi-value">{fmt_currency(remaining)}</span>')
+
+    @render.ui
+    def dig_media_pct_spent():
+        df = _dig_q8()
+        req(len(df) > 0)
+        budget = df["budget"].sum()
+        cost = df["cost"].sum()
+        pct = (cost / budget * 100) if budget > 0 else 0
+        return ui.HTML(f'<span class="kpi-value">{pct:.1f}%</span>')
+
+    # ── Media Plan Table ──
+
+    @reactive.calc
+    def _media_plan_table_cache():
+        df = _dig_q8()
+        req(len(df) > 0)
+
+        # Build month label
+        df = df.copy()
+        df["month_label"] = df["day"].dt.to_period("M").astype(str)
+
+        # Pivot: monthly spend
+        pivot_spend = df.pivot_table(
+            index=["group_name", "subgroup_name", "product_name", "campaign_name"],
+            columns="month_label", values="cost", aggfunc="sum", fill_value=0,
+        )
+        month_cols = sorted(pivot_spend.columns.tolist())
+        pivot_spend = pivot_spend[month_cols]
+
+        # Totals
+        agg = df.groupby(["group_name", "subgroup_name", "product_name", "campaign_name"]).agg(
+            total_spent=("cost", "sum"),
+            budget=("budget", "sum"),
+        ).reset_index()
+
+        result = pivot_spend.reset_index()
+        result = result.merge(agg, on=["group_name", "subgroup_name", "product_name", "campaign_name"], how="left")
+        result["remaining"] = result["budget"] - result["total_spent"]
+        result["pct_spent"] = result.apply(
+            lambda r: f'{r["total_spent"] / r["budget"] * 100:.1f}%' if r["budget"] > 0 else "0.0%", axis=1,
+        )
+
+        # Format currency columns
+        for col in month_cols + ["total_spent", "budget", "remaining"]:
+            result[col] = result[col].apply(lambda v: f"{v:,.0f}")
+
+        # Rename columns for display
+        result = result.rename(columns={
+            "group_name": "Group", "subgroup_name": "Subgroup",
+            "product_name": "Strategy", "campaign_name": "Campaign",
+            "total_spent": "Total Spent", "budget": "Budget",
+            "remaining": "Remaining", "pct_spent": "% Spent",
+        })
+
+        display_cols = ["Group", "Subgroup", "Strategy", "Campaign"] + month_cols + ["Total Spent", "Budget", "Remaining", "% Spent"]
+        result = result[[c for c in display_cols if c in result.columns]]
+
+        heatmap_cols = month_cols + ["Total Spent", "Budget"]
+        return _heatmap_table(result, heatmap_cols=heatmap_cols, paginated=True)
+
+    @render.ui
+    def media_plan_table():
+        return _media_plan_table_cache()
+
+    # ── Stacked Bar: Budget Allocation by Strategy & Month ──
+
+    @reactive.calc
+    def _media_plan_stacked_bar_cache():
+        df = _dig_q8()
+        req(len(df) > 0)
+        df = df.copy()
+        df["month_label"] = df["day"].dt.to_period("M").astype(str)
+        grouped = df.groupby(["month_label", "product_name"])["cost"].sum().reset_index()
+
+        strategies = grouped["product_name"].unique().tolist()
+        months = sorted(grouped["month_label"].unique().tolist())
+
+        fig = go.Figure()
+        for i, strat in enumerate(strategies):
+            sdf = grouped[grouped["product_name"] == strat]
+            sdf = sdf.set_index("month_label").reindex(months, fill_value=0).reset_index()
+            fig.add_trace(go.Bar(
+                x=sdf["month_label"], y=sdf["cost"], name=strat,
+                marker_color=STRATEGY_COLORS[i % len(STRATEGY_COLORS)],
+            ))
+
+        layout = _base_layout(height=340)
+        layout["barmode"] = "stack"
+        fig.update_layout(**layout)
+        return _plotly_html(fig)
+
+    @render.ui
+    def media_plan_stacked_bar():
+        return _media_plan_stacked_bar_cache()
+
+    # ── Pie: Budget Allocation by Strategy ──
+
+    @reactive.calc
+    def _media_plan_strategy_pie_cache():
+        df = _dig_q8()
+        req(len(df) > 0)
+        grouped = df.groupby("product_name")["budget"].sum().reset_index()
+        grouped = grouped.sort_values("budget", ascending=False)
+
+        fig = go.Figure(go.Pie(
+            labels=grouped["product_name"], values=grouped["budget"],
+            marker=dict(colors=CHART_COLORS[:len(grouped)]),
+            textinfo="label+percent", textfont=dict(family="Manrope, sans-serif", size=11),
+            hole=0.4,
+        ))
+        layout = _base_layout(height=340)
+        layout["showlegend"] = False
+        layout["margin"] = dict(l=16, r=16, t=8, b=8)
+        fig.update_layout(**layout)
+        return _plotly_html(fig)
+
+    @render.ui
+    def media_plan_strategy_pie():
+        return _media_plan_strategy_pie_cache()
+
+    # ── Pie: Campaign Status Breakdown ──
+
+    @reactive.calc
+    def _media_plan_status_pie_cache():
+        df = _dig_q8()
+        req(len(df) > 0)
+
+        # Determine most recent month in filtered data
+        max_month = df["day"].dt.to_period("M").max()
+
+        # Per-campaign status
+        camp_agg = df.groupby("campaign_name").agg(
+            total_impressions=("impressions", "sum"),
+            total_budget=("budget", "sum"),
+            months=("day", lambda x: set(x.dt.to_period("M"))),
+        ).reset_index()
+
+        def _status(row):
+            if max_month in row["months"]:
+                return "Live"
+            elif row["total_impressions"] == 0 and row["total_budget"] > 0:
+                return "Paused"
+            else:
+                return "Completed"
+
+        camp_agg["status"] = camp_agg.apply(_status, axis=1)
+        status_counts = camp_agg["status"].value_counts().reset_index()
+        status_counts.columns = ["Status", "Count"]
+
+        status_colors = {"Live": "#6B8F71", "Completed": "#021326", "Paused": "#C99D44"}
+        colors = [status_colors.get(s, "#9B9893") for s in status_counts["Status"]]
+
+        fig = go.Figure(go.Pie(
+            labels=status_counts["Status"], values=status_counts["Count"],
+            marker=dict(colors=colors),
+            textinfo="label+value+percent", textfont=dict(family="Manrope, sans-serif", size=11),
+            hole=0.4,
+        ))
+        layout = _base_layout(height=340)
+        layout["showlegend"] = False
+        layout["margin"] = dict(l=16, r=16, t=8, b=8)
+        fig.update_layout(**layout)
+        return _plotly_html(fig)
+
+    @render.ui
+    def media_plan_status_pie():
+        return _media_plan_status_pie_cache()
+
 
 def _pct_change(curr, prev):
     """Format percentage change."""
