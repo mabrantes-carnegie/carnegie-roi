@@ -1672,6 +1672,79 @@ navbar_title = ui.tags.div(
 )
 
 
+# ── Sharable filtered links (URL state) ──────────────────────────────────────
+# JS that reads filter params from URL on page load and provides a copy-link fn
+_url_state_js = ui.tags.script("""
+(function() {
+  function _applyUrlState() {
+    var params = new URLSearchParams(window.location.search);
+    var filterMap = {
+      'dig_month_start': 'dig_month_start',
+      'dig_month_end': 'dig_month_end',
+      'dig_group': 'dig_group',
+      'dig_subgroup': 'dig_subgroup',
+      'dig_product': 'dig_product',
+      'dig_campaign': 'dig_campaign',
+      'tab': 'nav',
+    };
+    for (var key in filterMap) {
+      var val = params.get(key);
+      if (val) {
+        try {
+          if (['dig_group','dig_subgroup','dig_product','dig_campaign'].indexOf(key) >= 0) {
+            Shiny.setInputValue(filterMap[key], val.split(','), {priority:'event'});
+          } else {
+            Shiny.setInputValue(filterMap[key], val, {priority:'event'});
+          }
+        } catch(e) {}
+      }
+    }
+  }
+  if (window.Shiny) {
+    $(document).on('shiny:connected', function() { setTimeout(_applyUrlState, 500); });
+  }
+  window._copyFilteredLink = function() {
+    var base = window.location.origin + window.location.pathname + window.location.search.split('&dig_')[0].split('&tab=')[0];
+    var sep = base.indexOf('?') >= 0 ? '&' : '?';
+    var params = [];
+    function _getSelect(id) {
+      var el = document.getElementById(id);
+      if (!el) return null;
+      var opts = el.selectedOptions || el.querySelectorAll('option:checked');
+      var vals = [];
+      for (var i = 0; i < opts.length; i++) vals.push(opts[i].value);
+      return vals.length > 0 ? vals.join(',') : null;
+    }
+    function _getVal(id) {
+      var el = document.getElementById(id);
+      return el ? el.value : null;
+    }
+    var ms = _getVal('dig_month_start');
+    var me = _getVal('dig_month_end');
+    if (ms) params.push('dig_month_start=' + ms);
+    if (me) params.push('dig_month_end=' + me);
+    var grp = _getSelect('dig_group');
+    if (grp) params.push('dig_group=' + grp);
+    var sub = _getSelect('dig_subgroup');
+    if (sub) params.push('dig_subgroup=' + sub);
+    var prod = _getSelect('dig_product');
+    if (prod) params.push('dig_product=' + prod);
+    var camp = _getSelect('dig_campaign');
+    if (camp) params.push('dig_campaign=' + camp);
+    try {
+      var nav = Shiny.shinyapp.$inputValues['nav'];
+      if (nav) params.push('tab=' + encodeURIComponent(nav));
+    } catch(e) {}
+    var url = base + (params.length > 0 ? sep + params.join('&') : '');
+    navigator.clipboard.writeText(url).then(function() {
+      var btn = document.getElementById('copy-link-btn');
+      if (btn) { btn.textContent = 'Copied!'; setTimeout(function(){ btn.textContent = 'Copy Link'; }, 2000); }
+    });
+  };
+})();
+""")
+
+
 # --- Main layout ---
 
 app_ui = ui.page_navbar(
@@ -1835,87 +1908,5 @@ app_ui = ui.page_navbar(
         ),
     ],
 )
-
-
-# ── Sharable filtered links (URL state) ──────────────────────────────────────
-# JS that reads filter params from URL on page load and provides a copy-link fn
-_url_state_js = ui.tags.script("""
-(function() {
-  // On page load, read URL params and apply to Shiny inputs
-  function _applyUrlState() {
-    var params = new URLSearchParams(window.location.search);
-    var filterMap = {
-      'dig_month_start': 'dig_month_start',
-      'dig_month_end': 'dig_month_end',
-      'dig_group': 'dig_group',
-      'dig_subgroup': 'dig_subgroup',
-      'dig_product': 'dig_product',
-      'dig_campaign': 'dig_campaign',
-      'tab': 'nav',
-    };
-    for (var key in filterMap) {
-      var val = params.get(key);
-      if (val) {
-        try {
-          // Multi-value params use comma separation
-          if (['dig_group','dig_subgroup','dig_product','dig_campaign'].indexOf(key) >= 0) {
-            Shiny.setInputValue(filterMap[key], val.split(','), {priority:'event'});
-          } else {
-            Shiny.setInputValue(filterMap[key], val, {priority:'event'});
-          }
-        } catch(e) {}
-      }
-    }
-  }
-  // Wait for Shiny to be ready before applying
-  if (window.Shiny) {
-    $(document).on('shiny:connected', function() { setTimeout(_applyUrlState, 500); });
-  }
-
-  // Copy current filter state as URL
-  window._copyFilteredLink = function() {
-    var base = window.location.origin + window.location.pathname + window.location.search.split('&dig_')[0].split('&tab=')[0];
-    var sep = base.indexOf('?') >= 0 ? '&' : '?';
-    var params = [];
-    // Read current filter values from DOM
-    function _getSelect(id) {
-      var el = document.getElementById(id);
-      if (!el) return null;
-      var opts = el.selectedOptions || el.querySelectorAll('option:checked');
-      var vals = [];
-      for (var i = 0; i < opts.length; i++) vals.push(opts[i].value);
-      return vals.length > 0 ? vals.join(',') : null;
-    }
-    function _getVal(id) {
-      var el = document.getElementById(id);
-      return el ? el.value : null;
-    }
-    var ms = _getVal('dig_month_start');
-    var me = _getVal('dig_month_end');
-    if (ms) params.push('dig_month_start=' + ms);
-    if (me) params.push('dig_month_end=' + me);
-    var grp = _getSelect('dig_group');
-    if (grp) params.push('dig_group=' + grp);
-    var sub = _getSelect('dig_subgroup');
-    if (sub) params.push('dig_subgroup=' + sub);
-    var prod = _getSelect('dig_product');
-    if (prod) params.push('dig_product=' + prod);
-    var camp = _getSelect('dig_campaign');
-    if (camp) params.push('dig_campaign=' + camp);
-    // Get active tab
-    try {
-      var nav = Shiny.shinyapp.$inputValues['nav'];
-      if (nav) params.push('tab=' + encodeURIComponent(nav));
-    } catch(e) {}
-
-    var url = base + (params.length > 0 ? sep + params.join('&') : '');
-    navigator.clipboard.writeText(url).then(function() {
-      // Brief flash feedback
-      var btn = document.getElementById('copy-link-btn');
-      if (btn) { btn.textContent = 'Copied!'; setTimeout(function(){ btn.textContent = 'Copy Link'; }, 2000); }
-    });
-  };
-})();
-""")
 
 app = App(app_ui, server_logic, static_assets=str(Path(__file__).parent / "www"))
