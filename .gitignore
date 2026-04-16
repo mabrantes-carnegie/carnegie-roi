@@ -3,7 +3,6 @@ __pycache__/
 .venv/
 
 # Local dev / JWT demo
-src/
 docker-compose.yml
 auth_strategy_summary.docx
 auth_strategy_summary.docx:Zone.Identifier
