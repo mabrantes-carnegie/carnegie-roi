@@ -114,11 +114,29 @@ def _load_goals() -> dict:
     }
 
 
+def _load_program_goals() -> pd.DataFrame:
+    """Load roi_goals.csv as a DataFrame with program-level goals."""
+    df = pd.read_csv(_DATA_DIR / "roi_goals.csv")
+    df = df.rename(columns={
+        "Program": "program",
+        "Inquiry Goal": "goal_inquiries",
+        "App Starts Goal": "goal_app_starts",
+        "App Submit Goal": "goal_app_submits",
+        "Admit Goal": "goal_admits",
+        "Deposit Goal": "goal_deposits",
+        "Net Deposit Goal": "goal_net_deposits",
+    })
+    # Normalize program names to lowercase for matching
+    df["program_lower"] = df["program"].str.strip().str.lower()
+    return df
+
+
 # Load once at import time
 Q6 = _load_q6()  # PRIMARY — KPIs, trending, source trend, state geo
 Q2 = _load_q2()  # Cost and campaign lead source data
 Q3 = _load_q3()  # City-level geography detail only
 GOALS = _load_goals()
+PROGRAM_GOALS = _load_program_goals()
 
 
 def get_institutions() -> list[str]:

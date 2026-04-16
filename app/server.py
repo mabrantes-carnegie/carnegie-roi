@@ -5,7 +5,7 @@ from shiny import render, reactive, ui, req
 import plotly.graph_objects as go
 import pandas as pd
 
-from data_loader import GOALS, ACAD_ORDER, MONTH_LABELS
+from data_loader import GOALS, PROGRAM_GOALS, ACAD_ORDER, MONTH_LABELS
 from client_resolver import resolve_institution, DEFAULT_SAGE_ID
 from data_loader_param import load_q6, load_q2, load_q3
 from digital_data_param import (
@@ -1915,6 +1915,32 @@ def server_logic(input, output, session):
             total_net_deposits=("total_net_deposits", "sum"),
         ).reset_index().sort_values("total_inquiries", ascending=False).head(20)
 
+        # Match program-level goals
+        goal_map = PROGRAM_GOALS.set_index("program_lower")
+        curr["_prog_lower"] = curr["program_display"].str.strip().str.lower()
+
+        def _pct_to_goal(actual, prog_lower, goal_col):
+            if prog_lower in goal_map.index:
+                g = goal_map.loc[prog_lower, goal_col]
+                if g and g > 0:
+                    return f"{actual / g * 100:.0f}%"
+            return "—"
+
+        curr["Inq Goal"] = curr.apply(
+            lambda r: f"{int(goal_map.loc[r['_prog_lower'], 'goal_inquiries']):,}"
+            if r["_prog_lower"] in goal_map.index and goal_map.loc[r["_prog_lower"], "goal_inquiries"] > 0 else "—", axis=1
+        )
+        curr["% to Inq Goal"] = curr.apply(
+            lambda r: _pct_to_goal(r["total_inquiries"], r["_prog_lower"], "goal_inquiries"), axis=1
+        )
+        curr["Dep Goal"] = curr.apply(
+            lambda r: f"{int(goal_map.loc[r['_prog_lower'], 'goal_deposits']):,}"
+            if r["_prog_lower"] in goal_map.index and goal_map.loc[r["_prog_lower"], "goal_deposits"] > 0 else "—", axis=1
+        )
+        curr["% to Dep Goal"] = curr.apply(
+            lambda r: _pct_to_goal(r["total_deposits"], r["_prog_lower"], "goal_deposits"), axis=1
+        )
+
         total_inq = curr["total_inquiries"].sum()
         total_starts = curr["total_app_starts"].sum()
         total_submits = curr["total_app_submits"].sum()
@@ -1923,22 +1949,13 @@ def server_logic(input, output, session):
         curr["% Inquiries"] = curr["total_inquiries"].apply(
             lambda v: f"{v / total_inq * 100:.1f}%" if total_inq > 0 else "—"
         )
-        curr["% App Starts"] = curr["total_app_starts"].apply(
-            lambda v: f"{v / total_starts * 100:.1f}%" if total_starts > 0 else "—"
-        )
         curr["Start Rate"] = curr.apply(
             lambda r: f"{r['total_app_starts'] / r['total_inquiries'] * 100:.1f}%"
             if r["total_inquiries"] > 0 else "—", axis=1
         )
-        curr["% App Submits"] = curr["total_app_submits"].apply(
-            lambda v: f"{v / total_submits * 100:.1f}%" if total_submits > 0 else "—"
-        )
         curr["Submit Rate"] = curr.apply(
             lambda r: f"{r['total_app_submits'] / r['total_app_starts'] * 100:.1f}%"
             if r["total_app_starts"] > 0 else "—", axis=1
-        )
-        curr["% Enrolled"] = curr["total_enrolled"].apply(
-            lambda v: f"{v / total_enrolled * 100:.1f}%" if total_enrolled > 0 else "—"
         )
         curr["Inq→Enroll Rate"] = curr.apply(
             lambda r: f"{r['total_enrolled'] / r['total_inquiries'] * 100:.1f}%"
@@ -1956,11 +1973,12 @@ def server_logic(input, output, session):
         })
         cols = [
             "Program",
-            "Inquiries", "% Inquiries",
-            "App Starts", "% App Starts", "Start Rate",
-            "App Submits", "% App Submits", "Submit Rate",
-            "Enrolled", "% Enrolled", "Inq→Enroll Rate",
-            "Deposits", "Net Deposits",
+            "Inquiries", "Inq Goal", "% to Inq Goal", "% Inquiries",
+            "App Starts", "Start Rate",
+            "App Submits", "Submit Rate",
+            "Enrolled", "Inq→Enroll Rate",
+            "Deposits", "Dep Goal", "% to Dep Goal",
+            "Net Deposits",
         ]
         heatmap_cols = ["Inquiries", "App Starts", "App Submits", "Enrolled", "Deposits", "Net Deposits"]
         return _heatmap_table(display[cols], heatmap_cols, paginated=True)
