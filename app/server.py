@@ -1519,21 +1519,21 @@ def server_logic(input, output, session):
 
     @render.ui
     def conversion_by_source_chart():
-        """Conversion rates by origin_source_first from Q6."""
+        """Early-funnel conversion rates by origin_source_first from Q6."""
         df = filtered_deep_dive()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        funnel_cols = ["total_inquiries", "total_app_submits", "total_admits", "total_net_deposits"]
+        funnel_cols = ["total_inquiries", "total_app_starts", "total_app_submits"]
         src_agg = df.groupby("origin_source_first", as_index=False)[funnel_cols].sum()
 
-        src_agg["admit_rate"] = src_agg.apply(
-            lambda r: (r["total_admits"] / r["total_app_submits"] * 100)
-            if r["total_app_submits"] > 0 else 0, axis=1
+        src_agg["inq_to_app_rate"] = src_agg.apply(
+            lambda r: (r["total_app_starts"] / r["total_inquiries"] * 100)
+            if r["total_inquiries"] > 0 else 0, axis=1
         )
-        src_agg["yield_rate"] = src_agg.apply(
-            lambda r: (r["total_net_deposits"] / r["total_admits"] * 100)
-            if r["total_admits"] > 0 else 0, axis=1
+        src_agg["app_completion_rate"] = src_agg.apply(
+            lambda r: (r["total_app_submits"] / r["total_app_starts"] * 100)
+            if r["total_app_starts"] > 0 else 0, axis=1
         )
 
         bd = src_agg.nlargest(8, "total_inquiries")
@@ -1557,22 +1557,22 @@ def server_logic(input, output, session):
 
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            x=x_labels, y=bd["admit_rate"], name="Admit Rate",
+            x=x_labels, y=bd["inq_to_app_rate"], name="Inquiry → App Rate",
             marker=dict(color="#EA332D", line=dict(width=0)),
-            text=[f"{v:.0f}%" for v in bd["admit_rate"]],
+            text=[f"{v:.0f}%" for v in bd["inq_to_app_rate"]],
             textposition="outside",
             textfont=dict(family="Manrope", size=10, color="#021326"),
             cliponaxis=False,
-            hovertemplate="<b>%{x}</b><br>Admit Rate: %{y:.1f}%<extra></extra>",
+            hovertemplate="<b>%{x}</b><br>Inquiry → App Rate: %{y:.1f}%<extra></extra>",
         ))
         fig.add_trace(go.Bar(
-            x=x_labels, y=bd["yield_rate"], name="Yield Rate",
+            x=x_labels, y=bd["app_completion_rate"], name="App Completion Rate",
             marker=dict(color="#FFDBD9", line=dict(width=0)),
-            text=[f"{v:.0f}%" for v in bd["yield_rate"]],
+            text=[f"{v:.0f}%" for v in bd["app_completion_rate"]],
             textposition="outside",
             textfont=dict(family="Manrope", size=10, color="#021326"),
             cliponaxis=False,
-            hovertemplate="<b>%{x}</b><br>Yield Rate: %{y:.1f}%<extra></extra>",
+            hovertemplate="<b>%{x}</b><br>App Completion Rate: %{y:.1f}%<extra></extra>",
         ))
 
         layout = _base_chart_layout(380)

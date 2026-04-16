@@ -378,8 +378,8 @@ page_funnel = ui.nav_panel(
             class_="chart-card",
         ),
 
-        # Section 3: Conversion rates by source
-        ui.tags.h2("Conversion rates by source", class_="section-heading"),
+        # Section 3: Early-funnel rates by source
+        ui.tags.h2("Early-funnel rates by source", class_="section-heading"),
         ui.tags.div(
             ui.output_ui("conversion_by_source_chart"),
             class_="chart-card",
