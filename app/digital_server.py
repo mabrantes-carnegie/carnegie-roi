@@ -902,8 +902,8 @@ def digital_server(
 
     # --- Trending Chart ---
 
-    @render.ui
-    def dig_trending_chart():
+    @reactive.calc
+    def _dig_trending_chart_cache():
         df_curr = _dig_q8()
         df_prior = _dig_q8_prior()
         if df_curr.empty:
@@ -1056,10 +1056,14 @@ def digital_server(
         _add_line_label_annotations(fig, _series_defs, chart_height=320, min_gap_px=20)
         return _plotly_html(fig)
 
+    @render.ui
+    def dig_trending_chart():
+        return _dig_trending_chart_cache()
+
     # --- Key Interaction Categories bar chart ---
 
-    @render.ui
-    def dig_key_interaction_categories():
+    @reactive.calc
+    def _dig_key_interaction_categories_cache():
         df = _dig_q9()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -1091,10 +1095,14 @@ def digital_server(
         fig.update_layout(**layout)
         return _plotly_html(fig)
 
+    @render.ui
+    def dig_key_interaction_categories():
+        return _dig_key_interaction_categories_cache()
+
     # --- Cost Per Total Conversion line chart ---
 
-    @render.ui
-    def dig_cost_per_total_conv():
+    @reactive.calc
+    def _dig_cost_per_total_conv_cache():
         df_curr = _dig_q8()
         df_prior = _dig_q8_prior()
         if df_curr.empty:
@@ -1190,6 +1198,10 @@ def digital_server(
             _series_defs[1]["font_size"] = 9
         _add_line_label_annotations(fig, _series_defs, chart_height=320, min_gap_px=20)
         return _plotly_html(fig)
+
+    @render.ui
+    def dig_cost_per_total_conv():
+        return _dig_cost_per_total_conv_cache()
 
     # ══════════════════════════════════════════════════════════
     # TAB 1b: OVERVIEW YoY  (same outputs, _yoy suffix, compare curr vs prior year)
@@ -1462,8 +1474,8 @@ def digital_server(
             invert=True,
         )
 
-    @render.ui
-    def dig_trending_chart_yoy():
+    @reactive.calc
+    def _dig_trending_chart_yoy_cache():
         df_curr = _dig_q8()
         df_prior = _dig_q8_yoy()
         if df_curr.empty:
@@ -1550,7 +1562,11 @@ def digital_server(
         return _plotly_html(fig)
 
     @render.ui
-    def dig_strategy_bar_yoy():
+    def dig_trending_chart_yoy():
+        return _dig_trending_chart_yoy_cache()
+
+    @reactive.calc
+    def _dig_strategy_bar_yoy_cache():
         df = _dig_q8()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -1587,7 +1603,11 @@ def digital_server(
         return _plotly_html(fig)
 
     @render.ui
-    def dig_strategy_trend_yoy():
+    def dig_strategy_bar_yoy():
+        return _dig_strategy_bar_yoy_cache()
+
+    @reactive.calc
+    def _dig_strategy_trend_yoy_cache():
         df = _dig_q8()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -1676,7 +1696,11 @@ def digital_server(
         return _plotly_html(fig)
 
     @render.ui
-    def dig_subgroup_table_yoy():
+    def dig_strategy_trend_yoy():
+        return _dig_strategy_trend_yoy_cache()
+
+    @reactive.calc
+    def _dig_subgroup_table_yoy_cache():
         df_c = _dig_q8()
         df_p = _dig_q8_yoy()
         if df_c.empty:
@@ -1684,12 +1708,20 @@ def digital_server(
         return _build_yoy_comparison_table(df_c, df_p, group_col="subgroup_name", label_col="Subgroup")
 
     @render.ui
-    def dig_strategy_table_yoy():
+    def dig_subgroup_table_yoy():
+        return _dig_subgroup_table_yoy_cache()
+
+    @reactive.calc
+    def _dig_strategy_table_yoy_cache():
         df_c = _dig_q8()
         df_p = _dig_q8_yoy()
         if df_c.empty:
             return ui.tags.div("No data available.", class_="empty-state")
         return _build_yoy_comparison_table(df_c, df_p, group_col="product_name", label_col="Strategy")
+
+    @render.ui
+    def dig_strategy_table_yoy():
+        return _dig_strategy_table_yoy_cache()
 
     @render.ui
     def dig_interactions_by_month_yoy():
@@ -1710,8 +1742,8 @@ def digital_server(
         "budget": "Budget",
     }
 
-    @render.ui
-    def dig_strategy_bar():
+    @reactive.calc
+    def _dig_strategy_bar_cache():
         df = _dig_q8()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -1751,6 +1783,10 @@ def digital_server(
         fig.update_layout(**layout)
         return _plotly_html(fig)
 
+    @render.ui
+    def dig_strategy_bar():
+        return _dig_strategy_bar_cache()
+
     # --- Strategy trend ---
 
     _STRATEGY_TREND_COLORS = ["#A4B9D3", "#FBCFB1", "#E9DBF6", "#B3C7BD", "#FFF8B4"]
@@ -1766,8 +1802,8 @@ def digital_server(
         "cost_per_total_interaction": "Cost Per Total Interaction",
     }
 
-    @render.ui
-    def dig_strategy_trend():
+    @reactive.calc
+    def _dig_strategy_trend_cache():
         df = _dig_q8()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -1856,30 +1892,42 @@ def digital_server(
         _add_line_label_annotations(fig, _series_defs, chart_height=320, min_gap_px=20)
         return _plotly_html(fig)
 
+    @render.ui
+    def dig_strategy_trend():
+        return _dig_strategy_trend_cache()
+
     # --- Subgroup performance table ---
 
-    @render.ui
-    def dig_subgroup_table():
+    @reactive.calc
+    def _dig_subgroup_table_cache():
         df_c = _dig_q8()
         df_p = _dig_q8_prior()
         if df_c.empty:
             return ui.tags.div("No data available.", class_="empty-state")
         return _build_yoy_comparison_table(df_c, df_p, group_col="subgroup_name", label_col="Subgroup")
 
+    @render.ui
+    def dig_subgroup_table():
+        return _dig_subgroup_table_cache()
+
     # --- Strategy performance table ---
 
-    @render.ui
-    def dig_strategy_table():
+    @reactive.calc
+    def _dig_strategy_table_cache():
         df_c = _dig_q8()
         df_p = _dig_q8_prior()
         if df_c.empty:
             return ui.tags.div("No data available.", class_="empty-state")
         return _build_yoy_comparison_table(df_c, df_p, group_col="product_name", label_col="Strategy")
 
+    @render.ui
+    def dig_strategy_table():
+        return _dig_strategy_table_cache()
+
     # --- Interactions by month & year ---
 
-    @render.ui
-    def dig_interactions_by_month():
+    @reactive.calc
+    def _dig_interactions_by_month_cache():
         # Apply only non-date filters so all years/months are always visible
         df = Q8()
         grp = input.dig_group()
@@ -1925,10 +1973,14 @@ def digital_server(
             pivot_wide[c] = pivot_wide[c].apply(lambda v: f"{round(v):,}")
         return _heatmap_table(pivot_wide, heatmap_cols)
 
+    @render.ui
+    def dig_interactions_by_month():
+        return _dig_interactions_by_month_cache()
+
     # --- Interactions by strategy & month ---
 
-    @render.ui
-    def dig_interactions_by_strategy_month():
+    @reactive.calc
+    def _dig_interactions_by_strategy_month_cache():
         # Bypass date filter — always show last 12 months available in data
         df = Q8()
         grp = input.dig_group()
@@ -1978,6 +2030,10 @@ def digital_server(
         for c in heatmap_cols:
             pivot_wide[c] = pivot_wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
         return _heatmap_table(pivot_wide, heatmap_cols)
+
+    @render.ui
+    def dig_interactions_by_strategy_month():
+        return _dig_interactions_by_strategy_month_cache()
 
     # ══════════════════════════════════════════════════════════
     # TAB 2: INTERACTIONS
@@ -2084,8 +2140,8 @@ def digital_server(
 
     # --- Cost Metrics panel (Interactions page) ---
 
-    @render.ui
-    def dig_int_cost_panel():
+    @reactive.calc
+    def _dig_int_cost_panel_cache():
         """Cost-per-category metrics for the Interactions page collapsible row."""
         budget_c = _dig_q8()["budget"].sum()
         budget_p = _dig_q8_prior()["budget"].sum()
@@ -2133,6 +2189,10 @@ def digital_server(
             style="display:grid; grid-template-columns:repeat(5, 1fr);",
             title="Cost metrics use total campaign budget divided by category interaction volume.",
         )
+
+    @render.ui
+    def dig_int_cost_panel():
+        return _dig_int_cost_panel_cache()
 
     # --- Inline cost metrics for Interactions KPI cards ---
 
@@ -2184,8 +2244,8 @@ def digital_server(
 
     # --- Category trend chart ---
 
-    @render.ui
-    def dig_cat_trend_chart():
+    @reactive.calc
+    def _dig_cat_trend_chart_cache():
         df = _dig_q9_filtered()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -2248,10 +2308,14 @@ def digital_server(
         _add_line_label_annotations(fig, _series_defs, chart_height=340, min_gap_px=20)
         return _plotly_html(fig)
 
+    @render.ui
+    def dig_cat_trend_chart():
+        return _dig_cat_trend_chart_cache()
+
     # --- Key Interaction Breakdown bar chart (Interactions page) ---
 
-    @render.ui
-    def dig_cat_breakdown_chart():
+    @reactive.calc
+    def _dig_cat_breakdown_chart_cache():
         df = _dig_q9_filtered()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -2282,10 +2346,14 @@ def digital_server(
         fig.update_layout(**layout)
         return _plotly_html(fig)
 
+    @render.ui
+    def dig_cat_breakdown_chart():
+        return _dig_cat_breakdown_chart_cache()
+
     # --- Category × Strategy chart ---
 
-    @render.ui
-    def dig_cat_strategy_chart():
+    @reactive.calc
+    def _dig_cat_strategy_chart_cache():
         df = _dig_q9_filtered()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -2315,10 +2383,14 @@ def digital_server(
         _add_bar_labels(fig)
         return _plotly_html(fig)
 
+    @render.ui
+    def dig_cat_strategy_chart():
+        return _dig_cat_strategy_chart_cache()
+
     # --- Interaction breakdown table ---
 
-    @render.ui
-    def dig_interaction_breakdown_table():
+    @reactive.calc
+    def _dig_interaction_breakdown_table_cache():
         df_c = _dig_q9_filtered()
         if df_c.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -2363,10 +2435,18 @@ def digital_server(
             })
         return _yoy_delta_table(rows, "Category", metric_cols)
 
+    @render.ui
+    def dig_interaction_breakdown_table():
+        return _dig_interaction_breakdown_table_cache()
+
     # --- Interactions by campaign name ---
 
-    @render.ui
-    def dig_interactions_campaign_table():
+    @reactive.calc
+    def _dig_interactions_campaign_table_cache():
+        df = _dig_q9_filtered()
+        if df.empty:
+            return ui.tags.div("No data available.", class_="empty-state")
+        df_p = _dig_q9_filtered_prior()
         df = _dig_q9_filtered()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -2416,10 +2496,14 @@ def digital_server(
         label_col = "Strategy / Campaign"
         return _yoy_delta_table(rows, label_col=label_col, metric_cols=metric_cols)
 
+    @render.ui
+    def dig_interactions_campaign_table():
+        return _dig_interactions_campaign_table_cache()
+
     # --- Interactions by month pivot ---
 
-    @render.ui
-    def dig_interactions_month_table():
+    @reactive.calc
+    def _dig_interactions_month_table_cache():
         # Always show last 12 months regardless of page date filter
         df_full = Q9()
         # Apply only non-date global filters
@@ -2486,10 +2570,14 @@ def digital_server(
         col_order = ["Category", "Interaction Name"] + display_month_cols + ["Grand Total"]
         return _heatmap_table(wide[[c for c in col_order if c in wide.columns]], heatmap_cols, paginated=True)
 
+    @render.ui
+    def dig_interactions_month_table():
+        return _dig_interactions_month_table_cache()
+
     # --- Interactions detail table ---
 
-    @render.ui
-    def dig_interactions_detail_table():
+    @reactive.calc
+    def _dig_interactions_detail_table_cache():
         df = _dig_q9_filtered()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -2528,6 +2616,10 @@ def digital_server(
                 "Total Key Int.":       (f"{round(r['total']):,}",   _pct_change(r["total"],   pv_t)),
             }})
         return _yoy_delta_table(rows, "Category / Interaction / Strategy / Campaign", metric_cols, paginated=True)
+
+    @render.ui
+    def dig_interactions_detail_table():
+        return _dig_interactions_detail_table_cache()
 
     # ══════════════════════════════════════════════════════════
     # TAB 3: GEOGRAPHY
@@ -2592,8 +2684,8 @@ def digital_server(
         label = _DIG_GEO_METRIC_LABELS.get(metric, "Total Interactions by state")
         return ui.tags.h2(label, class_="section-heading", style="margin:0;")
 
-    @render.ui
-    def dig_geo_map():
+    @reactive.calc
+    def _dig_geo_map_cache():
         df = _apply_dig_filters_monthly(Q10())
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -2688,6 +2780,10 @@ def digital_server(
             class_="map-layout",
         )
 
+    @render.ui
+    def dig_geo_map():
+        return _dig_geo_map_cache()
+
     @reactive.calc
     def _dig_q10_yoy():
         """Fixed prior academic year Jul 2024 – Jun 2025 for YoY comparison (Q10)."""
@@ -2710,8 +2806,8 @@ def digital_server(
             df = df[df["product_name"].isin(prod)]
         return df
 
-    @render.ui
-    def dig_geo_table():
+    @reactive.calc
+    def _dig_geo_table_cache():
         df = _apply_dig_filters_monthly(Q10())
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -2788,6 +2884,10 @@ def digital_server(
 
         table = _yoy_delta_table(rows, "Region", col_labels, paginated=True)
         return ui.tags.div(summary_badges, table)
+
+    @render.ui
+    def dig_geo_table():
+        return _dig_geo_table_cache()
 
     # ══════════════════════════════════════════════════════════
     # TAB 4: CREATIVE
@@ -3688,8 +3788,8 @@ def digital_server(
             class_="carnegie-table-card",
         )
 
-    @render.ui
-    def crv_card_list():
+    @reactive.calc
+    def _crv_card_list_cache():
         df = _crv_filtered()
         sub_tab = _crv_sub_tab()
         empty_label = "keywords" if sub_tab == "ppc" else "creatives"
@@ -3717,6 +3817,10 @@ def digital_server(
             *cards, class_="crv-card-list",
             style="display:flex;flex-direction:column;gap:16px;margin-bottom:28px;",
         )
+
+    @render.ui
+    def crv_card_list():
+        return _crv_card_list_cache()
 
     # ── Pagination helpers ──
 
@@ -4026,8 +4130,8 @@ def digital_server(
             ),
         )
 
-    @render.ui
-    def insights_card_list():
+    @reactive.calc
+    def _insights_card_list_cache():
         df = _insights_view_data()
         if df.empty:
             return ui.tags.div("No insights available for the selected filters.",
@@ -4050,6 +4154,10 @@ def digital_server(
         )
 
     @render.ui
+    def insights_card_list():
+        return _insights_card_list_cache()
+
+    @render.ui
     def insights_pag_range():
         df = _insights_view_data()
         total = len(df)
@@ -4061,8 +4169,8 @@ def digital_server(
         end = min(page * per_page, total)
         return ui.tags.span(f"{start}\u2013{end} of {total}", class_="insight-pag-text")
 
-    @render.ui
-    def insights_pag_buttons():
+    @reactive.calc
+    def _insights_pag_buttons_cache():
         df = _insights_view_data()
         total = len(df)
         per_page = _insights_per_page()
@@ -4110,6 +4218,10 @@ def digital_server(
         buttons.append(_page_btn("\u203A", page + 1, disabled=(page >= max_page)))
 
         return ui.tags.div(*buttons, class_="insight-pag-btns")
+
+    @render.ui
+    def insights_pag_buttons():
+        return _insights_pag_buttons_cache()
 
 
 def _pct_change(curr, prev):
