@@ -1069,16 +1069,20 @@ def digital_server(
 
         # Y-axis 1 (left)
         y1_opts = _yaxis_opts(metric_keys[0])
-        y1_opts["title"] = _METRIC_LABELS.get(metric_keys[0], metric_keys[0]) if dual else ""
-        y1_opts["titlefont"] = dict(color=_COLORS[0], size=11, family="Manrope, sans-serif")
+        y1_opts["title"] = dict(
+            text=_METRIC_LABELS.get(metric_keys[0], metric_keys[0]) if dual else "",
+            font=dict(color=_COLORS[0], size=11, family="Manrope, sans-serif"),
+        )
         y1_opts["tickfont"] = dict(color=_COLORS[0] if dual else "#9B9893", size=10, family="Manrope, sans-serif")
         layout["yaxis"] = {**layout.get("yaxis", {}), **y1_opts}
 
         if dual:
             # Y-axis 2 (right)
             y2_opts = _yaxis_opts(metric_keys[1])
-            y2_opts["title"] = _METRIC_LABELS.get(metric_keys[1], metric_keys[1])
-            y2_opts["titlefont"] = dict(color=_COLORS[1], size=11, family="Manrope, sans-serif")
+            y2_opts["title"] = dict(
+                text=_METRIC_LABELS.get(metric_keys[1], metric_keys[1]),
+                font=dict(color=_COLORS[1], size=11, family="Manrope, sans-serif"),
+            )
             y2_opts["tickfont"] = dict(color=_COLORS[1], size=10, family="Manrope, sans-serif")
             y2_opts["overlaying"] = "y"
             y2_opts["side"] = "right"
@@ -2153,9 +2157,15 @@ def digital_server(
     @reactive.effect
     def _update_interaction_filters():
         df = _dig_q9()
-        cats = sorted([c for c in df["interaction_category"].unique() if c])
+        cats = sorted([
+            str(c).strip() for c in df["interaction_category"].unique()
+            if pd.notna(c) and str(c).strip()
+        ])
         ui.update_selectize("dig_interaction_cat", choices=cats, selected=[])
-        names = sorted([n for n in df["conversion_name"].unique() if n and n != "Unknown"])
+        names = sorted([
+            str(n).strip() for n in df["conversion_name"].unique()
+            if pd.notna(n) and str(n).strip() and str(n).strip() != "Unknown"
+        ])
         ui.update_selectize("dig_conversion_name", choices=names, selected=[])
 
     @reactive.calc
@@ -3799,7 +3809,9 @@ def digital_server(
             last_run = row.get("last_run_date")
             last_run_str = pd.Timestamp(last_run).strftime("%b %d, %Y") if pd.notna(last_run) else None
             meta_rows = [r for r in [
-                _meta_row("YouTube Video", yt_link, is_link=True) if yt_link else None,
+                _meta_row("YouTube Video", yt_link, is_link=True) if yt_link else _meta_row(
+                    "YouTube Video", "Not available in current source data"
+                ),
                 _meta_row("Landing Page", ad_url, is_link=True) if ad_url and ad_url != yt_link else None,
                 _meta_row("First Run", first_run_str) if first_run_str else None,
                 _meta_row("Last Run", last_run_str) if last_run_str else None,
@@ -4340,33 +4352,33 @@ def digital_server(
     # MEDIA PLAN PAGE
     # ══════════════════════════════════════════════════════════════
 
-    @render.ui
+    @render.text
     def dig_media_budget():
         df = _dig_q8()
         req(len(df) > 0)
-        return ui.HTML(f'<span class="kpi-value">{fmt_currency(df["budget"].sum())}</span>')
+        return fmt_currency(df["budget"].sum())
 
-    @render.ui
+    @render.text
     def dig_media_spent():
         df = _dig_q8()
         req(len(df) > 0)
-        return ui.HTML(f'<span class="kpi-value">{fmt_currency(df["cost"].sum())}</span>')
+        return fmt_currency(df["cost"].sum())
 
-    @render.ui
+    @render.text
     def dig_media_remaining():
         df = _dig_q8()
         req(len(df) > 0)
         remaining = df["budget"].sum() - df["cost"].sum()
-        return ui.HTML(f'<span class="kpi-value">{fmt_currency(remaining)}</span>')
+        return fmt_currency(remaining)
 
-    @render.ui
+    @render.text
     def dig_media_pct_spent():
         df = _dig_q8()
         req(len(df) > 0)
         budget = df["budget"].sum()
         cost = df["cost"].sum()
         pct = (cost / budget * 100) if budget > 0 else 0
-        return ui.HTML(f'<span class="kpi-value">{pct:.1f}%</span>')
+        return f"{pct:.1f}%"
 
     # ── Media Plan Table ──
 
@@ -4375,17 +4387,22 @@ def digital_server(
         df = _dig_q8()
         req(len(df) > 0)
 
-        # Build month label
         df = df.copy()
-        df["month_label"] = df["day"].dt.to_period("M").astype(str)
+        df["month_period"] = df["day"].dt.to_period("M")
+        month_periods = sorted(df["month_period"].dropna().unique().tolist())
+        month_keys = [str(period) for period in month_periods]
+        month_label_map = {
+            str(period): period.strftime("%b %y").upper()
+            for period in month_periods
+        }
+        df["month_key"] = df["month_period"].astype(str)
 
         # Pivot: monthly spend
         pivot_spend = df.pivot_table(
             index=["group_name", "subgroup_name", "product_name", "campaign_name"],
-            columns="month_label", values="cost", aggfunc="sum", fill_value=0,
+            columns="month_key", values="cost", aggfunc="sum", fill_value=0,
         )
-        month_cols = sorted(pivot_spend.columns.tolist())
-        pivot_spend = pivot_spend[month_cols]
+        pivot_spend = pivot_spend.reindex(columns=month_keys, fill_value=0)
 
         # Totals
         agg = df.groupby(["group_name", "subgroup_name", "product_name", "campaign_name"]).agg(
@@ -4399,10 +4416,12 @@ def digital_server(
         result["pct_spent"] = result.apply(
             lambda r: f'{r["total_spent"] / r["budget"] * 100:.1f}%' if r["budget"] > 0 else "0.0%", axis=1,
         )
+        result = result.rename(columns=month_label_map)
+        display_month_cols = [month_label_map[key] for key in month_keys]
 
         # Format currency columns
-        for col in month_cols + ["total_spent", "budget", "remaining"]:
-            result[col] = result[col].apply(lambda v: f"{v:,.0f}")
+        for col in display_month_cols + ["total_spent", "budget", "remaining"]:
+            result[col] = result[col].fillna(0).apply(lambda v: f"{v:,.0f}")
 
         # Rename columns for display
         result = result.rename(columns={
@@ -4412,10 +4431,10 @@ def digital_server(
             "remaining": "Remaining", "pct_spent": "% Spent",
         })
 
-        display_cols = ["Group", "Subgroup", "Strategy", "Campaign"] + month_cols + ["Total Spent", "Budget", "Remaining", "% Spent"]
+        display_cols = ["Group", "Subgroup", "Strategy", "Campaign"] + display_month_cols + ["Total Spent", "Budget", "Remaining", "% Spent"]
         result = result[[c for c in display_cols if c in result.columns]]
 
-        heatmap_cols = month_cols + ["Total Spent", "Budget"]
+        heatmap_cols = display_month_cols + ["Total Spent", "Budget"]
         return _heatmap_table(result, heatmap_cols=heatmap_cols, paginated=True)
 
     @render.ui
@@ -4429,24 +4448,38 @@ def digital_server(
         df = _dig_q8()
         req(len(df) > 0)
         df = df.copy()
-        df["month_label"] = df["day"].dt.to_period("M").astype(str)
-        grouped = df.groupby(["month_label", "product_name"])["cost"].sum().reset_index()
+        df["month_period"] = df["day"].dt.to_period("M")
+        month_periods = sorted(df["month_period"].dropna().unique().tolist())
+        month_keys = [str(period) for period in month_periods]
+        month_label_map = {
+            str(period): period.strftime("%b %y").upper()
+            for period in month_periods
+        }
+        df["month_key"] = df["month_period"].astype(str)
+        grouped = df.groupby(["month_key", "product_name"])["cost"].sum().reset_index()
 
         strategies = grouped["product_name"].unique().tolist()
-        months = sorted(grouped["month_label"].unique().tolist())
+        months = month_keys
+        max_month_total = grouped.groupby("month_key")["cost"].sum().max() if not grouped.empty else 0
+        label_threshold = max_month_total * 0.08 if max_month_total else 0
 
         fig = go.Figure()
         for i, strat in enumerate(strategies):
             sdf = grouped[grouped["product_name"] == strat]
-            sdf = sdf.set_index("month_label").reindex(months, fill_value=0).reset_index()
+            sdf = sdf.set_index("month_key").reindex(months, fill_value=0).reset_index()
             fig.add_trace(go.Bar(
-                x=sdf["month_label"], y=sdf["cost"], name=strat,
+                x=[month_label_map[m] for m in sdf["month_key"]],
+                y=sdf["cost"],
+                name=strat,
                 marker_color=STRATEGY_COLORS[i % len(STRATEGY_COLORS)],
+                text=[f"${v:,.0f}" if v >= label_threshold and v > 0 else "" for v in sdf["cost"]],
+                hovertemplate=f"<b>{strat}</b><br>%{{x}}<br>Spend: $%{{y:,.0f}}<extra></extra>",
             ))
 
         layout = _base_layout(height=340)
         layout["barmode"] = "stack"
         fig.update_layout(**layout)
+        _add_bar_labels(fig)
         return _plotly_html(fig)
 
     @render.ui

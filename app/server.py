@@ -1916,13 +1916,17 @@ def server_logic(input, output, session):
         ).reset_index().sort_values("total_inquiries", ascending=False).head(20)
 
         # Match program-level goals
-        goal_map = PROGRAM_GOALS.set_index("program_lower")
+        goal_map = (
+            PROGRAM_GOALS
+            .groupby("program_lower", as_index=True)[["goal_inquiries", "goal_deposits"]]
+            .max()
+        )
         curr["_prog_lower"] = curr["program_display"].str.strip().str.lower()
 
         def _pct_to_goal(actual, prog_lower, goal_col):
             if prog_lower in goal_map.index:
                 g = goal_map.loc[prog_lower, goal_col]
-                if g and g > 0:
+                if pd.notna(g) and float(g) > 0:
                     return f"{actual / g * 100:.0f}%"
             return "—"
 

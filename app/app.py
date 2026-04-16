@@ -946,11 +946,12 @@ def _digital_filters():
         ),
         ui.tags.div(
             ui.tags.button(
-                "Copy Link",
+                "Share Filtered View",
                 id="copy-link-btn",
                 class_="pill-dropdown-btn",
                 style="font-size:11px;padding:4px 10px;margin-top:18px;",
                 onclick="window._copyFilteredLink()",
+                title="Copy a shareable link for the current dashboard view and filters",
             ),
             class_="inline-filter",
             style="align-self:flex-end;",
@@ -1613,10 +1614,10 @@ page_digital = ui.nav_menu(
             ),
             # ── KPI strip ──
             ui.tags.div(
-                _dig_kpi_card("Total Budget", "dig_media_budget", "#021326"),
-                _dig_kpi_card("Total Spent", "dig_media_spent", "#EA332D"),
-                _dig_kpi_card("Remaining Budget", "dig_media_remaining", "#C99D44"),
-                _dig_kpi_card("% Spent", "dig_media_pct_spent", "#6B8F71"),
+                _dig_kpi_card("Total Budget", "media_budget", "#021326"),
+                _dig_kpi_card("Total Spent", "media_spent", "#EA332D"),
+                _dig_kpi_card("Remaining Budget", "media_remaining", "#C99D44"),
+                _dig_kpi_card("% Spent", "media_pct_spent", "#6B8F71"),
                 class_="funnel-strip",
             ),
             # ── Main table ──
@@ -1676,69 +1677,168 @@ navbar_title = ui.tags.div(
 # JS that reads filter params from URL on page load and provides a copy-link fn
 _url_state_js = ui.tags.script("""
 (function() {
-  function _applyUrlState() {
-    var params = new URLSearchParams(window.location.search);
-    var filterMap = {
-      'dig_month_start': 'dig_month_start',
-      'dig_month_end': 'dig_month_end',
-      'dig_group': 'dig_group',
-      'dig_subgroup': 'dig_subgroup',
-      'dig_product': 'dig_product',
-      'dig_campaign': 'dig_campaign',
-      'tab': 'nav',
-    };
-    for (var key in filterMap) {
-      var val = params.get(key);
-      if (val) {
-        try {
-          if (['dig_group','dig_subgroup','dig_product','dig_campaign'].indexOf(key) >= 0) {
-            Shiny.setInputValue(filterMap[key], val.split(','), {priority:'event'});
-          } else {
-            Shiny.setInputValue(filterMap[key], val, {priority:'event'});
-          }
-        } catch(e) {}
-      }
+  var MULTI_KEYS = [
+    'dig_group', 'dig_subgroup', 'dig_product', 'dig_campaign',
+    'dig_interaction_cat', 'dig_conversion_name'
+  ];
+  var RADIO_KEYS = ['crv_sub', 'insights_view'];
+
+  function _getParams() {
+    return new URL(window.location.href).searchParams;
+  }
+
+  function _getMultiParam(params, key) {
+    var vals = params.getAll(key);
+    if (vals && vals.length) return vals.filter(function(v) { return v; });
+    var csv = params.get(key);
+    return csv ? csv.split(',').filter(function(v) { return v; }) : [];
+  }
+
+  function _setSelectizeValue(id, values, attempts) {
+    if (!values || !values.length) return;
+    var el = document.getElementById(id);
+    if (!el || !el.selectize) {
+      if (attempts > 0) setTimeout(function() { _setSelectizeValue(id, values, attempts - 1); }, 250);
+      return;
+    }
+    var control = el.selectize;
+    var optionCount = Object.keys(control.options || {}).length;
+    if (optionCount === 0 && attempts > 0) {
+      setTimeout(function() { _setSelectizeValue(id, values, attempts - 1); }, 250);
+      return;
+    }
+    control.setValue(values);
+  }
+
+  function _setRadioValue(name, value, attempts) {
+    if (!value) return;
+    var selector = 'input[name=\"' + name + '\"][value=\"' + value.replace(/\"/g, '\\\\\"') + '\"]';
+    var el = document.querySelector(selector);
+    if (!el) {
+      if (attempts > 0) setTimeout(function() { _setRadioValue(name, value, attempts - 1); }, 250);
+      return;
+    }
+    el.checked = true;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function _setMonthRange(startVal, endVal, attempts) {
+    if (!startVal && !endVal) return;
+    var startEl = document.getElementById('dig_month_start');
+    var endEl = document.getElementById('dig_month_end');
+    if (!startEl || !endEl) {
+      if (attempts > 0) setTimeout(function() { _setMonthRange(startVal, endVal, attempts - 1); }, 250);
+      return;
+    }
+    if (startVal) startEl.value = startVal;
+    if (endVal) endEl.value = endVal;
+    var rawEnd = endVal || endEl.value;
+    var ep = rawEnd ? rawEnd.split('-') : [];
+    if (ep.length === 3) {
+      var lastDay = new Date(+ep[0], +ep[1], 0).getDate();
+      var endStr = ep[0] + '-' + ep[1] + '-' + String(lastDay).padStart(2, '0');
+      Shiny.setInputValue('dig_period', [startVal || startEl.value, endStr], {priority:'event'});
     }
   }
+
+  function _activateTab(tabValue, attempts) {
+    if (!tabValue) return;
+    var tabEl = document.querySelector('[data-value=\"' + tabValue.replace(/\"/g, '\\\\\"') + '\"]');
+    if (!tabEl) {
+      if (attempts > 0) setTimeout(function() { _activateTab(tabValue, attempts - 1); }, 250);
+      return;
+    }
+    tabEl.click();
+  }
+
+  function _applyFilterState() {
+    var params = _getParams();
+    _setMonthRange(params.get('dig_month_start'), params.get('dig_month_end'), 20);
+
+    MULTI_KEYS.forEach(function(key) {
+      var vals = _getMultiParam(params, key);
+      if (vals.length) _setSelectizeValue(key, vals, 20);
+    });
+
+    RADIO_KEYS.forEach(function(key) {
+      var val = params.get(key);
+      if (val) _setRadioValue(key, val, 20);
+    });
+  }
+
+  function _applyUrlState() {
+    var params = _getParams();
+    var tab = params.get('tab');
+    if (tab) _activateTab(tab, 20);
+    setTimeout(_applyFilterState, 500);
+  }
+
   if (window.Shiny) {
     $(document).on('shiny:connected', function() { setTimeout(_applyUrlState, 500); });
   }
+
   window._copyFilteredLink = function() {
-    var base = window.location.origin + window.location.pathname + window.location.search.split('&dig_')[0].split('&tab=')[0];
-    var sep = base.indexOf('?') >= 0 ? '&' : '?';
-    var params = [];
+    var url = new URL(window.location.href);
+    [
+      'dig_month_start', 'dig_month_end', 'dig_group', 'dig_subgroup', 'dig_product',
+      'dig_campaign', 'dig_interaction_cat', 'dig_conversion_name', 'tab', 'crv_sub',
+      'insights_view'
+    ].forEach(function(key) {
+      url.searchParams.delete(key);
+    });
+
     function _getSelect(id) {
       var el = document.getElementById(id);
-      if (!el) return null;
+      if (!el) return [];
+      if (el.selectize) return el.selectize.getValue();
       var opts = el.selectedOptions || el.querySelectorAll('option:checked');
       var vals = [];
       for (var i = 0; i < opts.length; i++) vals.push(opts[i].value);
-      return vals.length > 0 ? vals.join(',') : null;
+      return vals;
     }
+
     function _getVal(id) {
       var el = document.getElementById(id);
       return el ? el.value : null;
     }
+
+    function _appendMulti(id, key) {
+      var vals = _getSelect(id);
+      if (!vals) return;
+      if (!Array.isArray(vals)) vals = [vals];
+      vals.filter(function(v) { return v; }).forEach(function(v) {
+        url.searchParams.append(key, v);
+      });
+    }
+
     var ms = _getVal('dig_month_start');
     var me = _getVal('dig_month_end');
-    if (ms) params.push('dig_month_start=' + ms);
-    if (me) params.push('dig_month_end=' + me);
-    var grp = _getSelect('dig_group');
-    if (grp) params.push('dig_group=' + grp);
-    var sub = _getSelect('dig_subgroup');
-    if (sub) params.push('dig_subgroup=' + sub);
-    var prod = _getSelect('dig_product');
-    if (prod) params.push('dig_product=' + prod);
-    var camp = _getSelect('dig_campaign');
-    if (camp) params.push('dig_campaign=' + camp);
+    if (ms) url.searchParams.set('dig_month_start', ms);
+    if (me) url.searchParams.set('dig_month_end', me);
+
+    _appendMulti('dig_group', 'dig_group');
+    _appendMulti('dig_subgroup', 'dig_subgroup');
+    _appendMulti('dig_product', 'dig_product');
+    _appendMulti('dig_campaign', 'dig_campaign');
+    _appendMulti('dig_interaction_cat', 'dig_interaction_cat');
+    _appendMulti('dig_conversion_name', 'dig_conversion_name');
+
     try {
       var nav = Shiny.shinyapp.$inputValues['nav'];
-      if (nav) params.push('tab=' + encodeURIComponent(nav));
+      if (nav) url.searchParams.set('tab', nav);
     } catch(e) {}
-    var url = base + (params.length > 0 ? sep + params.join('&') : '');
-    navigator.clipboard.writeText(url).then(function() {
+
+    var crvSub = document.querySelector('input[name=\"crv_sub\"]:checked');
+    if (crvSub && crvSub.value) url.searchParams.set('crv_sub', crvSub.value);
+    var insightsView = document.querySelector('input[name=\"insights_view\"]:checked');
+    if (insightsView && insightsView.value) url.searchParams.set('insights_view', insightsView.value);
+
+    navigator.clipboard.writeText(url.toString()).then(function() {
       var btn = document.getElementById('copy-link-btn');
-      if (btn) { btn.textContent = 'Copied!'; setTimeout(function(){ btn.textContent = 'Copy Link'; }, 2000); }
+      if (btn) {
+        btn.textContent = 'Link Copied';
+        setTimeout(function(){ btn.textContent = 'Share Filtered View'; }, 2000);
+      }
     });
   };
 })();
