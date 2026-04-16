@@ -1763,6 +1763,7 @@ def digital_server(
     @reactive.calc
     def _dig_strategy_bar_cache():
         df = _dig_q8()
+        df_prior = _dig_q8_prior()
         if df.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
@@ -1772,27 +1773,104 @@ def digital_server(
             metric_key = "total_interactions"
         metric_label = _STRATEGY_METRIC_LABELS.get(metric_key, metric_key)
 
-        strat = df.groupby("product_name")[metric_key].sum().sort_values(ascending=True).reset_index()
-        strat = strat[strat[metric_key] > 0]
-        if strat.empty:
-            return ui.tags.div("No data available.", class_="empty-state")
-
-        total = strat[metric_key].sum()
-        strat["pct"] = (strat[metric_key] / total * 100).round(1)
-        x_max = strat[metric_key].max() * 1.28
+        # Drill-down: campaign-level detail when toggle is on
+        try:
+            drill = input.dig_strategy_drill()
+        except Exception:
+            drill = False
 
         is_currency = metric_key == "budget"
-        hover_fmt = f"<b>%{{y}}</b><br>{metric_label}: %{{x:$,.0f}}<extra></extra>" if is_currency else f"<b>%{{y}}</b><br>{metric_label}: %{{x:,}}<extra></extra>"
 
-        fig = go.Figure(go.Bar(
-            x=strat[metric_key], y=strat["product_name"],
-            orientation="h", marker_color=CHART_COLORS[0],
-            text=[f"{p:.1f}%" for p in strat["pct"]],
-            textposition="outside",
-            textfont=dict(family="Manrope, sans-serif", size=10, color=CARNEGIE_NAVY),
-            hovertemplate=hover_fmt,
-        ))
-        layout = _base_layout(max(260, len(strat) * 28 + 60))
+        # Build prior-period lookup for % change in hover
+        def _build_prior_map(df_p, group_cols):
+            if df_p.empty:
+                return {}
+            return df_p.groupby(group_cols)[metric_key].sum().to_dict()
+
+        def _pct_delta(curr_val, prior_val):
+            if prior_val and prior_val != 0:
+                delta = (curr_val - prior_val) / prior_val * 100
+                sign = "+" if delta >= 0 else ""
+                return f"{sign}{delta:.1f}%"
+            return "N/A"
+
+        def _hover_with_delta(name_col, prior_map, row, is_curr=True):
+            val = row[metric_key]
+            key = row[name_col] if isinstance(name_col, str) else tuple(row[c] for c in name_col)
+            prior_val = prior_map.get(key, 0)
+            delta_str = _pct_delta(val, prior_val)
+            val_str = f"${val:,.0f}" if is_currency else f"{val:,.0f}"
+            prior_str = f"${prior_val:,.0f}" if is_currency else f"{prior_val:,.0f}"
+            return f"{metric_label}: {val_str}<br>Prior: {prior_str} ({delta_str})"
+
+        if drill:
+            # Campaign-level grouped by strategy
+            camp = df.groupby(["product_name", "campaign_name"])[metric_key].sum().reset_index()
+            camp = camp[camp[metric_key] > 0].sort_values([metric_key], ascending=True)
+            if camp.empty:
+                return ui.tags.div("No data available.", class_="empty-state")
+
+            prior_map = _build_prior_map(df_prior, ["product_name", "campaign_name"])
+            camp["label"] = camp["campaign_name"].str[:40] + " (" + camp["product_name"] + ")"
+            total = camp[metric_key].sum()
+            camp["pct"] = (camp[metric_key] / total * 100).round(1)
+            x_max = camp[metric_key].max() * 1.28
+
+            strategies = camp["product_name"].unique().tolist()
+            strat_colors = {s: CHART_COLORS[i % len(CHART_COLORS)] for i, s in enumerate(strategies)}
+            colors = [strat_colors[s] for s in camp["product_name"]]
+
+            hover_texts = []
+            for _, row in camp.iterrows():
+                key = (row["product_name"], row["campaign_name"])
+                pv = prior_map.get(key, 0)
+                v = row[metric_key]
+                vs = f"${v:,.0f}" if is_currency else f"{v:,.0f}"
+                ps = f"${pv:,.0f}" if is_currency else f"{pv:,.0f}"
+                ds = _pct_delta(v, pv)
+                hover_texts.append(f"<b>{row['label']}</b><br>{metric_label}: {vs}<br>Prior: {ps} ({ds})<extra></extra>")
+
+            fig = go.Figure(go.Bar(
+                x=camp[metric_key], y=camp["label"],
+                orientation="h", marker_color=colors,
+                text=[f"{p:.1f}%" for p in camp["pct"]],
+                textposition="outside",
+                textfont=dict(family="Manrope, sans-serif", size=10, color=CARNEGIE_NAVY),
+                hovertemplate=hover_texts,
+            ))
+            chart_h = max(300, len(camp) * 24 + 60)
+        else:
+            # Strategy-level (default)
+            strat = df.groupby("product_name")[metric_key].sum().sort_values(ascending=True).reset_index()
+            strat = strat[strat[metric_key] > 0]
+            if strat.empty:
+                return ui.tags.div("No data available.", class_="empty-state")
+
+            prior_map = _build_prior_map(df_prior, "product_name")
+            total = strat[metric_key].sum()
+            strat["pct"] = (strat[metric_key] / total * 100).round(1)
+            x_max = strat[metric_key].max() * 1.28
+
+            hover_texts = []
+            for _, row in strat.iterrows():
+                pv = prior_map.get(row["product_name"], 0)
+                v = row[metric_key]
+                vs = f"${v:,.0f}" if is_currency else f"{v:,.0f}"
+                ps = f"${pv:,.0f}" if is_currency else f"{pv:,.0f}"
+                ds = _pct_delta(v, pv)
+                hover_texts.append(f"<b>{row['product_name']}</b><br>{metric_label}: {vs}<br>Prior: {ps} ({ds})<extra></extra>")
+
+            fig = go.Figure(go.Bar(
+                x=strat[metric_key], y=strat["product_name"],
+                orientation="h", marker_color=CHART_COLORS[0],
+                text=[f"{p:.1f}%" for p in strat["pct"]],
+                textposition="outside",
+                textfont=dict(family="Manrope, sans-serif", size=10, color=CARNEGIE_NAVY),
+                hovertemplate=hover_texts,
+            ))
+            chart_h = max(260, len(strat) * 28 + 60)
+
+        layout = _base_layout(chart_h)
         layout["margin"] = dict(l=8, r=8, t=8, b=24, autoexpand=True)
         layout["xaxis"] = dict(showgrid=True, gridcolor="#F0EEEA", title="", range=[0, x_max])
         if is_currency:

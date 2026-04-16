@@ -1052,6 +1052,10 @@ _dig_overview_content = ui.tags.div(
         ui.tags.div(
             ui.tags.div(
                 ui.tags.span("Performance By Strategy", class_="card-heading"),
+                ui.tags.div(
+                    ui.input_switch("dig_strategy_drill", "Campaign Detail", value=False),
+                    style="margin:0 12px;",
+                ),
                 _pill_dropdown("dig_strategy_bar_metric", {
                     "total_interactions": "Total Actions",
                     "clicks": "Clicks",
