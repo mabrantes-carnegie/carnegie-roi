@@ -13,7 +13,7 @@ COOKIE_MAX_AGE = 60 * 60  # 1 hour
 _signer = URLSafeTimedSerializer(COOKIE_SECRET)
 
 
-def _valid_session(scope: Scope) -> bool:
+def _get_session_sage_id(scope: Scope) -> str:
     headers = dict(scope.get("headers", []))
     cookie_header = headers.get(b"cookie", b"").decode("utf-8")
     cookies = {}
@@ -23,12 +23,12 @@ def _valid_session(scope: Scope) -> bool:
             cookies[k.strip()] = v.strip()
     raw = cookies.get(COOKIE_NAME)
     if not raw:
-        return False
+        return ""
     try:
-        _signer.loads(raw, max_age=COOKIE_MAX_AGE)
-        return True
+        data = _signer.loads(raw, max_age=COOKIE_MAX_AGE)
+        return data.get("id", "")
     except (BadSignature, SignatureExpired):
-        return False
+        return ""
 
 
 class JWTAuthMiddleware:
@@ -50,11 +50,11 @@ class JWTAuthMiddleware:
                     await response(scope, receive, send)
                     return
                 try:
-                    jwt.decode(
+                    payload = jwt.decode(
                         token,
                         JWT_PUBLIC_KEY,
                         algorithms=["RS256"],
-                        options={"require": ["exp"]},
+                        options={"require": ["exp", "sage_id"]},
                     )
                 except jwt.ExpiredSignatureError:
                     response = HTMLResponse("Link expired. Please request a new one.", status_code=401)
@@ -65,16 +65,24 @@ class JWTAuthMiddleware:
                     await response(scope, receive, send)
                     return
 
-                cookie_sender = _CookieSender(send, "authenticated")
+                sage_id = payload.get("sage_id", "")
+                cookie_sender = _CookieSender(send, sage_id)
                 await self.app(scope, receive, cookie_sender.send)
                 return
 
-            if not _valid_session(scope):
+            session_sage_id = _get_session_sage_id(scope)
+            if not session_sage_id:
                 response = HTMLResponse(
                     "<h2>Access denied.</h2>"
                     "<p>Please use your portal link to access this dashboard.</p>",
                     status_code=403,
                 )
+                await response(scope, receive, send)
+                return
+
+            url_sage_id = request.query_params.get("sage_id", "")
+            if url_sage_id and url_sage_id != session_sage_id:
+                response = HTMLResponse("Access denied.", status_code=403)
                 await response(scope, receive, send)
                 return
 
