@@ -889,7 +889,7 @@ def digital_server(
     def dig_cost_key_int():
         c = _dig_q8()["total_interactions"].sum()
         p = _dig_q8_prior()["total_interactions"].sum()
-        return _dig_cost_inline(c, p, "Cost/Int.")
+        return _dig_cost_inline(c, p, "Cost/Act.")
 
     @render.ui
     def dig_cost_inquiry_int():
@@ -897,7 +897,7 @@ def digital_server(
         q9_p = _dig_q9_prior()
         c = q9_c[q9_c["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum()
         p = q9_p[q9_p["interaction_category"] == "RFI/Lead Gen"]["total_interactions"].sum() if not q9_p.empty else 0
-        return _dig_cost_inline(c, p, "Cost/Inquiry Int.")
+        return _dig_cost_inline(c, p, "Cost/Inquiry Act.")
 
     @render.ui
     def dig_cost_visit_int():
@@ -905,7 +905,7 @@ def digital_server(
         q9_p = _dig_q9_prior()
         c = q9_c[q9_c["interaction_category"] == "Visit/Event"]["total_interactions"].sum()
         p = q9_p[q9_p["interaction_category"] == "Visit/Event"]["total_interactions"].sum() if not q9_p.empty else 0
-        return _dig_cost_inline(c, p, "Cost/Visit Int.")
+        return _dig_cost_inline(c, p, "Cost/Visit Act.")
 
     @render.ui
     def dig_cost_apply_int():
@@ -913,7 +913,7 @@ def digital_server(
         q9_p = _dig_q9_prior()
         c = q9_c[q9_c["interaction_category"] == "Apply"]["total_interactions"].sum()
         p = q9_p[q9_p["interaction_category"] == "Apply"]["total_interactions"].sum() if not q9_p.empty else 0
-        return _dig_cost_inline(c, p, "Cost/Apply Int.")
+        return _dig_cost_inline(c, p, "Cost/Apply Act.")
 
     # --- Trending Chart ---
 
@@ -1210,7 +1210,7 @@ def digital_server(
         if merged is not None:
             fig.add_trace(go.Scatter(
                 x=merged["day"], y=merged["cptc"],
-                mode="lines+markers", name="Cost Per Total Key Int. (previous month)",
+                mode="lines+markers", name="Cost Per Total Key Act. (previous month)",
                 line=dict(color="#C99D44", width=1.8, dash="dash"),
                 marker=dict(color="#C99D44", size=3),
                 hovertemplate="%{x|%b %e}<br>Cost/Conv (prev): $%{y:,.2f}<extra></extra>",
@@ -1477,7 +1477,7 @@ def digital_server(
     @render.ui
     def dig_cost_interactions_yoy():
         return _dig_cost_inline_yoy(
-            _dig_q8()["impressions"].sum(), _dig_q8_yoy()["impressions"].sum(), "Cost/Int.")
+            _dig_q8()["impressions"].sum(), _dig_q8_yoy()["impressions"].sum(), "Cost/Act.")
 
     @render.ui
     def dig_cost_clicks_yoy():
@@ -1489,7 +1489,7 @@ def digital_server(
         df_c, df_p = _dig_q8(), _dig_q8_yoy()
         c = df_c["direct_conversions"].sum() + df_c["view_through_conversions"].sum() + df_c["in_platform_leads"].sum()
         p = df_p["direct_conversions"].sum() + df_p["view_through_conversions"].sum() + df_p["in_platform_leads"].sum()
-        return _dig_cost_inline_yoy(c, p, "Cost/Key Int.")
+        return _dig_cost_inline_yoy(c, p, "Cost/Key Act.")
 
     # --- Cost per View-through Int. (YoY Engagement & Spend) ---
 
@@ -2335,7 +2335,7 @@ def digital_server(
 
     @render.ui
     def dig_cost_cat_total():
-        return _cost_inline_cat(None, "Cost/Key Int.")
+        return _cost_inline_cat(None, "Cost/Key Act.")
 
     @render.ui
     def dig_cost_cat_rfi():
@@ -2721,7 +2721,7 @@ def digital_server(
             total=("total_interactions", "sum"),
         ).reset_index() if not df_p.empty else pd.DataFrame(columns=grp_cols + ["direct", "vt", "total"])
 
-        metric_cols = ["Direct Key Int.", "View-Through Int.", "Total Key Int."]
+        metric_cols = ["Direct Key Act.", "View-Through Act.", "Total Key Act."]
         rows = []
         for _, r in agg_c.iterrows():
             key_mask = (
@@ -2736,9 +2736,9 @@ def digital_server(
             pv_t = p_row["total"].sum() if not p_row.empty else 0
             label = f"{r['interaction_category']} | {r['conversion_name']} | {r['product_name']} | {r['campaign_name']}"
             rows.append({"label": label, "metrics": {
-                "Direct Key Int.":      (f"{round(r['direct']):,}",  _pct_change(r["direct"],  pv_d)),
-                "View-Through Int.":    (f"{round(r['vt']):,}",      _pct_change(r["vt"],      pv_v)),
-                "Total Key Int.":       (f"{round(r['total']):,}",   _pct_change(r["total"],   pv_t)),
+                "Direct Key Act.":      (f"{round(r['direct']):,}",  _pct_change(r["direct"],  pv_d)),
+                "View-Through Act.":    (f"{round(r['vt']):,}",      _pct_change(r["vt"],      pv_v)),
+                "Total Key Act.":       (f"{round(r['total']):,}",   _pct_change(r["total"],   pv_t)),
             }})
         return _yoy_delta_table(rows, "Category / Action / Strategy / Campaign", metric_cols, paginated=True)
 
@@ -2775,7 +2775,7 @@ def digital_server(
     _DIG_GEO_METRIC_SHORT = {
         "impressions": "Impressions",
         "clicks": "Clicks",
-        "total_conversions": "Total Key Int.",
+        "total_conversions": "Total Key Act.",
     }
 
     _DIG_SMALL_STATES = {"CT", "DE", "DC", "MA", "MD", "NH", "NJ", "RI", "VT"}
@@ -2819,7 +2819,7 @@ def digital_server(
             metric = input.dig_geo_metric()
         except Exception:
             metric = "total_conversions"
-        metric_short = _DIG_GEO_METRIC_SHORT.get(metric, "Total Key Int.")
+        metric_short = _DIG_GEO_METRIC_SHORT.get(metric, "Total Key Act.")
 
         # Region is now sanitized to 2-letter state codes, "International", or "Unknown"
         state_df = df[~df["region"].isin(["Unknown", "International", ""])].copy()
@@ -2990,8 +2990,8 @@ def digital_server(
             prev_map = us_p.set_index("region").to_dict(orient="index")
 
         # Build YoY delta table
-        col_labels = ["Impressions", "Clicks", "CTR", "Direct Key Int.",
-                      "View-Through Int.", "Total Key Int."]
+        col_labels = ["Impressions", "Clicks", "CTR", "Direct Key Act.",
+                      "View-Through Act.", "Total Key Act."]
         rows = []
         for _, r in us_agg.iterrows():
             p = prev_map.get(r["region"], {})
@@ -3001,9 +3001,9 @@ def digital_server(
                 "Impressions":      (f"{round(r['impressions']):,}",         _pct_change(r["impressions"], p.get("impressions", 0)) if p else "N/A"),
                 "Clicks":           (f"{round(r['clicks']):,}",              _pct_change(r["clicks"], p.get("clicks", 0)) if p else "N/A"),
                 "CTR":              (f"{ctr_curr:.2f}%",                     _pct_change(ctr_curr, ctr_prev) if ctr_prev is not None else "N/A"),
-                "Direct Key Int.":  (f"{round(r['direct_conversions']):,}",  _pct_change(r["direct_conversions"], p.get("direct_conversions", 0)) if p else "N/A"),
-                "View-Through Int.":(f"{round(r['view_through_conversions']):,}", _pct_change(r["view_through_conversions"], p.get("view_through_conversions", 0)) if p else "N/A"),
-                "Total Key Int.":   (f"{round(r['total_conversions']):,}",   _pct_change(r["total_conversions"], p.get("total_conversions", 0)) if p else "N/A"),
+                "Direct Key Act.":  (f"{round(r['direct_conversions']):,}",  _pct_change(r["direct_conversions"], p.get("direct_conversions", 0)) if p else "N/A"),
+                "View-Through Act.":(f"{round(r['view_through_conversions']):,}", _pct_change(r["view_through_conversions"], p.get("view_through_conversions", 0)) if p else "N/A"),
+                "Total Key Act.":   (f"{round(r['total_conversions']):,}",   _pct_change(r["total_conversions"], p.get("total_conversions", 0)) if p else "N/A"),
             }
             rows.append({"label": r["region"], "metrics": metrics_data})
 
@@ -3557,9 +3557,9 @@ def digital_server(
                 _metric_cell("Impressions", _fmt_metric(impr)),
                 _metric_cell("Clicks", _fmt_metric(clicks)),
                 _metric_cell("CTR", _ctr_fmt),
-                _metric_cell("Direct Int.", _fmt_metric(direct)),
-                _metric_cell("View-through Int.", _fmt_metric(vt)),
-                _metric_cell("Total Int.", _fmt_metric(total_conv)),
+                _metric_cell("Direct Act.", _fmt_metric(direct)),
+                _metric_cell("View-through Act.", _fmt_metric(vt)),
+                _metric_cell("Total Act.", _fmt_metric(total_conv)),
                 class_="crv-metric-grid",
             )
         elif sub_tab == "linkedin":
@@ -3567,11 +3567,11 @@ def digital_server(
                 _metric_cell("Impressions", _fmt_metric(impr)),
                 _metric_cell("Clicks", _fmt_metric(clicks)),
                 _metric_cell("CTR", _ctr_fmt),
-                _metric_cell("Direct Int.", _fmt_metric(direct)),
-                _metric_cell("View-through Int.", _fmt_metric(vt)),
+                _metric_cell("Direct Act.", _fmt_metric(direct)),
+                _metric_cell("View-through Act.", _fmt_metric(vt)),
                 _metric_cell("In-Platform Leads", _fmt_metric(in_platform_leads)),
-                _metric_cell("Total Int.", _fmt_metric(total_conv)),
-                _metric_cell("Int. Rate", _cr_fmt),
+                _metric_cell("Total Act.", _fmt_metric(total_conv)),
+                _metric_cell("Act. Rate", _cr_fmt),
                 class_="crv-metric-grid",
             )
         elif sub_tab == "youtube":
@@ -3580,10 +3580,10 @@ def digital_server(
                 _metric_cell("Clicks", _fmt_metric(clicks)),
                 _metric_cell("CTR", _ctr_fmt),
                 _metric_cell("YouTube View Rate", _va_fmt),
-                _metric_cell("View-through Int.", _fmt_metric(vt)),
+                _metric_cell("View-through Act.", _fmt_metric(vt)),
                 _metric_cell("In-Platform Leads", _fmt_metric(in_platform_leads)),
-                _metric_cell("Total Int.", _fmt_metric(total_conv)),
-                _metric_cell("Int. Rate", _cr_fmt),
+                _metric_cell("Total Act.", _fmt_metric(total_conv)),
+                _metric_cell("Act. Rate", _cr_fmt),
                 class_="crv-metric-grid",
             )
         elif sub_tab == "snapchat":
@@ -3591,8 +3591,8 @@ def digital_server(
                 _metric_cell("Impressions", _fmt_metric(impr)),
                 _metric_cell("Clicks (Swipe Ups)", _fmt_metric(clicks)),
                 _metric_cell("CTR (Swipe Up Rate)", _ctr_fmt),
-                _metric_cell("Total Int.", _fmt_metric(total_conv)),
-                _metric_cell("Int. Rate", _cr_fmt),
+                _metric_cell("Total Act.", _fmt_metric(total_conv)),
+                _metric_cell("Act. Rate", _cr_fmt),
                 class_="crv-metric-grid",
             )
         elif sub_tab == "tiktok":
@@ -3600,8 +3600,8 @@ def digital_server(
                 _metric_cell("Impressions", _fmt_metric(impr)),
                 _metric_cell("Clicks", _fmt_metric(clicks)),
                 _metric_cell("CTR", _ctr_fmt),
-                _metric_cell("Total Int.", _fmt_metric(total_conv)),
-                _metric_cell("Int. Rate", _cr_fmt),
+                _metric_cell("Total Act.", _fmt_metric(total_conv)),
+                _metric_cell("Act. Rate", _cr_fmt),
                 _metric_cell("Profile Visits", _fmt_metric(visits_val)),
                 _metric_cell("Likes", _fmt_metric(likes_val)),
                 _metric_cell("Shares", _fmt_metric(shares_val)),
@@ -3621,7 +3621,7 @@ def digital_server(
                 _metric_cell("Impressions", _fmt_metric(impr)),
                 _metric_cell("Clicks", _fmt_metric(clicks)),
                 _metric_cell("CTR", _ctr_fmt),
-                _metric_cell("Total Int.", _fmt_metric(total_conv)),
+                _metric_cell("Total Act.", _fmt_metric(total_conv)),
                 class_="crv-metric-grid",
             )
         else:
@@ -3631,9 +3631,9 @@ def digital_server(
                 _metric_cell("Impressions", _fmt_metric(impr)),
                 _metric_cell("Clicks", _fmt_metric(clicks)),
                 _metric_cell("CTR", _ctr_fmt),
-                _metric_cell("View-through Int." if _is_display else "View-through Conv.", _fmt_metric(vt)),
-                _metric_cell("Total Int." if _is_display else "Total Conv.", _fmt_metric(total_conv)),
-                _metric_cell("Int. Rate", _cr_fmt),
+                _metric_cell("View-through Act." if _is_display else "View-through Conv.", _fmt_metric(vt)),
+                _metric_cell("Total Act." if _is_display else "Total Conv.", _fmt_metric(total_conv)),
+                _metric_cell("Act. Rate", _cr_fmt),
                 class_="crv-metric-grid",
             )
 
@@ -3671,64 +3671,35 @@ def digital_server(
                 class_="crv-dm-cell",
             )
 
-        reach_group = ui.tags.div(
-            ui.tags.div("Reach & Engagement", class_="crv-dm-group-title"),
-            ui.tags.div(
-                _detail_metric("Impressions", _fmt_metric(impr)),
-                _detail_metric("Clicks", _fmt_metric(clicks)),
-                _detail_metric("CTR", _ctr_fmt),
-                class_="crv-dm-grid",
-            ),
-            class_="crv-dm-group",
-        )
+        # Expanded details: only show metrics NOT already in the card summary
+        # Card summary already shows Impressions, Clicks, CTR, and main action metrics
+        # Details focus on cost efficiency and action breakdowns not in summary
+        reach_group = ""  # Removed — all reach metrics visible in card summary
 
-        if sub_tab == "linkedin":
-            conv_detail_cells = [
-                _detail_metric("Direct Int.", _fmt_metric(direct)),
-                _detail_metric("View-through Int.", _fmt_metric(vt)),
-                _detail_metric("In-Platform Leads", _fmt_metric(in_platform_leads)),
-                _detail_metric("Total Int.", _fmt_metric(total_conv)),
-                _detail_metric("Int. Rate", _cr_fmt),
-            ]
-        elif sub_tab == "youtube":
-            conv_detail_cells = [
-                _detail_metric("YouTube View Rate", _va_fmt),
-                _detail_metric("View-through Int.", _fmt_metric(vt)),
-                _detail_metric("In-Platform Leads", _fmt_metric(in_platform_leads)),
-                _detail_metric("Total Int.", _fmt_metric(total_conv)),
-                _detail_metric("Int. Rate", _cr_fmt),
-            ]
-        elif sub_tab in ("snapchat", "tiktok"):
-            conv_detail_cells = [
-                _detail_metric("Total Int.", _fmt_metric(total_conv)),
-                _detail_metric("Int. Rate", _cr_fmt),
-            ]
-        elif sub_tab == "reddit":
-            conv_detail_cells = [
-                _detail_metric("Total Int.", _fmt_metric(total_conv)),
-            ]
-        elif sub_tab == "meta":
-            conv_detail_cells = [
-                _detail_metric("Direct Int.", _fmt_metric(direct)),
-                _detail_metric("View-through Int.", _fmt_metric(vt)),
-                _detail_metric("Total Int.", _fmt_metric(total_conv)),
-            ]
-        elif sub_tab == "spotify":
-            conv_detail_cells = []
-        else:
-            # display
-            conv_detail_cells = [
-                _detail_metric("Direct", _fmt_metric(direct)),
-                _detail_metric("View-through", _fmt_metric(vt)),
-                _detail_metric("Total", _fmt_metric(total_conv)),
-                _detail_metric("Int. Rate", _cr_fmt),
-            ]
+        cost_val = row.get("cost", 0) if isinstance(row, dict) else (row["cost"] if "cost" in row.index else 0)
+        budget_val = row.get("budget", 0) if isinstance(row, dict) else (row["budget"] if "budget" in row.index else 0)
+        cpc_val = cost_val / clicks if clicks and clicks > 0 else 0
+        cpa_val = cost_val / total_conv if total_conv and total_conv > 0 else 0
+
+        detail_cells = []
+        if cost_val and cost_val > 0:
+            detail_cells.append(_detail_metric("Spend", f"${cost_val:,.0f}"))
+        if budget_val and budget_val > 0 and budget_val != cost_val:
+            detail_cells.append(_detail_metric("Budget", f"${budget_val:,.0f}"))
+        if cpc_val > 0:
+            detail_cells.append(_detail_metric("Cost per Click", f"${cpc_val:,.2f}"))
+        if cpa_val > 0:
+            detail_cells.append(_detail_metric("Cost per Action", f"${cpa_val:,.2f}"))
+
+        # Show action breakdown only for platforms where it adds value beyond summary
+        if sub_tab == "youtube" and video_avg:
+            detail_cells.append(_detail_metric("Avg. View Duration", _va_fmt))
 
         conv_group = ui.tags.div(
-            ui.tags.div("Actions", class_="crv-dm-group-title"),
-            ui.tags.div(*conv_detail_cells, class_="crv-dm-grid"),
+            ui.tags.div("Cost & Efficiency", class_="crv-dm-group-title"),
+            ui.tags.div(*detail_cells, class_="crv-dm-grid"),
             class_="crv-dm-group",
-        ) if conv_detail_cells else ""
+        ) if detail_cells else ""
 
         # Insight chips
         chips = []
@@ -3751,16 +3722,16 @@ def digital_server(
         if conv_rate_val >= 5:
             chips.append(("positive", "Action efficiency strong"))
         elif conv_rate_val < 0.5 and impr_val > 1000:
-            chips.append(("warning", "Int. rate low"))
+            chips.append(("warning", "Action rate low"))
 
         if direct_val == 0 and vt_val > 0:
-            chips.append(("neutral", "No direct interactions"))
+            chips.append(("neutral", "No direct actions"))
 
         if total_val > 0 and vt_val / total_val > 0.7:
             chips.append(("neutral", "High view-through share"))
 
         if total_val == 0 and impr_val > 0 and sub_tab not in ("spotify",):
-            chips.append(("warning", "No interactions recorded"))
+            chips.append(("warning", "No actions recorded"))
 
         chip_els = [ui.tags.span(text, class_=f"crv-chip crv-chip--{tone}") for tone, text in chips]
         chip_section = ui.tags.div(*chip_els, class_="crv-chip-row") if chip_els else ""
@@ -3883,9 +3854,9 @@ def digital_server(
             "clicks": "Clicks",
             "ctr": "CTR",
             "cost_per_click": "Cost Per Click",
-            "total_conversions": "Direct Int.",
+            "total_conversions": "Direct Act.",
             "cost_per_conversion": "Cost Per Direct Int.",
-            "conv_rate": "Int. Rate",
+            "conv_rate": "Act. Rate",
         }
         # Format columns
         for c in ["impressions", "clicks"]:
