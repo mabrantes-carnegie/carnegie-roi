@@ -918,11 +918,11 @@ def digital_server(
         _METRIC_LABELS = {
             "clicks": "Clicks",
             "ctr": "CTR",
-            "direct_conversions": "Direct Interactions",
-            "view_through_conversions": "View-through Interactions",
+            "direct_conversions": "Direct Actions",
+            "view_through_conversions": "View-through Actions",
             "in_platform_leads": "In-Platform Leads",
             "budget": "Budget",
-            "cost_per_total_interaction": "Cost Per Total Interaction",
+            "cost_per_total_interaction": "Cost Per Total Action",
         }
         metric_label = _METRIC_LABELS.get(metric_key, metric_key)
 
@@ -1081,7 +1081,7 @@ def digital_server(
             x=agg["interaction_category"],
             y=agg["total_interactions"],
             marker_color=[colors[i % len(colors)] for i in range(len(agg))],
-            hovertemplate="%{x}<br>Total Key Interactions: %{y:,.0f}<extra></extra>",
+            hovertemplate="%{x}<br>Total Key Actions: %{y:,.0f}<extra></extra>",
             showlegend=False,
             text=[f"{v:,.0f}" for v in agg["total_interactions"]],
             textposition="inside",
@@ -1168,7 +1168,7 @@ def digital_server(
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             x=curr_daily["day"], y=curr_daily["cptc"],
-            mode="lines+markers", name="Cost Per Total Key Interaction",
+            mode="lines+markers", name="Cost Per Total Key Action",
             line=dict(color="#EA332D", width=2),
             marker=dict(color="#EA332D", size=4),
             hovertemplate="%{x|%b %e}<br>Cost/Conv: $%{y:,.2f}<extra></extra>",
@@ -1529,20 +1529,20 @@ def digital_server(
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             x=curr_monthly["month_dt"], y=curr_monthly["total_interactions"],
-            mode="lines+markers", name="Total Interactions",
+            mode="lines+markers", name="Total Actions",
             line=dict(color="#EA332D", width=2),
             marker=dict(color="#EA332D", size=4),
-            hovertemplate="%{x|%b %y}<br>Total Interactions: %{y:,.0f}<extra></extra>",
+            hovertemplate="%{x|%b %y}<br>Total Actions: %{y:,.0f}<extra></extra>",
         ))
 
         if merged is not None:
             fig.add_trace(go.Scatter(
                 x=merged["month_dt"], y=merged["total_interactions"],
                 customdata=merged["prior_label"],
-                mode="lines+markers", name="Total Interactions (previous year)",
+                mode="lines+markers", name="Total Actions (previous year)",
                 line=dict(color="#C99D44", width=1.8, dash="dash"),
                 marker=dict(color="#C99D44", size=3),
-                hovertemplate="%{customdata}<br>Total Interactions (prev): %{y:,.0f}<extra></extra>",
+                hovertemplate="%{customdata}<br>Total Actions (prev): %{y:,.0f}<extra></extra>",
             ))
 
         layout = _base_layout(320)
@@ -1734,10 +1734,10 @@ def digital_server(
     # --- Strategy bar chart ---
 
     _STRATEGY_METRIC_LABELS = {
-        "total_interactions": "Total Interactions",
+        "total_interactions": "Total Actions",
         "clicks": "Clicks",
-        "direct_conversions": "Direct Interactions",
-        "view_through_conversions": "View-through Interactions",
+        "direct_conversions": "Direct Actions",
+        "view_through_conversions": "View-through Actions",
         "in_platform_leads": "In-Platform Leads",
         "budget": "Budget",
     }
@@ -1792,14 +1792,14 @@ def digital_server(
     _STRATEGY_TREND_COLORS = ["#A4B9D3", "#FBCFB1", "#E9DBF6", "#B3C7BD", "#FFF8B4"]
 
     _STRATEGY_TREND_METRIC_LABELS = {
-        "total_interactions": "Total Interactions",
+        "total_interactions": "Total Actions",
         "clicks": "Clicks",
         "ctr": "CTR",
-        "direct_conversions": "Direct Interactions",
-        "view_through_conversions": "View-through Interactions",
+        "direct_conversions": "Direct Actions",
+        "view_through_conversions": "View-through Actions",
         "in_platform_leads": "In-Platform Leads",
         "budget": "Budget",
-        "cost_per_total_interaction": "Cost Per Total Interaction",
+        "cost_per_total_interaction": "Cost Per Total Action",
     }
 
     @reactive.calc
@@ -2154,7 +2154,7 @@ def digital_server(
             ("Cost per Visit / Events", "Visit/Event"),
             ("Cost per Application", "Apply"),
             ("Cost per Enroll", "Enroll/Deposit"),
-            ("Cost per Key Interaction", None),
+            ("Cost per Key Action", None),
         ]
 
         badges = []
@@ -2292,7 +2292,7 @@ def digital_server(
                 mode="lines+markers", name=cat,
                 line=dict(color=_clr, width=2),
                 marker=dict(size=4, color=_clr),
-                hovertemplate=f"<b>{cat}</b><br>%{{x|%b %e}}<br>Interactions: %{{y:,.0f}}<extra></extra>",
+                hovertemplate=f"<b>{cat}</b><br>%{{x|%b %e}}<br>Actions: %{{y:,.0f}}<extra></extra>",
             ))
 
         layout = _base_layout(340)
@@ -2332,7 +2332,7 @@ def digital_server(
             x=agg["interaction_category"],
             y=agg["total_interactions"],
             marker_color=[colors[i % len(colors)] for i in range(len(agg))],
-            hovertemplate="%{x}<br>Total Interactions: %{y:,.0f}<extra></extra>",
+            hovertemplate="%{x}<br>Total Actions: %{y:,.0f}<extra></extra>",
             showlegend=False,
             text=[f"{v:,.0f}" for v in agg["total_interactions"]],
             textposition="inside",
@@ -2372,7 +2372,7 @@ def digital_server(
                 x=sub["interaction_category"], y=sub["total_interactions"],
                 name=prod, marker_color=STRATEGY_COLORS[i % len(STRATEGY_COLORS)],
                 width=0.45,
-                hovertemplate=f"<b>{prod}</b><br>%{{x}}<br>Interactions: %{{y:,.0f}}<extra></extra>",
+                hovertemplate=f"<b>{prod}</b><br>%{{x}}<br>Actions: %{{y:,.0f}}<extra></extra>",
             ))
         layout = _base_layout(300)
         layout["barmode"] = "stack"
@@ -2422,15 +2422,15 @@ def digital_server(
         ).fillna(len(cats_order))
         merged = merged.sort_values("_order")
 
-        metric_cols = ["Direct Interaction", "View-through Interaction", "Total Interaction"]
+        metric_cols = ["Direct Action", "View-through Action", "Total Action"]
         rows = []
         for _, r in merged.iterrows():
             rows.append({
                 "label": r["interaction_category"],
                 "metrics": {
-                    "Direct Interaction":       (f"{round(r['direct']):,}",  _pct_change(r["direct"],  r.get("direct_p",  0))),
-                    "View-through Interaction": (f"{round(r['vt']):,}",      _pct_change(r["vt"],      r.get("vt_p",      0))),
-                    "Total Interaction":        (f"{round(r['total']):,}",   _pct_change(r["total"],   r.get("total_p",   0))),
+                    "Direct Action":       (f"{round(r['direct']):,}",  _pct_change(r["direct"],  r.get("direct_p",  0))),
+                    "View-through Action": (f"{round(r['vt']):,}",      _pct_change(r["vt"],      r.get("vt_p",      0))),
+                    "Total Action":        (f"{round(r['total']):,}",   _pct_change(r["total"],   r.get("total_p",   0))),
                 },
             })
         return _yoy_delta_table(rows, "Category", metric_cols)
@@ -2560,14 +2560,14 @@ def digital_server(
         wide = wide.rename(columns={
             **month_labels,
             "interaction_category": "Category",
-            "conversion_name": "Interaction Name",
+            "conversion_name": "Action Name",
         })
         display_month_cols = [month_labels[m] for m in month_cols]
         heatmap_cols = display_month_cols + ["Grand Total"]
         for c in heatmap_cols:
             wide[c] = wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
 
-        col_order = ["Category", "Interaction Name"] + display_month_cols + ["Grand Total"]
+        col_order = ["Category", "Action Name"] + display_month_cols + ["Grand Total"]
         return _heatmap_table(wide[[c for c in col_order if c in wide.columns]], heatmap_cols, paginated=True)
 
     @render.ui
@@ -2615,7 +2615,7 @@ def digital_server(
                 "View-Through Int.":    (f"{round(r['vt']):,}",      _pct_change(r["vt"],      pv_v)),
                 "Total Key Int.":       (f"{round(r['total']):,}",   _pct_change(r["total"],   pv_t)),
             }})
-        return _yoy_delta_table(rows, "Category / Interaction / Strategy / Campaign", metric_cols, paginated=True)
+        return _yoy_delta_table(rows, "Category / Action / Strategy / Campaign", metric_cols, paginated=True)
 
     @render.ui
     def dig_interactions_detail_table():
@@ -2645,7 +2645,7 @@ def digital_server(
     _DIG_GEO_METRIC_LABELS = {
         "impressions": "Impressions by state",
         "clicks": "Clicks by state",
-        "total_conversions": "Total Interactions by state",
+        "total_conversions": "Total Actions by state",
     }
     _DIG_GEO_METRIC_SHORT = {
         "impressions": "Impressions",
@@ -2681,7 +2681,7 @@ def digital_server(
             metric = input.dig_geo_metric()
         except Exception:
             metric = "total_conversions"
-        label = _DIG_GEO_METRIC_LABELS.get(metric, "Total Interactions by state")
+        label = _DIG_GEO_METRIC_LABELS.get(metric, "Total Actions by state")
         return ui.tags.h2(label, class_="section-heading", style="margin:0;")
 
     @reactive.calc
@@ -3600,7 +3600,7 @@ def digital_server(
             ]
 
         conv_group = ui.tags.div(
-            ui.tags.div("Interactions", class_="crv-dm-group-title"),
+            ui.tags.div("Actions", class_="crv-dm-group-title"),
             ui.tags.div(*conv_detail_cells, class_="crv-dm-grid"),
             class_="crv-dm-group",
         ) if conv_detail_cells else ""
@@ -3624,7 +3624,7 @@ def digital_server(
             chips.append(("positive", "Strong click volume"))
 
         if conv_rate_val >= 5:
-            chips.append(("positive", "Interaction efficiency strong"))
+            chips.append(("positive", "Action efficiency strong"))
         elif conv_rate_val < 0.5 and impr_val > 1000:
             chips.append(("warning", "Int. rate low"))
 
@@ -4235,17 +4235,17 @@ def _pct_change(curr, prev):
 def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str) -> "ui.HTML":
     """
     Build a YoY table with interleaved metric + Δ% columns.
-    Columns: Impressions, Clicks, CTR, Direct Interaction, View-through Interaction,
-             In-Platform Leads, Total Interactions, Interaction Rate.
+    Columns: Impressions, Clicks, CTR, Direct Action, View-through Action,
+             In-Platform Leads, Total Actions, Action Rate.
     """
     raw_metrics = [
         "impressions", "clicks", "direct_conversions",
         "view_through_conversions", "in_platform_leads", "total_interactions",
     ]
     col_labels = [
-        "Interactions", "Clicks", "CTR",
-        "Direct Key Interaction", "View-Through Int.", "In-Platform Leads",
-        "Total Interactions", "Interaction Rate",
+        "Impressions", "Clicks", "CTR",
+        "Direct Key Action", "View-Through Act.", "In-Platform Leads",
+        "Total Actions", "Action Rate",
     ]
 
     curr = df_c.groupby(group_col)[raw_metrics].sum().reset_index()
@@ -4285,15 +4285,15 @@ def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str) -> "
         ) if p else None
 
         metrics_data = {
-            "Interactions":        (_fmt_int(r["impressions"]),         _pct_change(r["impressions"], p.get("impressions", 0)) if p else "N/A"),
+            "Impressions":         (_fmt_int(r["impressions"]),         _pct_change(r["impressions"], p.get("impressions", 0)) if p else "N/A"),
             "Clicks":              (_fmt_int(r["clicks"]),              _pct_change(r["clicks"], p.get("clicks", 0)) if p else "N/A"),
             "CTR":                 (_fmt_pct(ctr_curr * 100 if ctr_curr is not None else None),
                                     _pct_change(ctr_curr, ctr_prev) if (ctr_curr is not None and ctr_prev is not None) else "N/A"),
-            "Direct Key Interaction":   (_fmt_int(r["direct_conversions"]),  _pct_change(r["direct_conversions"], p.get("direct_conversions", 0)) if p else "N/A"),
-            "View-Through Int.":  (_fmt_int(r["view_through_conversions"]), _pct_change(r["view_through_conversions"], p.get("view_through_conversions", 0)) if p else "N/A"),
+            "Direct Key Action":   (_fmt_int(r["direct_conversions"]),  _pct_change(r["direct_conversions"], p.get("direct_conversions", 0)) if p else "N/A"),
+            "View-Through Act.":  (_fmt_int(r["view_through_conversions"]), _pct_change(r["view_through_conversions"], p.get("view_through_conversions", 0)) if p else "N/A"),
             "In-Platform Leads":   (_fmt_int(r["in_platform_leads"]),   _pct_change(r["in_platform_leads"], p.get("in_platform_leads", 0)) if p else "N/A"),
-            "Total Interactions":  (_fmt_int(r["total_interactions"]),  _pct_change(r["total_interactions"], p.get("total_interactions", 0)) if p else "N/A"),
-            "Interaction Rate":    (_fmt_pct(conv_rate_curr * 100 if conv_rate_curr is not None else None),
+            "Total Actions":  (_fmt_int(r["total_interactions"]),  _pct_change(r["total_interactions"], p.get("total_interactions", 0)) if p else "N/A"),
+            "Action Rate":    (_fmt_pct(conv_rate_curr * 100 if conv_rate_curr is not None else None),
                                     _pct_change(conv_rate_curr, conv_rate_prev) if (conv_rate_curr is not None and conv_rate_prev is not None) else "N/A"),
         }
         rows.append({"label": grp, "metrics": metrics_data})
