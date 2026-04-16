@@ -3233,6 +3233,12 @@ def digital_server(
                     num_agg["video_avg"] = "mean"
                 valid_grp = [c for c in grp_cols if c in df.columns]
                 agged = df.groupby(valid_grp, as_index=False, dropna=False).agg({**str_agg, **num_agg})
+                # Preserve first/last run dates for YouTube
+                if "day" in df.columns:
+                    date_agg = df.groupby(valid_grp, dropna=False)["day"].agg(
+                        first_run_date="min", last_run_date="max"
+                    ).reset_index()
+                    agged = agged.merge(date_agg, on=valid_grp, how="left")
                 if "impressions" in agged.columns and "clicks" in agged.columns:
                     agged["ctr"] = (agged["clicks"] / agged["impressions"].replace(0, float("nan")) * 100).round(2)
                 else:
@@ -3784,8 +3790,19 @@ def digital_server(
                 _preview_row(click_to_view=True),
             ] if r is not None]
         elif sub_tab == "youtube":
+            # YouTube link from ad_url or preview_url
+            yt_link = ad_url if ad_url and "youtube" in ad_url.lower() else (
+                preview_url if preview_url and "youtube" in preview_url.lower() else ad_url
+            )
+            first_run = row.get("first_run_date")
+            first_run_str = pd.Timestamp(first_run).strftime("%b %d, %Y") if pd.notna(first_run) else None
+            last_run = row.get("last_run_date")
+            last_run_str = pd.Timestamp(last_run).strftime("%b %d, %Y") if pd.notna(last_run) else None
             meta_rows = [r for r in [
-                _meta_row("Landing Page", ad_url, is_link=True),
+                _meta_row("YouTube Video", yt_link, is_link=True) if yt_link else None,
+                _meta_row("Landing Page", ad_url, is_link=True) if ad_url and ad_url != yt_link else None,
+                _meta_row("First Run", first_run_str) if first_run_str else None,
+                _meta_row("Last Run", last_run_str) if last_run_str else None,
             ] if r is not None]
         elif sub_tab == "snapchat":
             meta_rows = [r for r in [
