@@ -469,8 +469,10 @@ def _fmt_digital_count(n, compact=False):
     return f"{rounded:,}"
 
 
-def _fmt_delta(curr, prev, invert=False, label="YoY"):
-    """Build a YoY/MoM delta badge. invert=True means down is good (cost)."""
+def _fmt_delta(curr, prev, invert=False, label="YoY", fmt="count"):
+    """Build a YoY/MoM delta badge with hover showing actual values.
+    fmt: 'count' | 'currency' | 'pct' — controls how values display in tooltip.
+    """
     if prev is None or prev == 0 or curr is None:
         return ui.tags.span("N/A", class_="kpi-badge kpi-badge--na")
     pct = (curr - prev) / abs(prev) * 100
@@ -481,9 +483,22 @@ def _fmt_delta(curr, prev, invert=False, label="YoY"):
         arrow, sentiment = "\u25bc", ("positive" if invert else "negative")
     else:
         arrow, sentiment = "", "neutral"
+    # Build hover tooltip with actual values
+    if fmt == "currency":
+        curr_str = f"${curr:,.0f}"
+        prev_str = f"${prev:,.0f}"
+    elif fmt == "pct":
+        curr_str = f"{curr:.2f}%"
+        prev_str = f"{prev:.2f}%"
+    else:
+        curr_str = f"{curr:,.0f}"
+        prev_str = f"{prev:,.0f}"
+    title = f"Current: {curr_str}  |  Prior: {prev_str}  |  Change: {'+' if rounded > 0 else ''}{rounded:.1f}%"
     return ui.tags.span(
         f"{arrow} {abs(rounded):.1f}% {label}",
         class_=f"kpi-badge kpi-badge--{sentiment}",
+        title=title,
+        style="cursor:help;",
     )
 
 
@@ -690,7 +705,7 @@ def digital_server(
         df_c, df_p = _dig_q8(), _dig_q8_prior()
         curr = _safe_div(df_c["budget"].sum(), df_c["total_interactions"].sum())
         prev = _safe_div(df_p["budget"].sum(), df_p["total_interactions"].sum())
-        return _fmt_delta(curr, prev, invert=True, label="MoM")
+        return _fmt_delta(curr, prev, invert=True, label="MoM", fmt="currency")
 
     @render.text
     def dig_inquiry_int():
@@ -736,7 +751,7 @@ def digital_server(
 
     @render.ui
     def dig_budget_delta():
-        return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_prior()["budget"].sum(), invert=True, label="MoM")
+        return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_prior()["budget"].sum(), invert=True, label="MoM", fmt="currency")
 
     @render.text
     def dig_cpc():
@@ -838,7 +853,7 @@ def digital_server(
 
     @render.ui
     def dig_budget_kpi_delta():
-        return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_prior()["budget"].sum(), invert=True, label="MoM")
+        return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_prior()["budget"].sum(), invert=True, label="MoM", fmt="currency")
 
     # --- Clicks metric card (Engagement & Spend grid) ---
 
@@ -1348,7 +1363,7 @@ def digital_server(
 
     @render.ui
     def dig_budget_yoy_delta():
-        return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_yoy()["budget"].sum(), invert=True)
+        return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_yoy()["budget"].sum(), invert=True, fmt="currency")
 
     @render.text
     def dig_cpc_yoy():
@@ -1438,7 +1453,7 @@ def digital_server(
 
     @render.ui
     def dig_budget_yoy_kpi_delta():
-        return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_yoy()["budget"].sum(), invert=True)
+        return _fmt_delta(_dig_q8()["budget"].sum(), _dig_q8_yoy()["budget"].sum(), invert=True, fmt="currency")
 
     # --- Inline cost outputs for YoY KPI cards ---
 

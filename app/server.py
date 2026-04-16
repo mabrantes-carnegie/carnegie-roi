@@ -613,6 +613,12 @@ def server_logic(input, output, session):
         changes = yoy_changes()
         text, sentiment = fmt_yoy(changes.get(key))
         badge_class = f"kpi-badge kpi-badge--{sentiment}"
+        # Add hover with actual values
+        curr_val = current_kpis().get(key)
+        prior_val = prior_kpis().get(key)
+        if curr_val is not None and prior_val is not None:
+            title = f"Current: {curr_val:,.0f}  |  Prior: {prior_val:,.0f}"
+            return ui.tags.span(text, class_=badge_class, title=title, style="cursor:help;")
         return ui.tags.span(text, class_=badge_class)
 
     def _yoy_badge_pp(key: str):
@@ -628,7 +634,8 @@ def server_logic(input, output, session):
             text, sentiment = f"\u25bc {abs(diff)}pp YoY", "negative"
         else:
             text, sentiment = "0pp YoY", "neutral"
-        return ui.tags.span(text, class_=f"kpi-badge kpi-badge--{sentiment}")
+        title = f"Current: {curr:.0f}%  |  Prior: {prior:.0f}%"
+        return ui.tags.span(text, class_=f"kpi-badge kpi-badge--{sentiment}", title=title, style="cursor:help;")
 
     @render.ui
     def yoy_total_inquiries():
