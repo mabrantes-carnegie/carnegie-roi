@@ -1275,7 +1275,14 @@ page_digital = ui.nav_menu(
             ),
             ui.tags.h2("Key Actions By Campaign Name", class_="section-heading"),
             ui.tags.div(ui.output_ui("dig_interactions_campaign_table"), class_="carnegie-table-card"),
-            ui.tags.h2("Key Actions By Month", class_="section-heading"),
+            ui.tags.div(
+                ui.tags.h2("Key Actions By Month", class_="section-heading",
+                            style="display:inline-block;margin-right:12px;"),
+                ui.tags.div(
+                    ui.input_switch("dig_month_detail", "Show Action Names", value=False),
+                    style="display:inline-block;vertical-align:middle;",
+                ),
+            ),
             ui.tags.div(ui.output_ui("dig_interactions_month_table"), class_="carnegie-table-card"),
             ui.tags.h2("Key Actions By Campaign & Action Name", class_="section-heading"),
             ui.tags.div(ui.output_ui("dig_interactions_detail_table"), class_="carnegie-table-card"),

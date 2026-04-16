@@ -2632,38 +2632,52 @@ def digital_server(
         months_12 = pd.period_range(end=latest, periods=12, freq="M")
         month_labels = {str(m): m.to_timestamp().strftime("%b %y") for m in months_12}
 
-        agg = df_full.groupby(["interaction_category", "conversion_name", "month"])["total_interactions"].sum().reset_index()
-        agg["ym"] = agg["month"].astype(str)
-        agg = agg[agg["ym"].isin(month_labels)]
+        # Determine drill-down level
+        try:
+            show_detail = input.dig_month_detail()
+        except Exception:
+            show_detail = False
 
-        wide = agg.pivot_table(
-            index=["interaction_category", "conversion_name"],
-            columns="ym", values="total_interactions", aggfunc="sum", fill_value=0,
-        ).reset_index()
-        wide.columns.name = None
+        if show_detail:
+            # Detailed: category + action name
+            agg = df_full.groupby(["interaction_category", "conversion_name", "month"])["total_interactions"].sum().reset_index()
+            agg["ym"] = agg["month"].astype(str)
+            agg = agg[agg["ym"].isin(month_labels)]
+            wide = agg.pivot_table(
+                index=["interaction_category", "conversion_name"],
+                columns="ym", values="total_interactions", aggfunc="sum", fill_value=0,
+            ).reset_index()
+            wide.columns.name = None
+            idx_rename = {"interaction_category": "Category", "conversion_name": "Action Name"}
+            idx_cols = ["Category", "Action Name"]
+        else:
+            # Category-level only (default)
+            agg = df_full.groupby(["interaction_category", "month"])["total_interactions"].sum().reset_index()
+            agg["ym"] = agg["month"].astype(str)
+            agg = agg[agg["ym"].isin(month_labels)]
+            wide = agg.pivot_table(
+                index=["interaction_category"],
+                columns="ym", values="total_interactions", aggfunc="sum", fill_value=0,
+            ).reset_index()
+            wide.columns.name = None
+            idx_rename = {"interaction_category": "Category"}
+            idx_cols = ["Category"]
 
-        # Ensure all 12 months are present as columns
         for ym in month_labels:
             if ym not in wide.columns:
                 wide[ym] = 0
 
-        # Sort columns chronologically
         month_cols = sorted(month_labels.keys())
         wide["Grand Total"] = wide[month_cols].sum(axis=1)
         wide = wide.sort_values("Grand Total", ascending=False)
 
-        # Rename month columns to "Feb 26" format
-        wide = wide.rename(columns={
-            **month_labels,
-            "interaction_category": "Category",
-            "conversion_name": "Action Name",
-        })
+        wide = wide.rename(columns={**month_labels, **idx_rename})
         display_month_cols = [month_labels[m] for m in month_cols]
         heatmap_cols = display_month_cols + ["Grand Total"]
         for c in heatmap_cols:
             wide[c] = wide[c].apply(lambda v: f"{round(v):,}" if isinstance(v, (int, float)) else v)
 
-        col_order = ["Category", "Action Name"] + display_month_cols + ["Grand Total"]
+        col_order = idx_cols + display_month_cols + ["Grand Total"]
         return _heatmap_table(wide[[c for c in col_order if c in wide.columns]], heatmap_cols, paginated=True)
 
     @render.ui
