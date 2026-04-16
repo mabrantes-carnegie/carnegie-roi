@@ -994,19 +994,29 @@ _dig_overview_content = ui.tags.div(
         class_="funnel-strip",
         style="grid-template-columns:repeat(5, 1fr);",
     ),
-    # Row A: Trending Performance (full width)
+    # Row A: Trending Performance (full width, dual-metric support)
     ui.tags.div(
         ui.tags.div(
             ui.tags.span("Trending Performance", class_="card-heading"),
-            _pill_dropdown("dig_trending_metric", {
-                "clicks": "Clicks",
-                "ctr": "CTR",
-                "direct_conversions": "Direct Actions",
-                "view_through_conversions": "View-through Actions",
-                "in_platform_leads": "In-Platform Leads",
-                "budget": "Budget",
-                "cost_per_total_interaction": "Cost Per Total Action",
-            }, "clicks"),
+            ui.tags.div(
+                ui.input_selectize(
+                    "dig_trending_metric",
+                    None,
+                    choices={
+                        "clicks": "Clicks",
+                        "ctr": "CTR",
+                        "direct_conversions": "Direct Actions",
+                        "view_through_conversions": "View-through Actions",
+                        "in_platform_leads": "In-Platform Leads",
+                        "budget": "Budget",
+                        "cost_per_total_interaction": "Cost Per Total Action",
+                    },
+                    selected="clicks",
+                    multiple=True,
+                    options={"maxItems": 2, "plugins": ["remove_button"]},
+                ),
+                style="min-width:260px;max-width:420px;",
+            ),
             class_="card-header-row",
         ),
         ui.output_ui("dig_trending_chart"),

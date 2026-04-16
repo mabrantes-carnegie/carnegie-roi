@@ -909,11 +909,15 @@ def digital_server(
         if df_curr.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        # Determine selected metric
+        # Determine selected metric(s) — now supports up to 2
         try:
-            metric_key = input.dig_trending_metric()
+            raw = input.dig_trending_metric()
+            metric_keys = list(raw) if isinstance(raw, (list, tuple)) else [raw]
         except Exception:
-            metric_key = "clicks"
+            metric_keys = ["clicks"]
+        if not metric_keys:
+            metric_keys = ["clicks"]
+        metric_keys = metric_keys[:2]  # enforce max 2
 
         _METRIC_LABELS = {
             "clicks": "Clicks",
@@ -924,12 +928,13 @@ def digital_server(
             "budget": "Budget",
             "cost_per_total_interaction": "Cost Per Total Action",
         }
-        metric_label = _METRIC_LABELS.get(metric_key, metric_key)
 
-        # Derived metrics need special aggregation
-        is_rate = metric_key == "ctr"
-        is_cost = metric_key in ("budget", "cost_per_total_interaction")
-        is_derived = metric_key in ("ctr", "cost_per_total_interaction")
+        _COLORS = ["#EA332D", "#021326"]
+        _RATE_METRICS = {"ctr"}
+        _COST_METRICS = {"budget", "cost_per_total_interaction"}
+
+        def _is_rate(mk): return mk in _RATE_METRICS
+        def _is_cost(mk): return mk in _COST_METRICS
 
         def _aggregate_daily(df):
             agg_cols = {"impressions": "sum", "clicks": "sum",
@@ -937,7 +942,6 @@ def digital_server(
                         "in_platform_leads": "sum", "total_interactions": "sum",
                         "budget": "sum"}
             daily = df.groupby("day").agg(agg_cols).reset_index().sort_values("day")
-            # Derived columns
             daily["ctr"] = daily.apply(
                 lambda r: (r["clicks"] / r["impressions"] * 100) if r["impressions"] > 0 else 0, axis=1)
             daily["cost_per_total_interaction"] = daily.apply(
@@ -958,87 +962,88 @@ def digital_server(
         all_days = pd.DataFrame({"day": pd.date_range(start_dt, end_dt, freq="D")})
         curr_daily = all_days.merge(curr_daily, on="day", how="left").fillna(0)
 
-        # Tick labels on odd days
         odd_days = curr_daily[curr_daily["day"].dt.day % 2 == 1]["day"]
         tickvals = odd_days.tolist()
         ticktext = [pd.Timestamp(d).strftime("%b ") + str(pd.Timestamp(d).day) for d in odd_days]
 
-        # Format hover values based on metric type
-        if is_rate:
-            hover_fmt = f"%{{x|%b %e}}<br>{metric_label}: %{{y:.2f}}%<extra></extra>"
-        elif metric_key == "budget":
-            hover_fmt = f"%{{x|%b %e}}<br>{metric_label}: $%{{y:,.0f}}<extra></extra>"
-        elif metric_key == "cost_per_total_interaction":
-            hover_fmt = f"%{{x|%b %e}}<br>{metric_label}: $%{{y:,.2f}}<extra></extra>"
-        else:
-            hover_fmt = f"%{{x|%b %e}}<br>{metric_label}: %{{y:,.0f}}<extra></extra>"
+        def _hover_fmt(mk, label, suffix=""):
+            if _is_rate(mk):
+                return f"%{{x|%b %e}}<br>{label}{suffix}: %{{y:.2f}}%<extra></extra>"
+            elif mk == "budget":
+                return f"%{{x|%b %e}}<br>{label}{suffix}: $%{{y:,.0f}}<extra></extra>"
+            elif mk == "cost_per_total_interaction":
+                return f"%{{x|%b %e}}<br>{label}{suffix}: $%{{y:,.2f}}<extra></extra>"
+            return f"%{{x|%b %e}}<br>{label}{suffix}: %{{y:,.0f}}<extra></extra>"
 
         def _fmt_text(vals, mk):
             if mk == "ctr":
                 return [f"{v:.1f}%" for v in vals]
             elif mk in ("budget", "cost_per_total_interaction"):
                 return [f"${v:,.0f}" if v >= 1 else f"${v:.2f}" for v in vals]
-            else:
-                return [f"{v:,.0f}" for v in vals]
+            return [f"{v:,.0f}" for v in vals]
 
-        # Compute prior series first so we can resolve label collisions for both
-        _merged = None
-        if not df_prior.empty:
+        def _yaxis_opts(mk):
+            opts = dict(showgrid=True, gridcolor="#F0EEEA")
+            if _is_rate(mk):
+                opts["ticksuffix"] = "%"
+            elif _is_cost(mk):
+                opts["tickprefix"] = "$"
+            return opts
+
+        dual = len(metric_keys) == 2
+        fig = go.Figure()
+        _series_defs = []
+
+        for i, mk in enumerate(metric_keys):
+            label = _METRIC_LABELS.get(mk, mk)
+            color = _COLORS[i]
+            yaxis_name = "y" if i == 0 else "y2"
+
+            fig.add_trace(go.Scatter(
+                x=curr_daily["day"], y=curr_daily[mk],
+                mode="lines+markers", name=label,
+                line=dict(color=color, width=2),
+                marker=dict(color=color, size=4),
+                hovertemplate=_hover_fmt(mk, label),
+                yaxis=yaxis_name,
+            ))
+            _series_defs.append({
+                "series_idx": len(fig.data) - 1,
+                "xs": curr_daily["day"].tolist(),
+                "ys": curr_daily[mk].tolist(),
+                "texts": _fmt_text(curr_daily[mk].tolist(), mk),
+                "default_pos": "top center" if i == 0 else "bottom center",
+                "color": color,
+                "font_size": 9,
+            })
+
+        # Prior-period comparison only for single-metric mode
+        if not dual and not df_prior.empty:
+            mk = metric_keys[0]
+            label = _METRIC_LABELS.get(mk, mk)
             prior_daily = _aggregate_daily(df_prior)
             prior_daily["day_num"] = prior_daily["day"].dt.day
             curr_daily["day_num"] = curr_daily["day"].dt.day
             _merged = curr_daily[["day", "day_num"]].merge(
-                prior_daily[["day_num", metric_key]], on="day_num", how="left"
+                prior_daily[["day_num", mk]], on="day_num", how="left"
             ).fillna(0)
 
-        _series_defs = [{
-            "series_idx": 0,
-            "xs": curr_daily["day"].tolist(),
-            "ys": curr_daily[metric_key].tolist(),
-            "texts": _fmt_text(curr_daily[metric_key].tolist(), metric_key),
-            "default_pos": "top center",
-        }]
-        if _merged is not None:
-            _series_defs.append({
-                "series_idx": 1,
-                "xs": _merged["day"].tolist(),
-                "ys": _merged[metric_key].tolist(),
-                "texts": _fmt_text(_merged[metric_key].tolist(), metric_key),
-                "default_pos": "bottom center",
-            })
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=curr_daily["day"], y=curr_daily[metric_key],
-            mode="lines+markers", name=metric_label,
-            line=dict(color="#EA332D", width=2),
-            marker=dict(color="#EA332D", size=4),
-            hovertemplate=hover_fmt,
-        ))
-
-        if _merged is not None:
-            if is_rate:
-                hover_fmt_prior = f"%{{x|%b %e}}<br>{metric_label} (prev month): %{{y:.2f}}%<extra></extra>"
-            elif metric_key == "budget":
-                hover_fmt_prior = f"%{{x|%b %e}}<br>{metric_label} (prev month): $%{{y:,.0f}}<extra></extra>"
-            elif metric_key == "cost_per_total_interaction":
-                hover_fmt_prior = f"%{{x|%b %e}}<br>{metric_label} (prev month): $%{{y:,.2f}}<extra></extra>"
-            else:
-                hover_fmt_prior = f"%{{x|%b %e}}<br>{metric_label} (prev month): %{{y:,.0f}}<extra></extra>"
-
             fig.add_trace(go.Scatter(
-                x=_merged["day"], y=_merged[metric_key],
-                mode="lines+markers", name=f"{metric_label} (previous month)",
+                x=_merged["day"], y=_merged[mk],
+                mode="lines+markers", name=f"{label} (previous month)",
                 line=dict(color="#C99D44", width=1.8, dash="dash"),
                 marker=dict(color="#C99D44", size=3),
-                hovertemplate=hover_fmt_prior,
+                hovertemplate=_hover_fmt(mk, label, " (prev month)"),
             ))
-
-        # Y-axis formatting
-        yaxis_opts = dict(showgrid=True, gridcolor="#F0EEEA")
-        if is_rate:
-            yaxis_opts["ticksuffix"] = "%"
-        elif is_cost or metric_key == "budget":
-            yaxis_opts["tickprefix"] = "$"
+            _series_defs.append({
+                "series_idx": len(fig.data) - 1,
+                "xs": _merged["day"].tolist(),
+                "ys": _merged[mk].tolist(),
+                "texts": _fmt_text(_merged[mk].tolist(), mk),
+                "default_pos": "bottom center",
+                "color": "#C99D44",
+                "font_size": 9,
+            })
 
         layout = _base_layout(320)
         layout["xaxis"] = dict(
@@ -1046,13 +1051,26 @@ def digital_server(
             tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
             showgrid=False, title="", tickangle=0,
         )
-        layout["yaxis"] = {**layout.get("yaxis", {}), **yaxis_opts}
+
+        # Y-axis 1 (left)
+        y1_opts = _yaxis_opts(metric_keys[0])
+        y1_opts["title"] = _METRIC_LABELS.get(metric_keys[0], metric_keys[0]) if dual else ""
+        y1_opts["titlefont"] = dict(color=_COLORS[0], size=11, family="Manrope, sans-serif")
+        y1_opts["tickfont"] = dict(color=_COLORS[0] if dual else "#9B9893", size=10, family="Manrope, sans-serif")
+        layout["yaxis"] = {**layout.get("yaxis", {}), **y1_opts}
+
+        if dual:
+            # Y-axis 2 (right)
+            y2_opts = _yaxis_opts(metric_keys[1])
+            y2_opts["title"] = _METRIC_LABELS.get(metric_keys[1], metric_keys[1])
+            y2_opts["titlefont"] = dict(color=_COLORS[1], size=11, family="Manrope, sans-serif")
+            y2_opts["tickfont"] = dict(color=_COLORS[1], size=10, family="Manrope, sans-serif")
+            y2_opts["overlaying"] = "y"
+            y2_opts["side"] = "right"
+            y2_opts["showgrid"] = False
+            layout["yaxis2"] = y2_opts
+
         fig.update_layout(**layout)
-        _series_defs[0]["color"] = "#EA332D"
-        _series_defs[0]["font_size"] = 9
-        if len(_series_defs) > 1:
-            _series_defs[1]["color"] = "#C99D44"
-            _series_defs[1]["font_size"] = 9
         _add_line_label_annotations(fig, _series_defs, chart_height=320, min_gap_px=20)
         return _plotly_html(fig)
 
