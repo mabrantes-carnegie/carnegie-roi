@@ -1,7 +1,7 @@
 environment = "prod"
 
 # Cloud Run
-min_instances = 0
+min_instances = 1
 max_instances = 1
 cpu           = "1"
 memory        = "512Mi"
