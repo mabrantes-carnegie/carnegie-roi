@@ -53,6 +53,17 @@ from shiny import App, ui
 from datetime import date
 
 
+_DIG_TRENDING_METRIC_CHOICES = {
+    "clicks": "Clicks",
+    "ctr": "CTR",
+    "direct_conversions": "Direct Actions",
+    "view_through_conversions": "View-through Actions",
+    "in_platform_leads": "In-Platform Leads",
+    "budget": "Budget",
+    "cost_per_total_interaction": "Cost Per Total Action",
+}
+
+
 def _pill_dropdown(input_id: str, choices: dict, selected: str):
     """Reusable iOS-style pill dropdown that sets a hidden Shiny input."""
     default_label = choices[selected]
@@ -103,6 +114,39 @@ def _pill_dropdown(input_id: str, choices: dict, selected: str):
             class_="pill-dropdown",
         ),
     )
+
+
+def _metric_chip_picker(
+    input_id: str,
+    choices: dict,
+    selected: list[str] | tuple[str, ...] | str,
+):
+    """Compact metric chips for ordered dual-axis selection."""
+    selected_keys = [selected] if isinstance(selected, str) else list(selected)
+    selected_csv = ",".join(selected_keys[:2] or ["clicks"])
+    return ui.tags.div(
+        *[
+            ui.tags.button(
+                ui.tags.span("", class_="metric-chip-dot"),
+                ui.tags.span(label, class_="metric-chip-label"),
+                ui.tags.span("", class_="metric-chip-axis-badge"),
+                type="button",
+                class_="metric-chip",
+                **{
+                    "data-key": value,
+                    "aria-pressed": "false",
+                },
+            )
+            for value, label in choices.items()
+        ],
+        class_="metric-chip-picker",
+        **{
+            "data-input-id": input_id,
+            "data-selected": selected_csv,
+            "data-max-items": "2",
+        },
+    )
+
 
 from server import server_logic
 
@@ -1030,24 +1074,13 @@ _dig_overview_content = ui.tags.div(
             ui.tags.span("Trending Performance", class_="card-heading"),
             ui.tags.div(
                 ui.tags.div(
-                    ui.input_selectize(
+                    _metric_chip_picker(
                         "dig_trending_metric",
-                        None,
-                        choices={
-                            "clicks": "Clicks",
-                            "ctr": "CTR",
-                            "direct_conversions": "Direct Actions",
-                            "view_through_conversions": "View-through Actions",
-                            "in_platform_leads": "In-Platform Leads",
-                            "budget": "Budget",
-                            "cost_per_total_interaction": "Cost Per Total Action",
-                        },
-                        selected="clicks",
-                        multiple=True,
-                        options={"maxItems": 2, "plugins": ["remove_button"]},
+                        _DIG_TRENDING_METRIC_CHOICES,
+                        ["clicks"],
                     ),
-                    class_="ios-metric-picker",
-                    style="flex:0 1 220px;min-width:180px;max-width:240px;",
+                    class_="metric-chip-picker-wrap",
+                    style="flex:1 1 520px;min-width:280px;",
                 ),
                 ui.tags.div(
                     ui.input_radio_buttons(
@@ -1180,24 +1213,13 @@ _dig_overview_yoy_content = ui.tags.div(
                 ui.tags.span("Trending Performance (YoY)", class_="card-heading"),
                 ui.tags.div(
                     ui.tags.div(
-                        ui.input_selectize(
+                        _metric_chip_picker(
                             "dig_trending_metric_yoy",
-                            None,
-                            choices={
-                                "clicks": "Clicks",
-                                "ctr": "CTR",
-                                "direct_conversions": "Direct Actions",
-                                "view_through_conversions": "View-through Actions",
-                                "in_platform_leads": "In-Platform Leads",
-                                "budget": "Budget",
-                                "cost_per_total_interaction": "Cost Per Total Action",
-                            },
-                            selected="clicks",
-                            multiple=True,
-                            options={"maxItems": 2, "plugins": ["remove_button"]},
+                            _DIG_TRENDING_METRIC_CHOICES,
+                            ["clicks"],
                         ),
-                        class_="ios-metric-picker",
-                        style="flex:0 1 220px;min-width:180px;max-width:240px;",
+                        class_="metric-chip-picker-wrap",
+                        style="flex:1 1 520px;min-width:280px;",
                     ),
                     ui.tags.div(
                         ui.input_radio_buttons(
@@ -1940,10 +1962,11 @@ app_ui = ui.page_navbar(
     header=[
         ui.output_ui("session_error"),
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=44"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=45"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(src="paginated-tables.js?v=2"),
+            ui.tags.script(src="metric-chip-picker.js?v=1"),
             ui.tags.script(
                 "document.addEventListener('click',function(){"
                 "document.querySelectorAll('.pill-dropdown-menu').forEach(function(m){"

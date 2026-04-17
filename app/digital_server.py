@@ -400,6 +400,9 @@ def _add_line_label_annotations(fig, series_defs, chart_height=320, min_gap_px=2
         texts = list(series["texts"])
         color = series.get("color", "#021326")
         font_size = series.get("font_size", 9)
+        trace = fig.data[s_idx] if s_idx < len(fig.data) else None
+        xref = getattr(trace, "xaxis", None) or series.get("xref", "x")
+        yref = getattr(trace, "yaxis", None) or series.get("yref", "y")
         for x_val, y_val, text in zip(xs, ys, texts):
             spec = layout_map.get(s_idx, {}).get(x_val, {"show": bool(text), "yshift": 14, "xshift": 0})
             if not text or not spec.get("show", True):
@@ -407,6 +410,8 @@ def _add_line_label_annotations(fig, series_defs, chart_height=320, min_gap_px=2
             fig.add_annotation(
                 x=x_val,
                 y=y_val,
+                xref=xref,
+                yref=yref,
                 text=text,
                 showarrow=False,
                 yshift=spec.get("yshift", 0),
@@ -1117,6 +1122,7 @@ def digital_server(
                 "default_pos": "top center" if i == 0 else "bottom center",
                 "color": color,
                 "font_size": 9,
+                "yref": yaxis_name,
             })
 
         layout = _base_layout(320)
@@ -1685,6 +1691,7 @@ def digital_server(
                 "default_pos": "top center" if i == 0 else "bottom center",
                 "color": color,
                 "font_size": 9,
+                "yref": yaxis_name,
             })
 
         tickvals, ticktext = _granularity_tick_spec(spine, granularity)

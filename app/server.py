@@ -130,6 +130,9 @@ def _add_line_label_annotations(fig, series_defs, chart_height=320, min_gap_px=2
         texts = list(series["texts"])
         color = series.get("color", CARNEGIE_NAVY)
         font_size = series.get("font_size", 9)
+        trace = fig.data[s_idx] if s_idx < len(fig.data) else None
+        xref = getattr(trace, "xaxis", None) or series.get("xref", "x")
+        yref = getattr(trace, "yaxis", None) or series.get("yref", "y")
         for x_val, y_val, text in zip(xs, ys, texts):
             spec = layout_map.get(s_idx, {}).get(x_val, {"show": bool(text), "yshift": 14, "xshift": 0})
             if not text or not spec.get("show", True):
@@ -137,6 +140,8 @@ def _add_line_label_annotations(fig, series_defs, chart_height=320, min_gap_px=2
             fig.add_annotation(
                 x=x_val,
                 y=y_val,
+                xref=xref,
+                yref=yref,
                 text=text,
                 showarrow=False,
                 yshift=spec.get("yshift", 0),
