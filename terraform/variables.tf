@@ -49,3 +49,9 @@ variable "memory" {
   type        = string
   default     = "2Gi"
 }
+
+variable "use_materialized" {
+  description = "If true, set USE_MATERIALIZED=1 so loaders read from dbt_mlima materialized tables (testing only)"
+  type        = bool
+  default     = false
+}

@@ -1855,6 +1855,7 @@ app_ui = ui.page_navbar(
     title=navbar_title,
     id="nav",
     header=[
+        ui.output_ui("session_error"),
         ui.head_content(
             ui.tags.link(rel="stylesheet", href="styles.css?v=44"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),

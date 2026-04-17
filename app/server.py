@@ -5,13 +5,26 @@ from shiny import render, reactive, ui, req
 import plotly.graph_objects as go
 import pandas as pd
 
+import os
+
 from data_loader import GOALS, PROGRAM_GOALS, ACAD_ORDER, MONTH_LABELS
-from client_resolver import resolve_institution, DEFAULT_SAGE_ID
-from data_loader_param import load_q6, load_q2, load_q3
-from digital_data_param import (
-    load_q8, load_q9, load_q10,
-    load_q11_creative, load_q11_keywords, load_q11_youtube, load_q12,
-)
+from client_resolver import resolve_institution
+
+if os.getenv("USE_MATERIALIZED") == "1":
+    from data_loader_mlima import load_q6, load_q2, load_q3
+    from digital_data_mlima import (
+        load_q8, load_q9, load_q10,
+        load_q11_creative, load_q11_keywords, load_q11_youtube, load_q12,
+    )
+    print("[loaders] Using MATERIALIZED tables (dbt_mlima)")
+else:
+    from data_loader_param import load_q6, load_q2, load_q3
+    from digital_data_param import (
+        load_q8, load_q9, load_q10,
+        load_q11_creative, load_q11_keywords, load_q11_youtube, load_q12,
+    )
+from session_cookie import read_sage_id
+from error_pages import render_banner_html
 from metrics import (
     FUNNEL_COLS, COST_PER_DEFS,
     compute_funnel_kpis, compute_yoy_change,
@@ -149,18 +162,26 @@ def server_logic(input, output, session):
     # ══════════════════════════════════════════════════════════
 
     @reactive.calc
-    def _sage_id() -> str:
-        from urllib.parse import parse_qs
-        qs = session.input[".clientdata_url_search"]()
-        if qs:
-            params = parse_qs(qs.lstrip("?"))
-            if "sage_id" in params:
-                return params["sage_id"][0]
-        return DEFAULT_SAGE_ID
+    def _sage_id() -> str | None:
+        # Trust only the signed roi_session cookie set by the JWT middleware.
+        # If the cookie is missing, tampered with, or expired, return None so
+        # every downstream req() guard short-circuits and the access-denied
+        # banner renders instead of a silent fallback to a wrong client.
+        cookie_header = session.http_conn.headers.get("cookie", "")
+        return read_sage_id(cookie_header)
 
     @reactive.calc
     def _institution_name() -> str | None:
         return resolve_institution(_sage_id())
+
+    @render.ui
+    def session_error():
+        if _institution_name() is None:
+            return ui.HTML(render_banner_html(
+                headline="Session expired",
+                message="Please return to the MyCarnegie portal and reopen your dashboard.",
+            ))
+        return ui.TagList()
 
     # ── Session-scoped data (loaded once per session per institution) ──
 

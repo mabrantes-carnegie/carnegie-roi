@@ -1,17 +1,15 @@
 import os
 import re
+
 import jwt
-from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, Response
-from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from starlette.responses import HTMLResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+from error_pages import render_error_response
+from session_cookie import build_cookie, read_sage_id
 
 JWT_PUBLIC_KEY = os.environ.get("JWT_PUBLIC_KEY", "")
-COOKIE_SECRET = os.environ.get("COOKIE_SECRET", "")
-COOKIE_NAME = "roi_session"
-COOKIE_MAX_AGE = 60 * 60 * 8  # 8 hours
-
-_signer = URLSafeTimedSerializer(COOKIE_SECRET)
 
 # Public framework assets — no tenant data, so no auth.
 # Needed because Safari drops third-party cookies on iframe subresources.
@@ -46,8 +44,6 @@ _SESSION_ASSET_RE = re.compile(r"^/session/[^/]+/(shared|lib)/")
 def _is_public_asset(path: str) -> bool:
     if any(path.startswith(p) for p in _PUBLIC_PATH_PREFIXES):
         return True
-    # Shiny's per-session framework assets. Anchored so a path like
-    # /evil/shared/... can't slip through.
     if _SESSION_ASSET_RE.match(path):
         return True
     if path.endswith(_PUBLIC_PATH_SUFFIXES):
@@ -55,22 +51,9 @@ def _is_public_asset(path: str) -> bool:
     return False
 
 
-def _get_session_sage_id(scope: Scope) -> str:
+def _cookie_header(scope: Scope) -> str:
     headers = dict(scope.get("headers", []))
-    cookie_header = headers.get(b"cookie", b"").decode("utf-8")
-    cookies = {}
-    for part in cookie_header.split(";"):
-        if "=" in part:
-            k, v = part.strip().split("=", 1)
-            cookies[k.strip()] = v.strip()
-    raw = cookies.get(COOKIE_NAME)
-    if not raw:
-        return ""
-    try:
-        data = _signer.loads(raw, max_age=COOKIE_MAX_AGE)
-        return data.get("id", "")
-    except (BadSignature, SignatureExpired):
-        return ""
+    return headers.get(b"cookie", b"").decode("utf-8")
 
 
 class JWTAuthMiddleware:
@@ -93,7 +76,9 @@ class JWTAuthMiddleware:
 
             if token:
                 if not JWT_PUBLIC_KEY:
-                    response = HTMLResponse("JWT_PUBLIC_KEY not configured.", status_code=500)
+                    response = HTMLResponse(
+                        "JWT_PUBLIC_KEY not configured.", status_code=500
+                    )
                     await response(scope, receive, send)
                     return
                 try:
@@ -104,17 +89,17 @@ class JWTAuthMiddleware:
                         options={"require": ["exp", "sage_id"]},
                     )
                 except jwt.ExpiredSignatureError:
-                    response = HTMLResponse(
-                        "<h2>Your session has expired.</h2>"
-                        "<p>Please return to the Carnegie portal and click the dashboard link again.</p>",
+                    response = render_error_response(
+                        headline="Your session has expired",
+                        message="Please return to the Carnegie portal and click the dashboard link again.",
                         status_code=401,
                     )
                     await response(scope, receive, send)
                     return
                 except jwt.InvalidTokenError:
-                    response = HTMLResponse(
-                        "<h2>Invalid link.</h2>"
-                        "<p>Please return to the Carnegie portal and click the dashboard link again.</p>",
+                    response = render_error_response(
+                        headline="Invalid link",
+                        message="Please return to the Carnegie portal and click the dashboard link again.",
                         status_code=401,
                     )
                     await response(scope, receive, send)
@@ -123,7 +108,11 @@ class JWTAuthMiddleware:
                 sage_id = payload.get("sage_id", "")
                 url_sage_id = request.query_params.get("sage_id", "")
                 if url_sage_id and url_sage_id != sage_id:
-                    response = HTMLResponse("Access denied.", status_code=403)
+                    response = render_error_response(
+                        headline="Access denied",
+                        message="Please use your portal link to access this dashboard.",
+                        status_code=403,
+                    )
                     await response(scope, receive, send)
                     return
 
@@ -131,11 +120,11 @@ class JWTAuthMiddleware:
                 await self.app(scope, receive, cookie_sender.send)
                 return
 
-            session_sage_id = _get_session_sage_id(scope)
+            session_sage_id = read_sage_id(_cookie_header(scope))
             if not session_sage_id:
-                response = HTMLResponse(
-                    "<h2>Access denied.</h2>"
-                    "<p>Please use your portal link to access this dashboard.</p>",
+                response = render_error_response(
+                    headline="Access denied",
+                    message="Please use your portal link to access this dashboard.",
                     status_code=403,
                 )
                 await response(scope, receive, send)
@@ -143,7 +132,11 @@ class JWTAuthMiddleware:
 
             url_sage_id = request.query_params.get("sage_id", "")
             if url_sage_id and url_sage_id != session_sage_id:
-                response = HTMLResponse("Access denied.", status_code=403)
+                response = render_error_response(
+                    headline="Access denied",
+                    message="Please use your portal link to access this dashboard.",
+                    status_code=403,
+                )
                 await response(scope, receive, send)
                 return
 
@@ -161,11 +154,7 @@ class _CookieSetter:
     async def send(self, message: dict) -> None:
         if message["type"] == "http.response.start" and not self._cookie_injected:
             self._cookie_injected = True
-            value = _signer.dumps({"id": self._identity})
-            cookie = (
-                f"{COOKIE_NAME}={value}; Max-Age={COOKIE_MAX_AGE}; "
-                f"Path=/; HttpOnly; Secure; SameSite=None; Partitioned"
-            )
+            cookie = build_cookie(self._identity)
             headers = list(message.get("headers", []))
             headers.append((b"set-cookie", cookie.encode("utf-8")))
             message = {**message, "headers": headers}

@@ -41,6 +41,14 @@ resource "google_cloud_run_v2_service" "app" {
         }
       }
 
+      dynamic "env" {
+        for_each = var.use_materialized ? [1] : []
+        content {
+          name  = "USE_MATERIALIZED"
+          value = "1"
+        }
+      }
+
     }
 
     scaling {
