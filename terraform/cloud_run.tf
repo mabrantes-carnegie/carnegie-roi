@@ -5,6 +5,7 @@ resource "google_cloud_run_v2_service" "app" {
 
   template {
     service_account = google_service_account.cloud_run_sa.email
+    timeout         = "3600s"
 
     containers {
       image = local.image
