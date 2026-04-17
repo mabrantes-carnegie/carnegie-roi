@@ -101,6 +101,12 @@ def _base_chart_layout(height=360):
 
 def server_logic(input, output, session):
 
+    # Swallow the keepalive ping so it doesn't trigger anything reactive.
+    @reactive.effect
+    @reactive.event(input._keepalive)
+    def _keepalive_noop():
+        pass
+
     # ══════════════════════════════════════════════════════════
     # SHARED REACTIVE DATA
     # ══════════════════════════════════════════════════════════

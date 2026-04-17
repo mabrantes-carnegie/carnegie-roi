@@ -29,13 +29,13 @@ variable "environment" {
 variable "min_instances" {
   description = "Minimum Cloud Run instances"
   type        = number
-  default     = 0
+  default     = 1
 }
 
 variable "max_instances" {
   description = "Maximum Cloud Run instances"
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "cpu" {
@@ -47,5 +47,5 @@ variable "cpu" {
 variable "memory" {
   description = "Cloud Run memory limit"
   type        = string
-  default     = "512Mi"
+  default     = "2Gi"
 }
