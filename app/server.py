@@ -1,9 +1,12 @@
 """Carnegie ROI Dashboard — Reactive server logic."""
 
+import logging
 from datetime import date
 from shiny import render, reactive, ui, req
 import plotly.graph_objects as go
 import pandas as pd
+
+_log = logging.getLogger("carnegie.roi")
 
 from data_loader import GOALS, PROGRAM_GOALS, ACAD_ORDER, MONTH_LABELS
 from client_resolver import resolve_institution
@@ -171,10 +174,20 @@ def server_logic(input, output, session):
 
     @render.ui
     def session_error():
-        if _institution_name() is None:
+        sid = _sage_id()
+        if sid is None:
             return ui.HTML(render_banner_html(
                 headline="Session expired",
                 message="Please return to the MyCarnegie portal and reopen your dashboard.",
+            ))
+        if _institution_name() is None:
+            _log.warning(
+                "unknown_sage_id sage_id=%s — not found in udp_udl.institution", sid
+            )
+            return ui.HTML(render_banner_html(
+                headline="Dashboard unavailable",
+                message="We couldn't load your dashboard. "
+                        "Please contact your Carnegie account team.",
             ))
         return ui.TagList()
 
