@@ -57,11 +57,19 @@ class JWTAuthMiddleware:
                         options={"require": ["exp", "sage_id"]},
                     )
                 except jwt.ExpiredSignatureError:
-                    response = HTMLResponse("Link expired. Please request a new one.", status_code=401)
+                    response = HTMLResponse(
+                        "<h2>Your session has expired.</h2>"
+                        "<p>Please return to the Carnegie portal and click the dashboard link again.</p>",
+                        status_code=401,
+                    )
                     await response(scope, receive, send)
                     return
                 except jwt.InvalidTokenError:
-                    response = HTMLResponse("Invalid link.", status_code=401)
+                    response = HTMLResponse(
+                        "<h2>Invalid link.</h2>"
+                        "<p>Please return to the Carnegie portal and click the dashboard link again.</p>",
+                        status_code=401,
+                    )
                     await response(scope, receive, send)
                     return
 

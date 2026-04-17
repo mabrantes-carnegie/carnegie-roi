@@ -1613,6 +1613,10 @@ app_ui = ui.page_navbar(
                 "document.querySelectorAll('.pill-dropdown-menu').forEach(function(m){"
                 "m.style.display='none';});});"
             ),
+            ui.tags.script(
+                "$(document).on('shiny:disconnected',function(){"
+                "location.reload();});"
+            ),
             # Show/hide digital filters based on active tab (uses Shiny nav input)
             ui.tags.script("""
 (function() {
