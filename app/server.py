@@ -5,24 +5,13 @@ from shiny import render, reactive, ui, req
 import plotly.graph_objects as go
 import pandas as pd
 
-import os
-
 from data_loader import GOALS, PROGRAM_GOALS, ACAD_ORDER, MONTH_LABELS
 from client_resolver import resolve_institution
-
-if os.getenv("USE_MATERIALIZED") == "1":
-    from data_loader_mlima import load_q6, load_q2, load_q3
-    from digital_data_mlima import (
-        load_q8, load_q9, load_q10,
-        load_q11_creative, load_q11_keywords, load_q11_youtube, load_q12,
-    )
-    print("[loaders] Using MATERIALIZED tables (dbt_mlima)")
-else:
-    from data_loader_param import load_q6, load_q2, load_q3
-    from digital_data_param import (
-        load_q8, load_q9, load_q10,
-        load_q11_creative, load_q11_keywords, load_q11_youtube, load_q12,
-    )
+from data_loader_param import load_q6, load_q2, load_q3
+from digital_data_param import (
+    load_q8, load_q9, load_q10,
+    load_q11_creative, load_q11_keywords, load_q11_youtube, load_q12,
+)
 from session_cookie import read_sage_id
 from error_pages import render_banner_html
 from metrics import (
