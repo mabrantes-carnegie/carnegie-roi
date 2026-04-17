@@ -10,7 +10,7 @@ from formatters import (
     fmt_number,
     fmt_currency,
     fmt_compact,
-    resolve_line_label_layout,
+    # resolve_line_label_layout,  # not implemented yet — using default per-point spec
 )
 
 # ── Image cache: URL → base64 data URI (fetched once, reused) ────
@@ -388,11 +388,8 @@ def _add_bar_labels(fig):
 
 def _add_line_label_annotations(fig, series_defs, chart_height=320, min_gap_px=20):
     """Render stacked line labels as annotations with explicit pixel spacing."""
-    layout_map = resolve_line_label_layout(
-        series_defs,
-        chart_height=chart_height,
-        min_gap_px=min_gap_px,
-    )
+    # layout_map = resolve_line_label_layout(series_defs, chart_height=chart_height, min_gap_px=min_gap_px)
+    layout_map = {}
     for series in series_defs:
         s_idx = series["series_idx"]
         xs = list(series["xs"])
