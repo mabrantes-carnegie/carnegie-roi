@@ -8,9 +8,8 @@ from google.cloud import bigquery
 _QUERY_DIR = Path(__file__).parent.parent / "data" / "queries"
 _DATA_DIR = Path(__file__).parent.parent / "data"
 
-# Use unified-data-platform-prod as billing project (jobs.create permission).
-# Queries reference carnegie-dartlet tables by full path — no change needed.
-_BQ_DIGITAL = bigquery.Client(project="unified-data-platform-prod")
+# Billing project. Queries reference source tables by full path.
+_BQ_DIGITAL = bigquery.Client(project="carnegie-roi-reports")
 
 # ── Region sanitizer — maps messy Q10 region field to US state abbreviations ──
 

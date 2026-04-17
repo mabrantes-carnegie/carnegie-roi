@@ -12,10 +12,10 @@ from functools import lru_cache
 
 from google.cloud import bigquery
 
-BQ_PROJECT = "unified-data-platform-prod"
-INSTITUTION_TABLE = f"`{BQ_PROJECT}.udp_udl.institution`"
+BQ_BILLING_PROJECT = "carnegie-roi-reports"
+INSTITUTION_TABLE = "`unified-data-platform-prod.udp_udl.institution`"
 
-_client = bigquery.Client(project=BQ_PROJECT)
+_client = bigquery.Client(project=BQ_BILLING_PROJECT)
 
 
 @lru_cache(maxsize=64)

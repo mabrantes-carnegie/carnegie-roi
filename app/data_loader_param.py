@@ -17,7 +17,7 @@ from google.cloud import bigquery
 
 _QUERY_DIR = Path(__file__).parent.parent / "data" / "queries"
 
-BQ_PROJECT = "unified-data-platform-prod"
+BQ_PROJECT = "carnegie-roi-reports"
 _client = bigquery.Client(project=BQ_PROJECT)
 
 # Valid US state/territory 2-letter codes (copied from data_loader.py)

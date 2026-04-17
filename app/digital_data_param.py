@@ -16,7 +16,7 @@ from google.cloud import bigquery
 _QUERY_DIR = Path(__file__).parent.parent / "data" / "queries"
 _DATA_DIR = Path(__file__).parent.parent / "data"
 
-BQ_PROJECT = "unified-data-platform-prod"
+BQ_PROJECT = "carnegie-roi-reports"
 _client = bigquery.Client(project=BQ_PROJECT)
 
 # ── Region sanitizer (copied from digital_data.py) ────────────────────────────
