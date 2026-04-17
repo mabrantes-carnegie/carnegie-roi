@@ -1,9 +1,12 @@
 """Carnegie ROI Dashboard — Reactive server logic."""
 
+import logging
 from datetime import date
 from shiny import render, reactive, ui, req
 import plotly.graph_objects as go
 import pandas as pd
+
+_log = logging.getLogger("carnegie.roi")
 
 from data_loader import GOALS, PROGRAM_GOALS, ACAD_ORDER, MONTH_LABELS
 from client_resolver import resolve_institution
@@ -25,7 +28,7 @@ from formatters import (
     fmt_pct,
     fmt_currency,
     fmt_yoy,
-    # resolve_line_label_layout,  # not implemented yet — using default per-point spec
+    resolve_line_label_layout,
 )
 from digital_server import (
     digital_server,
@@ -115,8 +118,11 @@ def _base_chart_layout(height=360):
 
 def _add_line_label_annotations(fig, series_defs, chart_height=320, min_gap_px=20):
     """Render stacked line labels as annotations with explicit pixel spacing."""
-    # layout_map = resolve_line_label_layout(series_defs, chart_height=chart_height, min_gap_px=min_gap_px)
-    layout_map = {}
+    layout_map = resolve_line_label_layout(
+        series_defs,
+        chart_height=chart_height,
+        min_gap_px=min_gap_px,
+    )
     for series in series_defs:
         s_idx = series["series_idx"]
         xs = list(series["xs"])
@@ -168,10 +174,20 @@ def server_logic(input, output, session):
 
     @render.ui
     def session_error():
-        if _institution_name() is None:
+        sid = _sage_id()
+        if sid is None:
             return ui.HTML(render_banner_html(
                 headline="Session expired",
                 message="Please return to the MyCarnegie portal and reopen your dashboard.",
+            ))
+        if _institution_name() is None:
+            _log.warning(
+                "unknown_sage_id sage_id=%s — not found in udp_udl.institution", sid
+            )
+            return ui.HTML(render_banner_html(
+                headline="Dashboard unavailable",
+                message="We couldn't load your dashboard. "
+                        "Please contact your Carnegie account team.",
             ))
         return ui.TagList()
 
