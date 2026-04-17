@@ -5,3 +5,18 @@ __pycache__/
 CEO_PRESENTATION_SCRIPT.md
 DIGITAL_TEAM_PRESENTATION_SCRIPT.md
 doc/engineering-cloud-presentation.md
+
+docker-compose.yml
+auth_strategy_summary.docx
+auth_strategy_summary.docx:Zone.Identifier
+
+# Secrets
+.env
+*.pem
+scripts/gen_test_token.py
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfvars
+terraform/*.tfstate
+terraform/*.tfstate.backup

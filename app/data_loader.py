@@ -9,7 +9,7 @@ from google.cloud import bigquery
 _QUERY_DIR = Path(__file__).parent.parent / "data" / "queries"
 _DATA_DIR = Path(__file__).parent.parent / "data"
 
-_BQ_ROI = bigquery.Client(project="unified-data-platform-prod")
+_BQ_ROI = bigquery.Client(project="carnegie-roi-reports")
 
 # Valid US state/territory 2-letter codes
 VALID_US_STATES = frozenset({

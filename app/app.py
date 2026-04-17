@@ -1938,6 +1938,7 @@ app_ui = ui.page_navbar(
     title=navbar_title,
     id="nav",
     header=[
+        ui.output_ui("session_error"),
         ui.head_content(
             ui.tags.link(rel="stylesheet", href="styles.css?v=44"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
@@ -1948,6 +1949,7 @@ app_ui = ui.page_navbar(
                 "document.querySelectorAll('.pill-dropdown-menu').forEach(function(m){"
                 "m.style.display='none';});});"
             ),
+            ui.tags.script(src="session-resilience.js?v=5"),
             # Show/hide digital filters based on active tab (uses Shiny nav input)
             ui.tags.script("""
 (function() {
@@ -2092,4 +2094,7 @@ app_ui = ui.page_navbar(
     ],
 )
 
-app = App(app_ui, server_logic, static_assets=str(Path(__file__).parent / "www"))
+from auth_middleware import JWTAuthMiddleware
+
+_base_app = App(app_ui, server_logic, static_assets=str(Path(__file__).parent / "www"))
+app = JWTAuthMiddleware(_base_app)

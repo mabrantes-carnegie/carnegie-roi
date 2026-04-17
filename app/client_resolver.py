@@ -1,48 +1,25 @@
 """
 Resolve a MyCarnegie sage_id to an institution name via BigQuery.
 
-Usage:
-    from client_resolver import resolve_institution, DEFAULT_SAGE_ID
-
-    institution_name = resolve_institution("CentralWA11686")
-    # → "Central Washington University"
-
-For local testing without a real sage_id, set the env var:
-    SAGE_ID=CentralWA11686
-or rely on DEFAULT_SAGE_ID below.
+sage_id is the trusted identity sent by MyCarnegie inside the signed JWT and
+then stored by auth_middleware in the `roi_session` cookie. There is no
+default fallback: if sage_id is missing or unknown, callers must handle the
+None return and show an access-denied UI rather than silently picking a
+client.
 """
 
-import os
 from functools import lru_cache
+
 from google.cloud import bigquery
 
-# ── Config ────────────────────────────────────────────────────────────────────
+BQ_BILLING_PROJECT = "carnegie-roi-reports"
+INSTITUTION_TABLE = "`unified-data-platform-prod.udp_udl.institution`"
 
-BQ_PROJECT = "unified-data-platform-prod"
-INSTITUTION_TABLE = f"`{BQ_PROJECT}.udp_udl.institution`"
+_client = bigquery.Client(project=BQ_BILLING_PROJECT)
 
-# Fallback sage_id for local dev when no URL param is present.
-# Change this to test a different client without touching the code.
-DEFAULT_SAGE_ID = os.environ.get("SAGE_ID", "CentralWA11686")
-
-_client = bigquery.Client(project=BQ_PROJECT)
-
-
-# ── Lookup ────────────────────────────────────────────────────────────────────
 
 @lru_cache(maxsize=64)
-def resolve_institution(sage_id: str) -> str | None:
-    """
-    Look up institution name from sage_id.
-
-    Args:
-        sage_id: The `id` value from udp_udl.institution
-                 (e.g. 'CentralWA11686'), as sent by MyCarnegie.
-
-    Returns:
-        The institution `name` (e.g. 'Central Washington University'),
-        or None if the sage_id is not found.
-    """
+def _lookup(sage_id: str) -> str | None:
     query = f"""
         SELECT name
         FROM {INSTITUTION_TABLE}
@@ -58,11 +35,19 @@ def resolve_institution(sage_id: str) -> str | None:
     return rows[0]["name"] if rows else None
 
 
+def resolve_institution(sage_id: str | None) -> str | None:
+    """Look up the institution name for a sage_id.
+
+    Returns None when sage_id is missing, empty, or not present in
+    `udp_udl.institution`. Callers must block access in that case.
+    """
+    if not sage_id:
+        return None
+    return _lookup(sage_id)
+
+
 def list_known_institutions(limit: int = 20) -> list[dict]:
-    """
-    Return a sample of known sage_id → name mappings.
-    Useful for local discovery during development.
-    """
+    """Return a sample of known sage_id → name mappings (dev helper)."""
     query = f"""
         SELECT id AS sage_id, name
         FROM {INSTITUTION_TABLE}
