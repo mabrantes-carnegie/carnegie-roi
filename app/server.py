@@ -25,7 +25,7 @@ from formatters import (
     fmt_pct,
     fmt_currency,
     fmt_yoy,
-    # resolve_line_label_layout,  # not implemented yet — using default per-point spec
+    resolve_line_label_layout,
 )
 from digital_server import (
     digital_server,
@@ -115,8 +115,11 @@ def _base_chart_layout(height=360):
 
 def _add_line_label_annotations(fig, series_defs, chart_height=320, min_gap_px=20):
     """Render stacked line labels as annotations with explicit pixel spacing."""
-    # layout_map = resolve_line_label_layout(series_defs, chart_height=chart_height, min_gap_px=min_gap_px)
-    layout_map = {}
+    layout_map = resolve_line_label_layout(
+        series_defs,
+        chart_height=chart_height,
+        min_gap_px=min_gap_px,
+    )
     for series in series_defs:
         s_idx = series["series_idx"]
         xs = list(series["xs"])
