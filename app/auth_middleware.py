@@ -8,7 +8,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 JWT_PUBLIC_KEY = os.environ.get("JWT_PUBLIC_KEY", "")
 COOKIE_SECRET = os.environ.get("COOKIE_SECRET", "")
 COOKIE_NAME = "roi_session"
-COOKIE_MAX_AGE = 60 * 60  # 1 hour
+COOKIE_MAX_AGE = 60 * 60 * 8  # 8 hours
 
 _signer = URLSafeTimedSerializer(COOKIE_SECRET)
 
@@ -66,7 +66,13 @@ class JWTAuthMiddleware:
                     return
 
                 sage_id = payload.get("sage_id", "")
-                cookie_sender = _CookieSender(send, sage_id)
+                url_sage_id = request.query_params.get("sage_id", "")
+                if url_sage_id and url_sage_id != sage_id:
+                    response = HTMLResponse("Access denied.", status_code=403)
+                    await response(scope, receive, send)
+                    return
+
+                cookie_sender = _CookieSetter(send, sage_id)
                 await self.app(scope, receive, cookie_sender.send)
                 return
 
@@ -89,7 +95,7 @@ class JWTAuthMiddleware:
             await self.app(scope, receive, send)
 
 
-class _CookieSender:
+class _CookieSetter:
     """Injects a Set-Cookie header into the first http.response.start message."""
 
     def __init__(self, send: Send, identity: str) -> None:
