@@ -148,7 +148,7 @@ ORDER BY day, interaction_category, conversion_name;
 -- Q10: Digital Geography — Region Level
 -- Source: tinman.v_kpi_geo
 -- Powers: Digital > Geography tab
--- Grain: client × group × subgroup × product × region × month
+-- Grain: client × group × subgroup × product × region × day
 -- Export as: q10_digital_geo.csv
 -- ============================================================
 SELECT
@@ -157,6 +157,7 @@ SELECT
     campaign_subgroup_name                                  AS subgroup_name,
     product_name,
     region,
+    day,
     EXTRACT(YEAR FROM day)                                  AS event_year,
     EXTRACT(MONTH FROM day)                                 AS event_month,
     FORMAT_DATE('%b', day)                                  AS event_month_name,
@@ -172,8 +173,8 @@ SELECT
 FROM `carnegie-dartlet-1528198422380.tinman.v_kpi_geo`
 WHERE client_name = 'Central Washington University'
     AND day >= '2024-01-01'
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
-ORDER BY event_year, event_month, impressions DESC;
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
+ORDER BY day, impressions DESC;
 
 
 -- ============================================================
@@ -203,6 +204,7 @@ SELECT
     ad_url,
     preview_url,
     CAST(NULL AS STRING)                                    AS segment_group,
+    day,
     EXTRACT(YEAR FROM day)                                  AS event_year,
     EXTRACT(MONTH FROM day)                                 AS event_month,
     FORMAT_DATE('%b', day)                                  AS event_month_name,
@@ -230,7 +232,7 @@ WHERE client_name = 'Central Washington University'
         'Display', 'IP Targeting', 'Audience Select',
         'Mobile Footprint', 'Discovery', 'Mobile Location Targeting'
     )
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17
 
 UNION ALL
 
@@ -249,6 +251,7 @@ SELECT
     ad_url,
     preview_url,
     segment_group,
+    day,
     EXTRACT(YEAR FROM day)                                  AS event_year,
     EXTRACT(MONTH FROM day)                                 AS event_month,
     FORMAT_DATE('%b', day)                                  AS event_month_name,
@@ -272,15 +275,15 @@ SELECT
 FROM `carnegie-dartlet-1528198422380.tinman.v_kpi_creative`
 WHERE client_name = 'Central Washington University'
     AND day >= '2024-01-01'
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
-ORDER BY product_name, event_year, event_month, impressions DESC;
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17
+ORDER BY product_name, day, impressions DESC;
 
 
 -- ============================================================
 -- Q11b: PPC Keyword Performance
 -- Source: tinman.v_kpi_keyword
 -- Powers: Digital > Creative tab > PPC keyword table
--- Grain: client × campaign × keyword × match_type × month
+-- Grain: client × campaign × keyword × match_type × day
 -- Export as: q11_digital_keywords.csv
 -- ============================================================
 SELECT
@@ -290,6 +293,7 @@ SELECT
     product_name,
     keyword,
     match_type,
+    day,
     EXTRACT(YEAR FROM day)                                  AS event_year,
     EXTRACT(MONTH FROM day)                                 AS event_month,
     FORMAT_DATE('%b', day)                                  AS event_month_name,
@@ -301,8 +305,8 @@ SELECT
 FROM `carnegie-dartlet-1528198422380.tinman.v_kpi_keyword`
 WHERE client_name = 'Central Washington University'
     AND day >= '2024-01-01'
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
-ORDER BY event_year, event_month, impressions DESC;
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+ORDER BY day, impressions DESC;
 
 
 -- ============================================================

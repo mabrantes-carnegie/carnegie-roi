@@ -209,8 +209,10 @@ def load_q9(client_name: str) -> pd.DataFrame:
 
 
 def load_q10(client_name: str) -> pd.DataFrame:
-    """Q10 — Digital geography (monthly grain by region)."""
+    """Q10 — Digital geography with daily rows by region."""
     df = _run_digital("q10_digital_geo.csv", client_name)
+    if "day" in df.columns:
+        df["day"] = pd.to_datetime(df["day"], errors="coerce")
     for col in ["group_name", "subgroup_name", "product_name", "region"]:
         df[col] = df[col].fillna("").str.strip()
     for col in ["impressions", "clicks", "direct_conversions",
@@ -222,8 +224,10 @@ def load_q10(client_name: str) -> pd.DataFrame:
 
 
 def load_q11_creative(client_name: str) -> pd.DataFrame:
-    """Q11a — Digital creative (ALL platforms, excludes YouTube)."""
+    """Q11a — Digital creative with daily rows (excludes YouTube)."""
     df = _run_digital("q11_digital_creative.csv", client_name)
+    if "day" in df.columns:
+        df["day"] = pd.to_datetime(df["day"], errors="coerce")
     df = df[~df["product_name"].str.strip().isin({"YouTube", "Youtube"})]
     for col in ["group_name", "subgroup_name", "product_name",
                 "campaign_name", "platform_campaign_name",
@@ -263,8 +267,10 @@ def load_q11_youtube(client_name: str) -> pd.DataFrame:
 
 
 def load_q11_keywords(client_name: str) -> pd.DataFrame:
-    """Q11b — PPC keyword performance (monthly grain)."""
+    """Q11b — PPC keyword performance with daily rows."""
     df = _run_digital("q11_digital_keywords.csv", client_name)
+    if "day" in df.columns:
+        df["day"] = pd.to_datetime(df["day"], errors="coerce")
     for col in ["platform_campaign_name", "campaign_name",
                 "product_name", "keyword", "match_type"]:
         df[col] = df[col].fillna("").str.strip()

@@ -103,7 +103,18 @@ def _load_q3() -> pd.DataFrame:
 
 def _load_goals() -> dict:
     """Load roi_goals.csv and aggregate to institution-level goals."""
-    df = pd.read_csv(_DATA_DIR / "roi_goals.csv")
+    goals_path = _DATA_DIR / "roi_goals.csv"
+    if not goals_path.exists():
+        return {}
+
+    df = pd.read_csv(goals_path)
+    required_cols = [
+        "Inquiry Goal", "App Starts Goal", "App Submit Goal",
+        "Admit Goal", "Deposit Goal", "Net Deposit Goal",
+    ]
+    if any(col not in df.columns for col in required_cols):
+        return {}
+
     return {
         "total_inquiries": int(df["Inquiry Goal"].sum()),
         "total_app_starts": int(df["App Starts Goal"].sum()),
@@ -116,7 +127,18 @@ def _load_goals() -> dict:
 
 def _load_program_goals() -> pd.DataFrame:
     """Load roi_goals.csv as a DataFrame with program-level goals."""
-    df = pd.read_csv(_DATA_DIR / "roi_goals.csv")
+    goals_path = _DATA_DIR / "roi_goals.csv"
+    empty_cols = [
+        "program", "goal_inquiries", "goal_app_starts", "goal_app_submits",
+        "goal_admits", "goal_deposits", "goal_net_deposits", "program_lower",
+    ]
+    if not goals_path.exists():
+        return pd.DataFrame(columns=empty_cols)
+
+    df = pd.read_csv(goals_path)
+    if "Program" not in df.columns:
+        return pd.DataFrame(columns=empty_cols)
+
     df = df.rename(columns={
         "Program": "program",
         "Inquiry Goal": "goal_inquiries",
@@ -126,6 +148,12 @@ def _load_program_goals() -> pd.DataFrame:
         "Deposit Goal": "goal_deposits",
         "Net Deposit Goal": "goal_net_deposits",
     })
+    for col in [
+        "goal_inquiries", "goal_app_starts", "goal_app_submits",
+        "goal_admits", "goal_deposits", "goal_net_deposits",
+    ]:
+        if col not in df.columns:
+            df[col] = pd.NA
     # Normalize program names to lowercase for matching
     df["program_lower"] = df["program"].str.strip().str.lower()
     return df

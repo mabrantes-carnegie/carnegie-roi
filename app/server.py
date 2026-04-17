@@ -159,6 +159,12 @@ def server_logic(input, output, session):
         return DEFAULT_SAGE_ID
 
     @reactive.calc
+    def _url_params() -> dict[str, list[str]]:
+        from urllib.parse import parse_qs
+        qs = session.input[".clientdata_url_search"]()
+        return parse_qs(qs.lstrip("?")) if qs else {}
+
+    @reactive.calc
     def _institution_name() -> str | None:
         return resolve_institution(_sage_id())
 
@@ -252,6 +258,7 @@ def server_logic(input, output, session):
 
     # Update digital filter choices from session Q8
     @reactive.effect
+    @reactive.event(_session_q8)
     def _sync_digital_filters():
         try:
             q8 = _session_q8()
@@ -259,10 +266,37 @@ def server_logic(input, output, session):
             subgroups = sorted([s for s in q8["subgroup_name"].unique() if s])
             products = sorted([p for p in q8["product_name"].unique() if p])
             campaigns = sorted([c for c in q8["campaign_name"].unique() if c])
-            ui.update_selectize("dig_group", choices=groups, selected=[])
-            ui.update_selectize("dig_subgroup", choices=subgroups, selected=[])
-            ui.update_selectize("dig_product", choices=products, selected=[])
-            ui.update_selectize("dig_campaign", choices=campaigns, selected=[])
+            params = _url_params()
+
+            def _selected_for(key: str, choices: list[str], current):
+                if isinstance(current, (list, tuple)) and len(current) > 0:
+                    return [v for v in current if v in set(choices)]
+                if current and current in set(choices):
+                    return [current]
+                raw = params.get(key, [])
+                selected = [v for v in raw if v in set(choices)]
+                return selected
+
+            ui.update_selectize(
+                "dig_group",
+                choices=groups,
+                selected=_selected_for("dig_group", groups, input.dig_group()),
+            )
+            ui.update_selectize(
+                "dig_subgroup",
+                choices=subgroups,
+                selected=_selected_for("dig_subgroup", subgroups, input.dig_subgroup()),
+            )
+            ui.update_selectize(
+                "dig_product",
+                choices=products,
+                selected=_selected_for("dig_product", products, input.dig_product()),
+            )
+            ui.update_selectize(
+                "dig_campaign",
+                choices=campaigns,
+                selected=_selected_for("dig_campaign", campaigns, input.dig_campaign()),
+            )
         except Exception:
             pass
 
@@ -823,7 +857,7 @@ def server_logic(input, output, session):
     def _progress_bar(key: str):
         goal = GOALS.get(key)
         if not goal or goal <= 0:
-            return ui.tags.div()
+            return None
         actual = current_kpis().get(key, 0)
         pct = (actual / goal) * 100
         bar_width = min(pct, 100)
@@ -1200,7 +1234,7 @@ def server_logic(input, output, session):
     def _goal_text_ui(key: str):
         goal = GOALS.get(key)
         if not goal or goal <= 0:
-            return ui.tags.div()
+            return None
         actual = current_kpis().get(key, 0)
         pct = (actual / goal) * 100
         return ui.tags.div(
@@ -1916,11 +1950,15 @@ def server_logic(input, output, session):
         ).reset_index().sort_values("total_inquiries", ascending=False).head(20)
 
         # Match program-level goals
+        has_program_goals = (
+            not PROGRAM_GOALS.empty and
+            {"program_lower", "goal_inquiries", "goal_deposits"}.issubset(PROGRAM_GOALS.columns)
+        )
         goal_map = (
             PROGRAM_GOALS
             .groupby("program_lower", as_index=True)[["goal_inquiries", "goal_deposits"]]
             .max()
-        )
+        ) if has_program_goals else pd.DataFrame(columns=["goal_inquiries", "goal_deposits"])
         curr["_prog_lower"] = curr["program_display"].str.strip().str.lower()
 
         def _pct_to_goal(actual, prog_lower, goal_col):
@@ -1930,20 +1968,26 @@ def server_logic(input, output, session):
                     return f"{actual / g * 100:.0f}%"
             return "—"
 
-        curr["Inq Goal"] = curr.apply(
-            lambda r: f"{int(goal_map.loc[r['_prog_lower'], 'goal_inquiries']):,}"
-            if r["_prog_lower"] in goal_map.index and goal_map.loc[r["_prog_lower"], "goal_inquiries"] > 0 else "—", axis=1
-        )
-        curr["% to Inq Goal"] = curr.apply(
-            lambda r: _pct_to_goal(r["total_inquiries"], r["_prog_lower"], "goal_inquiries"), axis=1
-        )
-        curr["Dep Goal"] = curr.apply(
-            lambda r: f"{int(goal_map.loc[r['_prog_lower'], 'goal_deposits']):,}"
-            if r["_prog_lower"] in goal_map.index and goal_map.loc[r["_prog_lower"], "goal_deposits"] > 0 else "—", axis=1
-        )
-        curr["% to Dep Goal"] = curr.apply(
-            lambda r: _pct_to_goal(r["total_deposits"], r["_prog_lower"], "goal_deposits"), axis=1
-        )
+        show_inquiry_goals = has_program_goals and (goal_map["goal_inquiries"].fillna(0) > 0).any()
+        show_deposit_goals = has_program_goals and (goal_map["goal_deposits"].fillna(0) > 0).any()
+
+        if show_inquiry_goals:
+            curr["Inq Goal"] = curr.apply(
+                lambda r: f"{int(goal_map.loc[r['_prog_lower'], 'goal_inquiries']):,}"
+                if r["_prog_lower"] in goal_map.index and goal_map.loc[r["_prog_lower"], "goal_inquiries"] > 0 else "—", axis=1
+            )
+            curr["% to Inq Goal"] = curr.apply(
+                lambda r: _pct_to_goal(r["total_inquiries"], r["_prog_lower"], "goal_inquiries"), axis=1
+            )
+
+        if show_deposit_goals:
+            curr["Dep Goal"] = curr.apply(
+                lambda r: f"{int(goal_map.loc[r['_prog_lower'], 'goal_deposits']):,}"
+                if r["_prog_lower"] in goal_map.index and goal_map.loc[r["_prog_lower"], "goal_deposits"] > 0 else "—", axis=1
+            )
+            curr["% to Dep Goal"] = curr.apply(
+                lambda r: _pct_to_goal(r["total_deposits"], r["_prog_lower"], "goal_deposits"), axis=1
+            )
 
         total_inq = curr["total_inquiries"].sum()
         total_starts = curr["total_app_starts"].sum()
@@ -1975,15 +2019,19 @@ def server_logic(input, output, session):
             "total_deposits": "Deposits",
             "total_net_deposits": "Net Deposits",
         })
-        cols = [
-            "Program",
-            "Inquiries", "Inq Goal", "% to Inq Goal", "% Inquiries",
+        cols = ["Program", "Inquiries"]
+        if show_inquiry_goals:
+            cols += ["Inq Goal", "% to Inq Goal"]
+        cols += [
+            "% Inquiries",
             "App Starts", "Start Rate",
             "App Submits", "Submit Rate",
             "Enrolled", "Inq→Enroll Rate",
-            "Deposits", "Dep Goal", "% to Dep Goal",
-            "Net Deposits",
+            "Deposits",
         ]
+        if show_deposit_goals:
+            cols += ["Dep Goal", "% to Dep Goal"]
+        cols += ["Net Deposits"]
         heatmap_cols = ["Inquiries", "App Starts", "App Submits", "Enrolled", "Deposits", "Net Deposits"]
         return _heatmap_table(display[cols], heatmap_cols, paginated=True)
 
@@ -2062,6 +2110,11 @@ def server_logic(input, output, session):
         map_df = state_df[state_df["location_type"] == "US"].copy()
         if map_df.empty:
             return ui.tags.div("No mappable state data available.", class_="empty-state")
+
+        # Normalize nullable pandas numeric dtypes (for example Net Deposits)
+        # so downstream float/int casts and comparisons do not fail on pd.NA.
+        map_df[metric] = pd.to_numeric(map_df[metric], errors="coerce").fillna(0.0)
+        state_df[metric] = pd.to_numeric(state_df[metric], errors="coerce").fillna(0.0)
 
         import numpy as _np
         z_raw = map_df[metric].fillna(0)

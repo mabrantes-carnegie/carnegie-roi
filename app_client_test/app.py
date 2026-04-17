@@ -128,8 +128,14 @@ def server(input, output, session):
     # ── Read sage_id from URL query params ─────────────────────────────────────
     @reactive.calc
     def sage_id() -> str:
-        params = session.http_conn.query_params
-        return params.get("sage_id", DEFAULT_SAGE_ID)
+        qs = session.input[".clientdata_url_search"]()
+        # qs is like "?sage_id=AlvernoWI10017" or ""
+        if qs:
+            from urllib.parse import parse_qs, urlparse
+            params = parse_qs(qs.lstrip("?"))
+            if "sage_id" in params:
+                return params["sage_id"][0]
+        return DEFAULT_SAGE_ID
 
     # ── Resolve sage_id → institution_name via BigQuery ────────────────────────
     @reactive.calc

@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 .venv/
+.claude/settings.local.json
+CEO_PRESENTATION_SCRIPT.md
+DIGITAL_TEAM_PRESENTATION_SCRIPT.md
+doc/engineering-cloud-presentation.md

@@ -79,8 +79,10 @@ def _run(sql_file: str, institution_name: str) -> pd.DataFrame:
 # ── Public loaders ─────────────────────────────────────────────────────────────
 
 def load_q6(institution_name: str) -> pd.DataFrame:
-    """Q6 — Principal funnel data (monthly grain)."""
+    """Q6 — Principal funnel data with daily rows and month helper columns."""
     df = _run("ROI_Principal.sql", institution_name)
+    if "day" in df.columns:
+        df["day"] = pd.to_datetime(df["day"], errors="coerce")
     df["student_type"] = df["student_type"].fillna("Unknown").replace("", "Unknown")
     df["is_international"] = df["is_international"].astype(bool)
     df["term_year"] = df["term_year"].astype(int)
@@ -105,8 +107,10 @@ def load_q6(institution_name: str) -> pd.DataFrame:
 
 
 def load_q2(institution_name: str) -> pd.DataFrame:
-    """Q2 — Campaign cost + lead source."""
+    """Q2 — Campaign cost + lead source with daily rows."""
     df = _run("ROI_Campaign_Cost.sql", institution_name)
+    if "day" in df.columns:
+        df["day"] = pd.to_datetime(df["day"], errors="coerce")
     df["term_year"] = df["term_year"].astype(int)
     for col in ["institution_name", "lead_source", "campaign_service", "campaign_funnel_target"]:
         if col in df.columns:
@@ -115,8 +119,10 @@ def load_q2(institution_name: str) -> pd.DataFrame:
 
 
 def load_q3(institution_name: str) -> pd.DataFrame:
-    """Q3 — City-level geography detail."""
+    """Q3 — City-level geography detail with daily rows."""
     df = _run("ROI_Geography.sql", institution_name)
+    if "day" in df.columns:
+        df["day"] = pd.to_datetime(df["day"], errors="coerce")
     df["student_state"] = df["student_state"].fillna("").str.strip()
     df.loc[df["student_state"] == "", "student_state"] = "Unknown"
     mask = ~df["student_state"].isin(VALID_US_STATES | {"Unknown"})

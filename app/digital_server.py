@@ -442,6 +442,102 @@ def _base_layout(height=360):
     )
 
 
+def _granularity_bucket_start(series: "pd.Series", granularity: str) -> "pd.Series":
+    if granularity == "daily":
+        return series.dt.normalize()
+    if granularity == "weekly":
+        return (series.dt.normalize() - pd.to_timedelta(series.dt.weekday, unit="D"))
+    return series.dt.to_period("M").dt.to_timestamp()
+
+
+def _granularity_bucket_range(start_dt: "pd.Timestamp", end_dt: "pd.Timestamp", granularity: str):
+    start_dt = pd.Timestamp(start_dt).normalize()
+    end_dt = pd.Timestamp(end_dt).normalize()
+    if granularity == "daily":
+        return pd.date_range(start_dt, end_dt, freq="D")
+    if granularity == "weekly":
+        first = start_dt - pd.Timedelta(days=start_dt.weekday())
+        last = end_dt - pd.Timedelta(days=end_dt.weekday())
+        return pd.date_range(first, last, freq="W-MON")
+    first = start_dt.to_period("M").to_timestamp()
+    last = end_dt.to_period("M").to_timestamp()
+    return pd.date_range(first, last, freq="MS")
+
+
+def _granularity_label(ts: "pd.Timestamp", granularity: str, long: bool = False) -> str:
+    ts = pd.Timestamp(ts)
+    if granularity == "daily":
+        base = f"{ts.strftime('%b')} {ts.day}"
+        return f"{base}, {ts.year}" if long else base
+    if granularity == "weekly":
+        base = f"{ts.strftime('%b')} {ts.day}"
+        return f"Week of {base}, {ts.year}" if long else base
+    return ts.strftime("%b %Y" if long else "%b %y")
+
+
+def _granularity_tick_spec(df: "pd.DataFrame", granularity: str):
+    if df.empty:
+        return [], []
+    if granularity == "monthly":
+        return df["bucket_start"].tolist(), df["label"].tolist()
+    if granularity == "daily":
+        count = len(df)
+        step = 1 if count <= 14 else 2 if count <= 31 else 7
+        idxs = list(range(0, count, step))
+        if idxs[-1] != count - 1:
+            idxs.append(count - 1)
+        tick_df = df.iloc[idxs]
+        return tick_df["bucket_start"].tolist(), tick_df["label"].tolist()
+
+    count = len(df)
+    step = 1 if count <= 12 else 2 if count <= 24 else 4
+    idxs = list(range(0, count, step))
+    if idxs[-1] != count - 1:
+        idxs.append(count - 1)
+    tick_df = df.iloc[idxs]
+    return tick_df["bucket_start"].tolist(), tick_df["label"].tolist()
+
+
+def _aggregate_q8_trend(df: "pd.DataFrame", start_dt: "pd.Timestamp", end_dt: "pd.Timestamp", granularity: str) -> "pd.DataFrame":
+    agg_cols = {
+        "impressions": "sum",
+        "clicks": "sum",
+        "direct_conversions": "sum",
+        "view_through_conversions": "sum",
+        "in_platform_leads": "sum",
+        "total_interactions": "sum",
+        "budget": "sum",
+    }
+    grouped = df.copy()
+    grouped["bucket_start"] = _granularity_bucket_start(grouped["day"], granularity)
+    grouped = grouped.groupby("bucket_start", as_index=False).agg(agg_cols).sort_values("bucket_start")
+
+    spine = pd.DataFrame({"bucket_start": _granularity_bucket_range(start_dt, end_dt, granularity)})
+    grouped = spine.merge(grouped, on="bucket_start", how="left").fillna(0)
+    grouped["label"] = grouped["bucket_start"].apply(lambda ts: _granularity_label(ts, granularity))
+    grouped["hover_label"] = grouped["bucket_start"].apply(lambda ts: _granularity_label(ts, granularity, long=True))
+    grouped["ctr"] = grouped.apply(
+        lambda r: (r["clicks"] / r["impressions"] * 100) if r["impressions"] > 0 else 0, axis=1
+    )
+    grouped["cost_per_total_interaction"] = grouped.apply(
+        lambda r: (r["budget"] / r["total_interactions"]) if r["total_interactions"] > 0 else 0, axis=1
+    )
+    return grouped
+
+
+def _aggregate_total_interactions(df: "pd.DataFrame", granularity: str) -> "pd.DataFrame":
+    grouped = df.copy()
+    grouped["bucket_start"] = _granularity_bucket_start(grouped["day"], granularity)
+    grouped = (
+        grouped.groupby("bucket_start", as_index=False)["total_interactions"]
+        .sum()
+        .sort_values("bucket_start")
+    )
+    grouped["label"] = grouped["bucket_start"].apply(lambda ts: _granularity_label(ts, granularity))
+    grouped["hover_label"] = grouped["bucket_start"].apply(lambda ts: _granularity_label(ts, granularity, long=True))
+    return grouped
+
+
 def _safe_div(num, denom):
     """Safe division returning None on zero denominator."""
     return (num / denom) if denom and denom > 0 else None
@@ -920,11 +1016,10 @@ def digital_server(
     @reactive.calc
     def _dig_trending_chart_cache():
         df_curr = _dig_q8()
-        df_prior = _dig_q8_prior()
         if df_curr.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        # Determine selected metric(s) — now supports up to 2
+        granularity = input.dig_trending_granularity() or "monthly"
         try:
             raw = input.dig_trending_metric()
             metric_keys = list(raw) if isinstance(raw, (list, tuple)) else [raw]
@@ -932,9 +1027,9 @@ def digital_server(
             metric_keys = ["clicks"]
         if not metric_keys:
             metric_keys = ["clicks"]
-        metric_keys = metric_keys[:2]  # enforce max 2
+        metric_keys = metric_keys[:2]
 
-        _METRIC_LABELS = {
+        metric_labels = {
             "clicks": "Clicks",
             "ctr": "CTR",
             "direct_conversions": "Direct Actions",
@@ -943,154 +1038,119 @@ def digital_server(
             "budget": "Budget",
             "cost_per_total_interaction": "Cost Per Total Action",
         }
+        colors = ["#EA332D", "#021326"]
+        rate_metrics = {"ctr"}
+        cost_metrics = {"budget", "cost_per_total_interaction"}
 
-        _COLORS = ["#EA332D", "#021326"]
-        _RATE_METRICS = {"ctr"}
-        _COST_METRICS = {"budget", "cost_per_total_interaction"}
-
-        def _is_rate(mk): return mk in _RATE_METRICS
-        def _is_cost(mk): return mk in _COST_METRICS
-
-        def _aggregate_daily(df):
-            agg_cols = {"impressions": "sum", "clicks": "sum",
-                        "direct_conversions": "sum", "view_through_conversions": "sum",
-                        "in_platform_leads": "sum", "total_interactions": "sum",
-                        "budget": "sum"}
-            daily = df.groupby("day").agg(agg_cols).reset_index().sort_values("day")
-            daily["ctr"] = daily.apply(
-                lambda r: (r["clicks"] / r["impressions"] * 100) if r["impressions"] > 0 else 0, axis=1)
-            daily["cost_per_total_interaction"] = daily.apply(
-                lambda r: (r["budget"] / r["total_interactions"]) if r["total_interactions"] > 0 else 0, axis=1)
-            return daily
-
-        curr_daily = _aggregate_daily(df_curr)
-
-        # Build full date spine
         period = input.dig_period()
         if period and len(period) == 2:
             start_dt = pd.Timestamp(period[0])
-            end_dt   = pd.Timestamp(period[1])
+            end_dt = pd.Timestamp(period[1])
         else:
-            start_dt = curr_daily["day"].min()
-            end_dt   = curr_daily["day"].max()
+            start_dt = df_curr["day"].min()
+            end_dt = df_curr["day"].max()
 
-        all_days = pd.DataFrame({"day": pd.date_range(start_dt, end_dt, freq="D")})
-        curr_daily = all_days.merge(curr_daily, on="day", how="left").fillna(0)
+        curr_trend = _aggregate_q8_trend(df_curr, start_dt, end_dt, granularity)
+        tickvals, ticktext = _granularity_tick_spec(curr_trend, granularity)
 
-        odd_days = curr_daily[curr_daily["day"].dt.day % 2 == 1]["day"]
-        tickvals = odd_days.tolist()
-        ticktext = [pd.Timestamp(d).strftime("%b ") + str(pd.Timestamp(d).day) for d in odd_days]
+        def _is_rate(metric_key):
+            return metric_key in rate_metrics
 
-        def _hover_fmt(mk, label, suffix=""):
-            if _is_rate(mk):
-                return f"%{{x|%b %e}}<br>{label}{suffix}: %{{y:.2f}}%<extra></extra>"
-            elif mk == "budget":
-                return f"%{{x|%b %e}}<br>{label}{suffix}: $%{{y:,.0f}}<extra></extra>"
-            elif mk == "cost_per_total_interaction":
-                return f"%{{x|%b %e}}<br>{label}{suffix}: $%{{y:,.2f}}<extra></extra>"
-            return f"%{{x|%b %e}}<br>{label}{suffix}: %{{y:,.0f}}<extra></extra>"
+        def _is_cost(metric_key):
+            return metric_key in cost_metrics
 
-        def _fmt_text(vals, mk):
-            if mk == "ctr":
+        def _hover_fmt(metric_key, label):
+            if _is_rate(metric_key):
+                return f"%{{customdata}}<br>{label}: %{{y:.2f}}%<extra></extra>"
+            if metric_key == "budget":
+                return f"%{{customdata}}<br>{label}: $%{{y:,.0f}}<extra></extra>"
+            if metric_key == "cost_per_total_interaction":
+                return f"%{{customdata}}<br>{label}: $%{{y:,.2f}}<extra></extra>"
+            return f"%{{customdata}}<br>{label}: %{{y:,.0f}}<extra></extra>"
+
+        def _fmt_text(vals, metric_key):
+            if metric_key == "ctr":
                 return [f"{v:.1f}%" for v in vals]
-            elif mk in ("budget", "cost_per_total_interaction"):
+            if metric_key in ("budget", "cost_per_total_interaction"):
                 return [f"${v:,.0f}" if v >= 1 else f"${v:.2f}" for v in vals]
             return [f"{v:,.0f}" for v in vals]
 
-        def _yaxis_opts(mk):
+        def _series_texts(vals, metric_key):
+            texts = _fmt_text(vals, metric_key)
+            if granularity == "monthly" or len(texts) <= 14:
+                return texts
+            step = 2 if len(texts) <= 24 else 4
+            return [txt if i % step == 0 or i == len(texts) - 1 else "" for i, txt in enumerate(texts)]
+
+        def _yaxis_opts(metric_key):
             opts = dict(showgrid=True, gridcolor="#F0EEEA")
-            if _is_rate(mk):
+            if _is_rate(metric_key):
                 opts["ticksuffix"] = "%"
-            elif _is_cost(mk):
+            elif _is_cost(metric_key):
                 opts["tickprefix"] = "$"
             return opts
 
         dual = len(metric_keys) == 2
         fig = go.Figure()
-        _series_defs = []
+        series_defs = []
 
-        for i, mk in enumerate(metric_keys):
-            label = _METRIC_LABELS.get(mk, mk)
-            color = _COLORS[i]
+        for i, metric_key in enumerate(metric_keys):
+            label = metric_labels.get(metric_key, metric_key)
+            color = colors[i]
             yaxis_name = "y" if i == 0 else "y2"
-
             fig.add_trace(go.Scatter(
-                x=curr_daily["day"], y=curr_daily[mk],
-                mode="lines+markers", name=label,
+                x=curr_trend["bucket_start"],
+                y=curr_trend[metric_key],
+                customdata=curr_trend["hover_label"],
+                mode="lines+markers",
+                name=label,
                 line=dict(color=color, width=2),
                 marker=dict(color=color, size=4),
-                hovertemplate=_hover_fmt(mk, label),
+                hovertemplate=_hover_fmt(metric_key, label),
                 yaxis=yaxis_name,
             ))
-            _series_defs.append({
+            series_defs.append({
                 "series_idx": len(fig.data) - 1,
-                "xs": curr_daily["day"].tolist(),
-                "ys": curr_daily[mk].tolist(),
-                "texts": _fmt_text(curr_daily[mk].tolist(), mk),
+                "xs": curr_trend["bucket_start"].tolist(),
+                "ys": curr_trend[metric_key].tolist(),
+                "texts": _series_texts(curr_trend[metric_key].tolist(), metric_key),
                 "default_pos": "top center" if i == 0 else "bottom center",
                 "color": color,
                 "font_size": 9,
             })
 
-        # Prior-period comparison only for single-metric mode
-        if not dual and not df_prior.empty:
-            mk = metric_keys[0]
-            label = _METRIC_LABELS.get(mk, mk)
-            prior_daily = _aggregate_daily(df_prior)
-            prior_daily["day_num"] = prior_daily["day"].dt.day
-            curr_daily["day_num"] = curr_daily["day"].dt.day
-            _merged = curr_daily[["day", "day_num"]].merge(
-                prior_daily[["day_num", mk]], on="day_num", how="left"
-            ).fillna(0)
-
-            fig.add_trace(go.Scatter(
-                x=_merged["day"], y=_merged[mk],
-                mode="lines+markers", name=f"{label} (previous month)",
-                line=dict(color="#C99D44", width=1.8, dash="dash"),
-                marker=dict(color="#C99D44", size=3),
-                hovertemplate=_hover_fmt(mk, label, " (prev month)"),
-            ))
-            _series_defs.append({
-                "series_idx": len(fig.data) - 1,
-                "xs": _merged["day"].tolist(),
-                "ys": _merged[mk].tolist(),
-                "texts": _fmt_text(_merged[mk].tolist(), mk),
-                "default_pos": "bottom center",
-                "color": "#C99D44",
-                "font_size": 9,
-            })
-
         layout = _base_layout(320)
         layout["xaxis"] = dict(
-            tickvals=tickvals, ticktext=ticktext,
+            tickvals=tickvals,
+            ticktext=ticktext,
             tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
-            showgrid=False, title="", tickangle=0,
+            showgrid=False,
+            title="",
+            tickangle=0,
         )
 
-        # Y-axis 1 (left)
         y1_opts = _yaxis_opts(metric_keys[0])
         y1_opts["title"] = dict(
-            text=_METRIC_LABELS.get(metric_keys[0], metric_keys[0]) if dual else "",
-            font=dict(color=_COLORS[0], size=11, family="Manrope, sans-serif"),
+            text=metric_labels.get(metric_keys[0], metric_keys[0]) if dual else "",
+            font=dict(color=colors[0], size=11, family="Manrope, sans-serif"),
         )
-        y1_opts["tickfont"] = dict(color=_COLORS[0] if dual else "#9B9893", size=10, family="Manrope, sans-serif")
+        y1_opts["tickfont"] = dict(color=colors[0] if dual else "#9B9893", size=10, family="Manrope, sans-serif")
         layout["yaxis"] = {**layout.get("yaxis", {}), **y1_opts}
 
         if dual:
-            # Y-axis 2 (right)
             y2_opts = _yaxis_opts(metric_keys[1])
             y2_opts["title"] = dict(
-                text=_METRIC_LABELS.get(metric_keys[1], metric_keys[1]),
-                font=dict(color=_COLORS[1], size=11, family="Manrope, sans-serif"),
+                text=metric_labels.get(metric_keys[1], metric_keys[1]),
+                font=dict(color=colors[1], size=11, family="Manrope, sans-serif"),
             )
-            y2_opts["tickfont"] = dict(color=_COLORS[1], size=10, family="Manrope, sans-serif")
+            y2_opts["tickfont"] = dict(color=colors[1], size=10, family="Manrope, sans-serif")
             y2_opts["overlaying"] = "y"
             y2_opts["side"] = "right"
             y2_opts["showgrid"] = False
             layout["yaxis2"] = y2_opts
 
         fig.update_layout(**layout)
-        _add_line_label_annotations(fig, _series_defs, chart_height=320, min_gap_px=20)
+        _add_line_label_annotations(fig, series_defs, chart_height=320, min_gap_px=20)
         return _plotly_html(fig)
 
     @render.ui
@@ -1514,88 +1574,152 @@ def digital_server(
     @reactive.calc
     def _dig_trending_chart_yoy_cache():
         df_curr = _dig_q8()
-        df_prior = _dig_q8_yoy()
         if df_curr.empty:
             return ui.tags.div("No data available.", class_="empty-state")
 
-        # Group current period by month
-        df_curr = df_curr.copy()
-        df_curr["month"] = df_curr["day"].dt.to_period("M")
-        curr_monthly = (
-            df_curr.groupby("month")["total_interactions"].sum()
-            .reset_index().sort_values("month")
-        )
-        curr_monthly["month_dt"] = curr_monthly["month"].dt.to_timestamp()
-        curr_monthly["label"] = curr_monthly["month_dt"].dt.strftime("%b %y")
-        # month position index (0, 1, 2, …) for aligning prior year
-        curr_monthly = curr_monthly.reset_index(drop=True)
-        curr_monthly["month_pos"] = curr_monthly.index
+        granularity = input.dig_trending_granularity_yoy() or "monthly"
+        try:
+            raw = input.dig_trending_metric_yoy()
+            metric_keys = list(raw) if isinstance(raw, (list, tuple)) else [raw]
+        except Exception:
+            metric_keys = ["clicks"]
+        if not metric_keys:
+            metric_keys = ["clicks"]
+        metric_keys = metric_keys[:2]
 
-        _series_defs = [{
-            "series_idx": 0,
-            "xs": curr_monthly["month_dt"].tolist(),
-            "ys": curr_monthly["total_interactions"].tolist(),
-            "texts": [f"{v:,.0f}" for v in curr_monthly["total_interactions"]],
-            "default_pos": "top center",
-        }]
+        metric_labels = {
+            "clicks": "Clicks",
+            "ctr": "CTR",
+            "direct_conversions": "Direct Actions",
+            "view_through_conversions": "View-through Actions",
+            "in_platform_leads": "In-Platform Leads",
+            "budget": "Budget",
+            "cost_per_total_interaction": "Cost Per Total Action",
+        }
+        colors = ["#EA332D", "#021326"]
+        rate_metrics = {"ctr"}
+        cost_metrics = {"budget", "cost_per_total_interaction"}
 
-        if not df_prior.empty:
-            df_prior = df_prior.copy()
-            df_prior["month"] = df_prior["day"].dt.to_period("M")
-            prior_monthly = (
-                df_prior.groupby("month")["total_interactions"].sum()
-                .reset_index().sort_values("month")
-            ).reset_index(drop=True)
-            prior_monthly["month_pos"] = prior_monthly.index
-            prior_monthly["prior_label"] = prior_monthly["month"].dt.strftime("%b %y")
-            merged = curr_monthly[["month_dt", "month_pos"]].merge(
-                prior_monthly[["month_pos", "total_interactions", "prior_label"]], on="month_pos", how="left"
-            )
-            merged["total_interactions"] = merged["total_interactions"].fillna(0)
-            merged["prior_label"] = merged["prior_label"].fillna("")
-            _series_defs.append({
-                "series_idx": 1,
-                "xs": merged["month_dt"].tolist(),
-                "ys": merged["total_interactions"].tolist(),
-                "texts": [f"{v:,.0f}" for v in merged["total_interactions"]],
-                "default_pos": "bottom center",
-            })
+        period = input.dig_period()
+        if period and len(period) == 2:
+            start_dt = pd.Timestamp(period[0])
+            end_dt = pd.Timestamp(period[1])
         else:
-            merged = None
+            start_dt = df_curr["day"].min()
+            end_dt = df_curr["day"].max()
 
+        spine = pd.DataFrame({"bucket_start": _granularity_bucket_range(start_dt, end_dt, granularity)})
+        spine["label"] = spine["bucket_start"].apply(lambda ts: _granularity_label(ts, granularity))
+        spine["hover_label"] = spine["bucket_start"].apply(lambda ts: _granularity_label(ts, granularity, long=True))
+        spine = spine.reset_index(drop=True)
+        spine["bucket_pos"] = spine.index
+
+        curr_trend = _aggregate_q8_trend(df_curr, start_dt, end_dt, granularity)
+        curr_trend = spine.merge(
+            curr_trend[["bucket_start"] + [mk for mk in metric_keys if mk in curr_trend.columns]],
+            on="bucket_start",
+            how="left",
+        ).fillna(0)
+
+        def _is_rate(metric_key):
+            return metric_key in rate_metrics
+
+        def _is_cost(metric_key):
+            return metric_key in cost_metrics
+
+        def _hover_fmt(metric_key, label):
+            if _is_rate(metric_key):
+                return f"%{{customdata}}<br>{label}: %{{y:.2f}}%<extra></extra>"
+            if metric_key == "budget":
+                return f"%{{customdata}}<br>{label}: $%{{y:,.0f}}<extra></extra>"
+            if metric_key == "cost_per_total_interaction":
+                return f"%{{customdata}}<br>{label}: $%{{y:,.2f}}<extra></extra>"
+            return f"%{{customdata}}<br>{label}: %{{y:,.0f}}<extra></extra>"
+
+        def _fmt_text(vals, metric_key):
+            if metric_key == "ctr":
+                return [f"{v:.1f}%" for v in vals]
+            if metric_key in ("budget", "cost_per_total_interaction"):
+                return [f"${v:,.0f}" if v >= 1 else f"${v:.2f}" for v in vals]
+            return [f"{v:,.0f}" for v in vals]
+
+        def _series_texts(vals, metric_key):
+            texts = _fmt_text(vals, metric_key)
+            if granularity == "monthly" or len(vals) <= 14:
+                return texts
+            step = 2 if len(vals) <= 24 else 4
+            return [txt if i % step == 0 or i == len(vals) - 1 else "" for i, txt in enumerate(texts)]
+
+        def _yaxis_opts(metric_key):
+            opts = dict(showgrid=True, gridcolor="#F0EEEA")
+            if _is_rate(metric_key):
+                opts["ticksuffix"] = "%"
+            elif _is_cost(metric_key):
+                opts["tickprefix"] = "$"
+            return opts
+
+        dual = len(metric_keys) == 2
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=curr_monthly["month_dt"], y=curr_monthly["total_interactions"],
-            mode="lines+markers", name="Total Actions",
-            line=dict(color="#EA332D", width=2),
-            marker=dict(color="#EA332D", size=4),
-            hovertemplate="%{x|%b %y}<br>Total Actions: %{y:,.0f}<extra></extra>",
-        ))
+        series_defs = []
 
-        if merged is not None:
+        for i, metric_key in enumerate(metric_keys):
+            label = metric_labels.get(metric_key, metric_key)
+            color = colors[i]
+            yaxis_name = "y" if i == 0 else "y2"
             fig.add_trace(go.Scatter(
-                x=merged["month_dt"], y=merged["total_interactions"],
-                customdata=merged["prior_label"],
-                mode="lines+markers", name="Total Actions (previous year)",
-                line=dict(color="#C99D44", width=1.8, dash="dash"),
-                marker=dict(color="#C99D44", size=3),
-                hovertemplate="%{customdata}<br>Total Actions (prev): %{y:,.0f}<extra></extra>",
+                x=curr_trend["bucket_start"],
+                y=curr_trend[metric_key],
+                customdata=spine["hover_label"],
+                mode="lines+markers",
+                name=label,
+                line=dict(color=color, width=2),
+                marker=dict(color=color, size=4),
+                hovertemplate=_hover_fmt(metric_key, label),
+                yaxis=yaxis_name,
             ))
+            series_defs.append({
+                "series_idx": len(fig.data) - 1,
+                "xs": curr_trend["bucket_start"].tolist(),
+                "ys": curr_trend[metric_key].tolist(),
+                "texts": _series_texts(curr_trend[metric_key].tolist(), metric_key),
+                "default_pos": "top center" if i == 0 else "bottom center",
+                "color": color,
+                "font_size": 9,
+            })
 
+        tickvals, ticktext = _granularity_tick_spec(spine, granularity)
         layout = _base_layout(320)
         layout["xaxis"] = dict(
-            tickvals=curr_monthly["month_dt"].tolist(),
-            ticktext=curr_monthly["label"].tolist(),
+            tickvals=tickvals,
+            ticktext=ticktext,
             tickfont=dict(family="Manrope, sans-serif", size=10, color="#9B9893"),
-            showgrid=False, title="", tickangle=0,
+            showgrid=False,
+            title="",
+            tickangle=0,
         )
+
+        y1_opts = _yaxis_opts(metric_keys[0])
+        y1_opts["title"] = dict(
+            text=metric_labels.get(metric_keys[0], metric_keys[0]) if dual else "",
+            font=dict(color=colors[0], size=11, family="Manrope, sans-serif"),
+        )
+        y1_opts["tickfont"] = dict(color=colors[0] if dual else "#9B9893", size=10, family="Manrope, sans-serif")
+        layout["yaxis"] = {**layout.get("yaxis", {}), **y1_opts}
+
+        if dual:
+            y2_opts = _yaxis_opts(metric_keys[1])
+            y2_opts["title"] = dict(
+                text=metric_labels.get(metric_keys[1], metric_keys[1]),
+                font=dict(color=colors[1], size=11, family="Manrope, sans-serif"),
+            )
+            y2_opts["tickfont"] = dict(color=colors[1], size=10, family="Manrope, sans-serif")
+            y2_opts["overlaying"] = "y"
+            y2_opts["side"] = "right"
+            y2_opts["showgrid"] = False
+            layout["yaxis2"] = y2_opts
+
         fig.update_layout(**layout)
-        _series_defs[0]["color"] = "#EA332D"
-        _series_defs[0]["font_size"] = 9
-        if len(_series_defs) > 1:
-            _series_defs[1]["color"] = "#C99D44"
-            _series_defs[1]["font_size"] = 9
-        _add_line_label_annotations(fig, _series_defs, chart_height=320, min_gap_px=20)
+        _add_line_label_annotations(fig, series_defs, chart_height=320, min_gap_px=20)
         return _plotly_html(fig)
 
     @render.ui
@@ -2161,12 +2285,24 @@ def digital_server(
             str(c).strip() for c in df["interaction_category"].unique()
             if pd.notna(c) and str(c).strip()
         ])
-        ui.update_selectize("dig_interaction_cat", choices=cats, selected=[])
         names = sorted([
             str(n).strip() for n in df["conversion_name"].unique()
             if pd.notna(n) and str(n).strip() and str(n).strip() != "Unknown"
         ])
-        ui.update_selectize("dig_conversion_name", choices=names, selected=[])
+
+        with reactive.isolate():
+            current_cats = input.dig_interaction_cat() or []
+            if not isinstance(current_cats, (list, tuple)):
+                current_cats = [current_cats]
+            selected_cats = [value for value in current_cats if value in set(cats)]
+
+            current_names = input.dig_conversion_name() or []
+            if not isinstance(current_names, (list, tuple)):
+                current_names = [current_names]
+            selected_names = [value for value in current_names if value in set(names)]
+
+        ui.update_selectize("dig_interaction_cat", choices=cats, selected=selected_cats)
+        ui.update_selectize("dig_conversion_name", choices=names, selected=selected_names)
 
     @reactive.calc
     def _dig_q9_filtered():

@@ -43,19 +43,25 @@ WITH base AS (
 -- Inquiries: person-level stage
 inquiries AS (
     SELECT
-        student_state, student_city, person_term_year AS term_year, person_term_semester AS term_semester,
+        student_state, student_city, DATE(person_inquired_date) AS day,
+        person_term_year AS term_year, person_term_semester AS term_semester,
         COUNT(DISTINCT person_id) AS total_inquiries
     FROM base
     WHERE person_inquired_date IS NOT NULL
         AND person_term_year     IN (2024, 2025, 2026)
         AND person_term_semester = 'Fall'
-    GROUP BY 1, 2, 3, 4
+    GROUP BY 1, 2, 3, 4, 5
 ),
 
 -- App Starts: app-level stage
 app_starts AS (
     SELECT
-        student_state, student_city, app_term_year AS term_year, app_term_semester AS term_semester,
+        student_state, student_city,
+        DATE(CASE
+            WHEN LOWER(app_type) LIKE '%common%' THEN app_submitted_date
+            ELSE app_created_date
+        END) AS day,
+        app_term_year AS term_year, app_term_semester AS term_semester,
         COUNT(DISTINCT application_id) AS total_app_starts
     FROM base
     WHERE CASE
@@ -64,37 +70,40 @@ app_starts AS (
           END IS NOT NULL
         AND app_term_year     IN (2024, 2025, 2026)
         AND app_term_semester = 'Fall'
-    GROUP BY 1, 2, 3, 4
+    GROUP BY 1, 2, 3, 4, 5
 ),
 
 -- App Submits: app-level stage
 app_submits AS (
     SELECT
-        student_state, student_city, app_term_year AS term_year, app_term_semester AS term_semester,
+        student_state, student_city, DATE(app_submitted_date) AS day,
+        app_term_year AS term_year, app_term_semester AS term_semester,
         COUNT(DISTINCT application_id) AS total_app_submits
     FROM base
     WHERE app_submitted_date IS NOT NULL
         AND app_term_year     IN (2024, 2025, 2026)
         AND app_term_semester = 'Fall'
-    GROUP BY 1, 2, 3, 4
+    GROUP BY 1, 2, 3, 4, 5
 ),
 
 -- Admits: app-level stage
 admits AS (
     SELECT
-        student_state, student_city, app_term_year AS term_year, app_term_semester AS term_semester,
+        student_state, student_city, DATE(app_admitted_date) AS day,
+        app_term_year AS term_year, app_term_semester AS term_semester,
         COUNT(DISTINCT application_id) AS total_admits
     FROM base
     WHERE app_admitted_date IS NOT NULL
         AND app_term_year     IN (2024, 2025, 2026)
         AND app_term_semester = 'Fall'
-    GROUP BY 1, 2, 3, 4
+    GROUP BY 1, 2, 3, 4, 5
 ),
 
 -- Deposits: app-level stage (person_id for dedup)
 deposits AS (
     SELECT
-        student_state, student_city, app_term_year AS term_year, app_term_semester AS term_semester,
+        student_state, student_city, DATE(app_deposited_date) AS day,
+        app_term_year AS term_year, app_term_semester AS term_semester,
         COUNT(DISTINCT person_id)    AS total_deposits,
         COUNT(DISTINCT CASE
             WHEN app_exit_date IS NOT NULL
@@ -104,34 +113,35 @@ deposits AS (
     WHERE app_deposited_date IS NOT NULL
         AND app_term_year     IN (2024, 2025, 2026)
         AND app_term_semester = 'Fall'
-    GROUP BY 1, 2, 3, 4
+    GROUP BY 1, 2, 3, 4, 5
 ),
 
 -- Enrolled: app-level stage (person_id for dedup)
 enrolled AS (
     SELECT
-        student_state, student_city, app_term_year AS term_year, app_term_semester AS term_semester,
+        student_state, student_city, DATE(app_enrolled_date) AS day,
+        app_term_year AS term_year, app_term_semester AS term_semester,
         COUNT(DISTINCT person_id) AS total_enrolled
     FROM base
     WHERE app_enrolled_date IS NOT NULL
         AND app_term_year     IN (2024, 2025, 2026)
         AND app_term_semester = 'Fall'
-    GROUP BY 1, 2, 3, 4
+    GROUP BY 1, 2, 3, 4, 5
 ),
 
 -- All combinations of state × city × term_year × term_semester
 all_keys AS (
-    SELECT student_state, student_city, term_year, term_semester FROM inquiries
+    SELECT student_state, student_city, day, term_year, term_semester FROM inquiries
     UNION DISTINCT
-    SELECT student_state, student_city, term_year, term_semester FROM app_starts
+    SELECT student_state, student_city, day, term_year, term_semester FROM app_starts
     UNION DISTINCT
-    SELECT student_state, student_city, term_year, term_semester FROM app_submits
+    SELECT student_state, student_city, day, term_year, term_semester FROM app_submits
     UNION DISTINCT
-    SELECT student_state, student_city, term_year, term_semester FROM admits
+    SELECT student_state, student_city, day, term_year, term_semester FROM admits
     UNION DISTINCT
-    SELECT student_state, student_city, term_year, term_semester FROM deposits
+    SELECT student_state, student_city, day, term_year, term_semester FROM deposits
     UNION DISTINCT
-    SELECT student_state, student_city, term_year, term_semester FROM enrolled
+    SELECT student_state, student_city, day, term_year, term_semester FROM enrolled
 )
 
 SELECT
@@ -139,6 +149,7 @@ SELECT
     'WA'                                        AS institution_state,
     k.student_state,
     k.student_city,
+    k.day,
     k.term_year,
     k.term_semester,
     COALESCE(inq.total_inquiries,    0)         AS total_inquiries,
@@ -150,10 +161,10 @@ SELECT
         - COALESCE(dep.total_exits_after_deposit, 0) AS total_net_deposits,
     COALESCE(enr.total_enrolled,     0)         AS total_enrolled
 FROM all_keys AS k
-LEFT JOIN inquiries  AS inq ON inq.student_state = k.student_state AND inq.student_city = k.student_city AND inq.term_year = k.term_year AND inq.term_semester = k.term_semester
-LEFT JOIN app_starts AS ast ON ast.student_state = k.student_state AND ast.student_city = k.student_city AND ast.term_year = k.term_year AND ast.term_semester = k.term_semester
-LEFT JOIN app_submits AS sub ON sub.student_state = k.student_state AND sub.student_city = k.student_city AND sub.term_year = k.term_year AND sub.term_semester = k.term_semester
-LEFT JOIN admits     AS adm ON adm.student_state = k.student_state AND adm.student_city = k.student_city AND adm.term_year = k.term_year AND adm.term_semester = k.term_semester
-LEFT JOIN deposits   AS dep ON dep.student_state = k.student_state AND dep.student_city = k.student_city AND dep.term_year = k.term_year AND dep.term_semester = k.term_semester
-LEFT JOIN enrolled   AS enr ON enr.student_state = k.student_state AND enr.student_city = k.student_city AND enr.term_year = k.term_year AND enr.term_semester = k.term_semester
-ORDER BY total_inquiries DESC
+LEFT JOIN inquiries  AS inq ON inq.student_state = k.student_state AND inq.student_city = k.student_city AND inq.day = k.day AND inq.term_year = k.term_year AND inq.term_semester = k.term_semester
+LEFT JOIN app_starts AS ast ON ast.student_state = k.student_state AND ast.student_city = k.student_city AND ast.day = k.day AND ast.term_year = k.term_year AND ast.term_semester = k.term_semester
+LEFT JOIN app_submits AS sub ON sub.student_state = k.student_state AND sub.student_city = k.student_city AND sub.day = k.day AND sub.term_year = k.term_year AND sub.term_semester = k.term_semester
+LEFT JOIN admits     AS adm ON adm.student_state = k.student_state AND adm.student_city = k.student_city AND adm.day = k.day AND adm.term_year = k.term_year AND adm.term_semester = k.term_semester
+LEFT JOIN deposits   AS dep ON dep.student_state = k.student_state AND dep.student_city = k.student_city AND dep.day = k.day AND dep.term_year = k.term_year AND dep.term_semester = k.term_semester
+LEFT JOIN enrolled   AS enr ON enr.student_state = k.student_state AND enr.student_city = k.student_city AND enr.day = k.day AND enr.term_year = k.term_year AND enr.term_semester = k.term_semester
+ORDER BY day, total_inquiries DESC

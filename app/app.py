@@ -117,9 +117,16 @@ _CW = (
 
 # --- Page context note component ---
 
-def _page_context_note(page_name: str, question: str, comparison: str, note: str | None = None):
+def _page_context_note(
+    page_name: str,
+    question: str,
+    comparison: str,
+    note: str | None = None,
+    include_actions_note: bool = False,
+):
     """Compact horizontal context note below filters, above page content."""
     dot = ui.tags.span(" · ", style="color:#d1d0ce;font-size:12px;")
+    actions_note = "Actions: Total user engagements (clicks, inquiries, and submissions) tracked throughout the platform."
     children = [
         ui.tags.span(page_name, style=(
             "font-family:Manrope,sans-serif;font-size:12px;font-weight:600;color:#4b5563;"
@@ -128,18 +135,30 @@ def _page_context_note(page_name: str, question: str, comparison: str, note: str
         ui.tags.span(question, style=(
             "font-family:Manrope,sans-serif;font-size:12px;font-weight:400;color:#6b7280;"
         )),
-        dot,
-        ui.tags.span("Comparison: ", style=(
-            "font-family:Manrope,sans-serif;font-size:11px;font-weight:400;color:#9ca3af;"
-        )),
-        ui.tags.span(comparison, style=(
-            "font-family:Manrope,sans-serif;font-size:11px;font-weight:500;color:#6b7280;"
-        )),
+    ]
+    if comparison:
+        children.extend([
+            dot,
+            ui.tags.span("Comparison: ", style=(
+                "font-family:Manrope,sans-serif;font-size:11px;font-weight:400;color:#9ca3af;"
+            )),
+            ui.tags.span(comparison, style=(
+                "font-family:Manrope,sans-serif;font-size:11px;font-weight:500;color:#6b7280;"
+            )),
+        ])
+    children.extend([
         dot,
         ui.tags.span("Semester: Fall", style=(
             "font-family:Manrope,sans-serif;font-size:11px;font-weight:500;color:#6b7280;"
         )),
-    ]
+    ])
+    if include_actions_note:
+        children.extend([
+            dot,
+            ui.tags.span(actions_note, style=(
+                "font-family:Manrope,sans-serif;font-size:11px;font-weight:500;color:#9b9893;"
+            )),
+        ])
     if note:
         children.extend([
             dot,
@@ -178,7 +197,7 @@ _COST_METRICS = [
 
 
 def _funnel_kpi_card(label: str, key: str, border_color: str = "#EA332D"):
-    """Compact funnel KPI card with value, YoY delta, goal, progress, and inline cost."""
+    """Compact funnel KPI card with value, YoY delta, goal, and progress."""
     return ui.tags.div(
         ui.tags.div(label, class_="funnel-label"),
         ui.tags.div(
@@ -188,8 +207,6 @@ def _funnel_kpi_card(label: str, key: str, border_color: str = "#EA332D"):
         ),
         ui.output_ui(f"goal_text_{key}"),
         ui.output_ui(f"progress_{key}"),
-        # Inline cost metric
-        ui.output_ui(f"cost_inline_{key}"),
         class_="funnel-card",
         style=f"border-top:3px solid {border_color};",
     )
@@ -995,6 +1012,7 @@ _dig_overview_content = ui.tags.div(
         "Digital Performance \u2014 Overview",
         "How did digital campaigns perform last month?",
         "April 2026 vs. March 2026 (month-over-month)",
+        include_actions_note=True,
     ),
     # KPI strip
     ui.tags.div(
@@ -1011,23 +1029,40 @@ _dig_overview_content = ui.tags.div(
         ui.tags.div(
             ui.tags.span("Trending Performance", class_="card-heading"),
             ui.tags.div(
-                ui.input_selectize(
-                    "dig_trending_metric",
-                    None,
-                    choices={
-                        "clicks": "Clicks",
-                        "ctr": "CTR",
-                        "direct_conversions": "Direct Actions",
-                        "view_through_conversions": "View-through Actions",
-                        "in_platform_leads": "In-Platform Leads",
-                        "budget": "Budget",
-                        "cost_per_total_interaction": "Cost Per Total Action",
-                    },
-                    selected="clicks",
-                    multiple=True,
-                    options={"maxItems": 2, "plugins": ["remove_button"]},
+                ui.tags.div(
+                    ui.input_selectize(
+                        "dig_trending_metric",
+                        None,
+                        choices={
+                            "clicks": "Clicks",
+                            "ctr": "CTR",
+                            "direct_conversions": "Direct Actions",
+                            "view_through_conversions": "View-through Actions",
+                            "in_platform_leads": "In-Platform Leads",
+                            "budget": "Budget",
+                            "cost_per_total_interaction": "Cost Per Total Action",
+                        },
+                        selected="clicks",
+                        multiple=True,
+                        options={"maxItems": 2, "plugins": ["remove_button"]},
+                    ),
+                    class_="ios-metric-picker",
+                    style="flex:0 1 220px;min-width:180px;max-width:240px;",
                 ),
-                style="min-width:260px;max-width:420px;",
+                ui.tags.div(
+                    ui.input_radio_buttons(
+                        "dig_trending_granularity", None,
+                        choices={
+                            "daily": "Daily",
+                            "weekly": "Weekly",
+                            "monthly": "Monthly",
+                        },
+                        selected="daily",
+                        inline=True,
+                    ),
+                    class_="pill-toggle pill-toggle--secondary",
+                ),
+                class_="toggle-group",
             ),
             class_="card-header-row",
         ),
@@ -1127,6 +1162,7 @@ _dig_overview_yoy_content = ui.tags.div(
         "Digital Performance \u2014 Overview YoY",
         "How does this academic year compare to last year?",
         "AY 2025\u201326 vs. AY 2024\u201325 (year-over-year)",
+        include_actions_note=True,
     ),
     ui.tags.div(
         _dig_kpi_card("Budget", "budget_yoy_kpi", "#EA332D"),
@@ -1140,7 +1176,46 @@ _dig_overview_yoy_content = ui.tags.div(
     ),
     ui.tags.div(
         ui.tags.div(
-            ui.tags.span("Trending Performance (YoY)", class_="card-heading"),
+            ui.tags.div(
+                ui.tags.span("Trending Performance (YoY)", class_="card-heading"),
+                ui.tags.div(
+                    ui.tags.div(
+                        ui.input_selectize(
+                            "dig_trending_metric_yoy",
+                            None,
+                            choices={
+                                "clicks": "Clicks",
+                                "ctr": "CTR",
+                                "direct_conversions": "Direct Actions",
+                                "view_through_conversions": "View-through Actions",
+                                "in_platform_leads": "In-Platform Leads",
+                                "budget": "Budget",
+                                "cost_per_total_interaction": "Cost Per Total Action",
+                            },
+                            selected="clicks",
+                            multiple=True,
+                            options={"maxItems": 2, "plugins": ["remove_button"]},
+                        ),
+                        class_="ios-metric-picker",
+                        style="flex:0 1 220px;min-width:180px;max-width:240px;",
+                    ),
+                    ui.tags.div(
+                        ui.input_radio_buttons(
+                            "dig_trending_granularity_yoy", None,
+                            choices={
+                                "daily": "Daily",
+                                "weekly": "Weekly",
+                                "monthly": "Monthly",
+                            },
+                            selected="monthly",
+                            inline=True,
+                        ),
+                        class_="pill-toggle pill-toggle--secondary",
+                    ),
+                    class_="toggle-group",
+                ),
+                class_="card-header-row",
+            ),
             ui.output_ui("dig_trending_chart_yoy"),
             class_="chart-card",
             style="flex:3;",
@@ -1234,6 +1309,7 @@ page_digital = ui.nav_menu(
                 "Digital Performance \u2014 Actions",
                 "What types of key actions are campaigns generating?",
                 "April 2026 vs. March 2026 (month-over-month)",
+                include_actions_note=True,
             ),
             ui.tags.h2("Action Filters", class_="section-heading"),
             ui.tags.div(
@@ -1308,6 +1384,7 @@ page_digital = ui.nav_menu(
                 "Digital Performance \u2014 Geography",
                 "Where are digital actions happening geographically?",
                 "AY 2025\u201326 vs. AY 2024\u201325 (year-over-year)",
+                include_actions_note=True,
             ),
             ui.tags.div(
                 ui.tags.div(
@@ -1343,6 +1420,7 @@ page_digital = ui.nav_menu(
                 "Digital Performance \u2014 Creative",
                 "Which ad creatives and keywords are performing best?",
                 "AY 2025\u201326 (year-to-date)",
+                include_actions_note=True,
             ),
             # ── Sub-page tab switcher ──
             ui.tags.div(
@@ -1516,6 +1594,7 @@ page_digital = ui.nav_menu(
                 "Digital Performance \u2014 Insights",
                 "What optimizations and observations have been made?",
                 "AY 2025\u201326 (year-to-date)",
+                include_actions_note=True,
             ),
             # ── Segmented view switcher ──
             ui.tags.div(
@@ -1606,7 +1685,8 @@ page_digital = ui.nav_menu(
             _page_context_note(
                 "Digital Performance — Media Plan",
                 "How is budget being allocated and spent?",
-                "Current period vs. prior period (month-over-month)",
+                "",
+                include_actions_note=True,
             ),
             ui.tags.p(
                 "Filters above apply to this page. Use the global digital filters to refine.",
@@ -1708,6 +1788,9 @@ _url_state_js = ui.tags.script("""
       return;
     }
     control.setValue(values);
+    if (window.Shiny && Shiny.setInputValue) {
+      Shiny.setInputValue(id, control.getValue(), {priority:'event'});
+    }
   }
 
   function _setRadioValue(name, value, attempts) {
