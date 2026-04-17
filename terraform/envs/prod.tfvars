@@ -4,4 +4,4 @@ environment = "prod"
 min_instances = 1
 max_instances = 1
 cpu           = "1"
-memory        = "512Mi"
+memory        = "2Gi"
