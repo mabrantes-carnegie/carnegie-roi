@@ -1,4 +1,5 @@
 import os
+import re
 import jwt
 from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.requests import Request
@@ -11,6 +12,47 @@ COOKIE_NAME = "roi_session"
 COOKIE_MAX_AGE = 60 * 60 * 8  # 8 hours
 
 _signer = URLSafeTimedSerializer(COOKIE_SECRET)
+
+# Public framework assets — no tenant data, so no auth.
+# Needed because Safari drops third-party cookies on iframe subresources.
+_PUBLIC_PATH_PREFIXES = (
+    "/lib/",
+    "/shared/",
+    "/static/",
+    "/www/",
+    "/favicon",
+)
+_PUBLIC_PATH_SUFFIXES = (
+    ".css",
+    ".js",
+    ".map",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".otf",
+    ".eot",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".ico",
+)
+
+
+_SESSION_ASSET_RE = re.compile(r"^/session/[^/]+/(shared|lib)/")
+
+
+def _is_public_asset(path: str) -> bool:
+    if any(path.startswith(p) for p in _PUBLIC_PATH_PREFIXES):
+        return True
+    # Shiny's per-session framework assets. Anchored so a path like
+    # /evil/shared/... can't slip through.
+    if _SESSION_ASSET_RE.match(path):
+        return True
+    if path.endswith(_PUBLIC_PATH_SUFFIXES):
+        return True
+    return False
 
 
 def _get_session_sage_id(scope: Scope) -> str:
@@ -42,6 +84,11 @@ class JWTAuthMiddleware:
 
         if scope["type"] == "http":
             request = Request(scope, receive)
+
+            if _is_public_asset(request.url.path):
+                await self.app(scope, receive, send)
+                return
+
             token = request.query_params.get("token", "")
 
             if token:
@@ -117,7 +164,7 @@ class _CookieSetter:
             value = _signer.dumps({"id": self._identity})
             cookie = (
                 f"{COOKIE_NAME}={value}; Max-Age={COOKIE_MAX_AGE}; "
-                f"Path=/; HttpOnly; Secure; SameSite=None"
+                f"Path=/; HttpOnly; Secure; SameSite=None; Partitioned"
             )
             headers = list(message.get("headers", []))
             headers.append((b"set-cookie", cookie.encode("utf-8")))
