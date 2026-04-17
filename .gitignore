@@ -9,6 +9,8 @@ auth_strategy_summary.docx:Zone.Identifier
 
 # Secrets
 .env
+*.pem
+scripts/gen_test_token.py
 
 # Terraform
 terraform/.terraform/
