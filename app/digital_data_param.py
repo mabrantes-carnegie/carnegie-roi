@@ -3,9 +3,6 @@ Parameterized digital data loader — loads Q8-Q12 per session for a given clien
 
 All functions accept client_name as an explicit argument.
 No data is loaded at module import time.
-
-The client_name comes from udp_udl.institution.name (same value as
-'Central Washington University' used in the Tinman WHERE clauses).
 """
 
 import re
@@ -19,7 +16,7 @@ _DATA_DIR = Path(__file__).parent.parent / "data"
 BQ_PROJECT = "carnegie-roi-reports"
 _client = bigquery.Client(project=BQ_PROJECT)
 
-# ── Region sanitizer (copied from digital_data.py) ────────────────────────────
+# ── Region sanitizer ──────────────────────────────────────────────────────────
 
 _STATE_NAME_TO_ABBR = {
     "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
@@ -154,16 +151,24 @@ def _extract_query(sql: str, export_label: str) -> str:
 
 
 def _parameterize_digital(sql: str, client_name: str) -> tuple[str, bigquery.QueryJobConfig]:
-    """Replace hardcoded client_name filter with a BigQuery named parameter."""
+    """Ensure digital queries use a required BigQuery client_name parameter."""
+    if not client_name or not str(client_name).strip():
+        raise ValueError("client_name is required")
+
     parameterized = re.sub(
         r"((?:WHERE|AND)\s+client_name\s*=\s*)'[^']*'",
         r"\1@client_name",
         sql,
         flags=re.IGNORECASE,
     )
+    if "@client_name" not in parameterized:
+        raise ValueError("SQL is missing required @client_name parameter")
+    if re.search(r"\bclient_name\s*=\s*'[^']+'", parameterized, flags=re.IGNORECASE):
+        raise ValueError("SQL contains an unparameterized client_name filter")
+
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
-            bigquery.ScalarQueryParameter("client_name", "STRING", client_name)
+            bigquery.ScalarQueryParameter("client_name", "STRING", str(client_name).strip())
         ]
     )
     return parameterized, job_config

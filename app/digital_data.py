@@ -1,15 +1,16 @@
-"""Load and clean digital performance data from BigQuery once at startup."""
+"""Legacy digital loader module.
+
+Unparameterized startup data loading is disabled for the multi-client
+dashboard. Use digital_data_param.py and pass the resolved client_name
+explicitly from the signed session.
+"""
 
 from pathlib import Path
 import re
 import pandas as pd
-from google.cloud import bigquery
 
 _QUERY_DIR = Path(__file__).parent.parent / "data" / "queries"
 _DATA_DIR = Path(__file__).parent.parent / "data"
-
-# Billing project. Queries reference source tables by full path.
-_BQ_DIGITAL = bigquery.Client(project="carnegie-roi-reports")
 
 # ── Region sanitizer — maps messy Q10 region field to US state abbreviations ──
 
@@ -172,9 +173,10 @@ def _extract_query(sql: str, export_label: str) -> str:
 
 
 def _run_digital(export_label: str) -> pd.DataFrame:
-    sql_full = (_QUERY_DIR / "ROI_All_Digital.sql").read_text(encoding="utf-8", errors="replace")
-    sql = _extract_query(sql_full, export_label)
-    return _BQ_DIGITAL.query(sql).to_dataframe()
+    raise RuntimeError(
+        "Unparameterized digital data loading is disabled. "
+        "Use digital_data_param.py with an explicit client_name."
+    )
 
 
 def _load_q8() -> pd.DataFrame:
@@ -287,31 +289,31 @@ def _load_q12() -> pd.DataFrame:
     return df
 
 
-# Load once at import time
-Q8 = _load_q8()
-Q9 = _load_q9()
-Q10 = _sanitize_q10_regions(_load_q10())
-Q11_CREATIVE = _load_q11_creative()
-Q11_KEYWORDS = _load_q11_keywords()
-Q11_YOUTUBE = _load_q11_youtube()
-Q12 = _load_q12()
+# Import-time client data loading is disabled.
+Q8 = pd.DataFrame()
+Q9 = pd.DataFrame()
+Q10 = pd.DataFrame()
+Q11_CREATIVE = pd.DataFrame()
+Q11_KEYWORDS = pd.DataFrame()
+Q11_YOUTUBE = pd.DataFrame()
+Q12 = pd.DataFrame()
 
 
 def get_digital_date_range() -> tuple:
-    return Q8["day"].min(), Q8["day"].max()
+    return pd.NaT, pd.NaT
 
 
 def get_digital_groups() -> list[str]:
-    return sorted([g for g in Q8["group_name"].unique() if g])
+    return []
 
 
 def get_digital_subgroups() -> list[str]:
-    return sorted([s for s in Q8["subgroup_name"].unique() if s])
+    return []
 
 
 def get_digital_products() -> list[str]:
-    return sorted([p for p in Q8["product_name"].unique() if p])
+    return []
 
 
 def get_digital_campaigns() -> list[str]:
-    return sorted([c for c in Q8["campaign_name"].unique() if c])
+    return []

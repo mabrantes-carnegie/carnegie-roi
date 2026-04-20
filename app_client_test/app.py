@@ -13,18 +13,14 @@ HOW TO RUN:
     shiny run app.py --port 8000 --reload
 
 HOW TO TEST:
-    With URL param (production flow simulation):
-        http://127.0.0.1:8000/?sage_id=CentralWA11686
-
-    Without URL param (uses SAGE_ID env var or DEFAULT_SAGE_ID fallback):
-        http://127.0.0.1:8000/
-        SAGE_ID=CentralWA11686 shiny run app.py --port 8000
+    Pass a sage_id URL param:
+        http://127.0.0.1:8000/?sage_id=<sage_id>
 
 WHAT IT VALIDATES:
     1. sage_id is read correctly from the URL query parameter
     2. sage_id is mapped to institution_name via udp_udl.institution
     3. BigQuery queries run correctly with the parameterized institution_name
-    4. The data returned matches the expected institution (not CWU hardcoded)
+    4. The data returned matches only the resolved institution
     5. Row counts and column shapes are correct for Q6, Q2, Q3
 """
 
@@ -36,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from shiny import App, ui, render, reactive, req
 from shiny.types import NavSetArg
 
-from client_resolver import resolve_institution, list_known_institutions, DEFAULT_SAGE_ID
+from client_resolver import resolve_institution, list_known_institutions
 from data_loader_param import load_q6, load_q2, load_q3
 
 import pandas as pd
@@ -127,15 +123,14 @@ def server(input, output, session):
 
     # ── Read sage_id from URL query params ─────────────────────────────────────
     @reactive.calc
-    def sage_id() -> str:
+    def sage_id() -> str | None:
         qs = session.input[".clientdata_url_search"]()
-        # qs is like "?sage_id=AlvernoWI10017" or ""
         if qs:
-            from urllib.parse import parse_qs, urlparse
+            from urllib.parse import parse_qs
             params = parse_qs(qs.lstrip("?"))
             if "sage_id" in params:
                 return params["sage_id"][0]
-        return DEFAULT_SAGE_ID
+        return None
 
     # ── Resolve sage_id → institution_name via BigQuery ────────────────────────
     @reactive.calc
@@ -170,6 +165,14 @@ def server(input, output, session):
     def resolution_status():
         sid = sage_id()
         name = institution_name()
+        if sid is None:
+            return ui.tags.div(
+                ui.tags.p(
+                    ui.tags.span("MISSING sage_id", class_="status-err"),
+                    " — pass ?sage_id=<sage_id> in the URL.",
+                    style="font-size:13px;margin:0;"
+                )
+            )
         if name:
             return ui.tags.div(
                 ui.tags.p(

@@ -3172,7 +3172,7 @@ def digital_server(
     # ══════════════════════════════════════════════════════════
     #
     # CREATIVE SEARCH BAR — Searchable fields:
-    #   - campaign_name: Campaign name (e.g., "CWU - UG - Display")
+    #   - campaign_name: Campaign name
     #   - ad_group: Ad group / ad set name
     #   - product_name: Strategy/platform (e.g., "Display", "Meta")
     #   - platform_campaign_name: Platform-level campaign identifier

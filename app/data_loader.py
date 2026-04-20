@@ -1,15 +1,17 @@
-"""Load and clean data from BigQuery once at startup."""
+"""Legacy loader module.
+
+Unparameterized startup data loading is disabled for the multi-client
+dashboard. Use data_loader_param.py and pass the resolved institution_name
+explicitly from the signed session.
+"""
 
 import re
 from datetime import date
 from pathlib import Path
 import pandas as pd
-from google.cloud import bigquery
 
 _QUERY_DIR = Path(__file__).parent.parent / "data" / "queries"
 _DATA_DIR = Path(__file__).parent.parent / "data"
-
-_BQ_ROI = bigquery.Client(project="carnegie-roi-reports")
 
 # Valid US state/territory 2-letter codes
 VALID_US_STATES = frozenset({
@@ -29,8 +31,10 @@ MONTH_LABELS = {1: "Jul", 2: "Aug", 3: "Sep", 4: "Oct", 5: "Nov", 6: "Dec",
 
 
 def _run_query(sql_file: str) -> pd.DataFrame:
-    sql = (_QUERY_DIR / sql_file).read_text()
-    return _BQ_ROI.query(sql).to_dataframe()
+    raise RuntimeError(
+        "Unparameterized data loading is disabled. "
+        "Use data_loader_param.py with an explicit institution_name."
+    )
 
 
 def _load_q6() -> pd.DataFrame:
@@ -102,90 +106,48 @@ def _load_q3() -> pd.DataFrame:
 
 
 def _load_goals() -> dict:
-    """Load roi_goals.csv and aggregate to institution-level goals."""
-    goals_path = _DATA_DIR / "roi_goals.csv"
-    if not goals_path.exists():
-        return {}
-
-    df = pd.read_csv(goals_path)
-    required_cols = [
-        "Inquiry Goal", "App Starts Goal", "App Submit Goal",
-        "Admit Goal", "Deposit Goal", "Net Deposit Goal",
-    ]
-    if any(col not in df.columns for col in required_cols):
-        return {}
-
-    return {
-        "total_inquiries": int(df["Inquiry Goal"].sum()),
-        "total_app_starts": int(df["App Starts Goal"].sum()),
-        "total_app_submits": int(df["App Submit Goal"].sum()),
-        "total_admits": int(df["Admit Goal"].sum()),
-        "total_deposits": int(df["Deposit Goal"].sum()),
-        "total_net_deposits": int(df["Net Deposit Goal"].sum()),
-    }
+    """Legacy local goals loading is disabled for multi-client safety."""
+    return {}
 
 
 def _load_program_goals() -> pd.DataFrame:
-    """Load roi_goals.csv as a DataFrame with program-level goals."""
-    goals_path = _DATA_DIR / "roi_goals.csv"
+    """Legacy local program goals loading is disabled for multi-client safety."""
     empty_cols = [
         "program", "goal_inquiries", "goal_app_starts", "goal_app_submits",
         "goal_admits", "goal_deposits", "goal_net_deposits", "program_lower",
     ]
-    if not goals_path.exists():
-        return pd.DataFrame(columns=empty_cols)
-
-    df = pd.read_csv(goals_path)
-    if "Program" not in df.columns:
-        return pd.DataFrame(columns=empty_cols)
-
-    df = df.rename(columns={
-        "Program": "program",
-        "Inquiry Goal": "goal_inquiries",
-        "App Starts Goal": "goal_app_starts",
-        "App Submit Goal": "goal_app_submits",
-        "Admit Goal": "goal_admits",
-        "Deposit Goal": "goal_deposits",
-        "Net Deposit Goal": "goal_net_deposits",
-    })
-    for col in [
-        "goal_inquiries", "goal_app_starts", "goal_app_submits",
-        "goal_admits", "goal_deposits", "goal_net_deposits",
-    ]:
-        if col not in df.columns:
-            df[col] = pd.NA
-    # Normalize program names to lowercase for matching
-    df["program_lower"] = df["program"].str.strip().str.lower()
-    return df
+    return pd.DataFrame(columns=empty_cols)
 
 
-# Load once at import time
-Q6 = _load_q6()  # PRIMARY — KPIs, trending, source trend, state geo
-Q2 = _load_q2()  # Cost and campaign lead source data
-Q3 = _load_q3()  # City-level geography detail only
-GOALS = _load_goals()
-PROGRAM_GOALS = _load_program_goals()
+# Client data placeholders; no import-time loading.
+Q6 = pd.DataFrame()
+Q2 = pd.DataFrame()
+Q3 = pd.DataFrame()
+GOALS = {}
+PROGRAM_GOALS = pd.DataFrame(
+    columns=[
+        "program", "goal_inquiries", "goal_app_starts", "goal_app_submits",
+        "goal_admits", "goal_deposits", "goal_net_deposits", "program_lower",
+    ]
+)
 
 
 def get_institutions() -> list[str]:
-    return sorted(Q6["institution_name"].unique().tolist())
+    return []
 
 
 def get_term_years() -> list[str]:
-    years = set(Q6["term_year"].unique()) | set(Q2["term_year"].unique())
-    return [str(y) for y in sorted(years)]
+    return []
 
 
 def get_term_semesters() -> list[str]:
-    return sorted(Q6["term_semester"].unique().tolist())
+    return []
 
 
 def get_student_types() -> list[str]:
-    types = Q6["student_type"].unique().tolist()
-    priority = ["First Year", "Transfer", "Graduate", "Adult", "Readmit", "Other", "Unknown"]
-    return [t for t in priority if t in types]
+    return []
 
 
 def get_programs_date_range() -> tuple:
     """Return min/max event_date from Q6."""
-    return Q6["event_date"].min(), Q6["event_date"].max()
+    return pd.NaT, pd.NaT

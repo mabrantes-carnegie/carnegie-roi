@@ -36,7 +36,7 @@ WITH base AS (
         ON  a.person_id      = c.person_id
         AND a.institution_id = c.institution_id
         AND a.address_rank   = 1
-    WHERE i.name = 'Central Washington University'
+    WHERE i.name = @institution_name
         AND c.person_is_international_student = FALSE
 ),
 
@@ -145,8 +145,8 @@ all_keys AS (
 )
 
 SELECT
-    'Central Washington University'             AS institution_name,
-    'WA'                                        AS institution_state,
+    @institution_name                           AS institution_name,
+    CAST(NULL AS STRING)                        AS institution_state,
     k.student_state,
     k.student_city,
     k.day,

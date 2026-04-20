@@ -126,6 +126,6 @@ SELECT
 FROM conversion_daily AS cm
 INNER JOIN `unified-data-platform-prod.udp_udl.institution` AS i
     ON cm.institution_id = i.id
-WHERE i.name = 'Central Washington University'
+WHERE i.name = @institution_name
 GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
 ORDER BY term_year, day

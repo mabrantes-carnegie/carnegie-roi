@@ -18,7 +18,7 @@ campaign_costs AS (
     WHERE cr.campaign_id IN (
         SELECT DISTINCT campaign_id
         FROM `unified-data-platform-prod.udp_url.conversion_campaign_attribution`
-        WHERE institution_name = 'Central Washington University'
+        WHERE institution_name = @institution_name
             AND entry_term_year IN (2024,2025, 2026)
             AND entry_term_semester = 'Fall'
     )
@@ -91,7 +91,7 @@ funnel_by_campaign AS (
         STRUCT(c.app_enrolled_date AS stage_day, 'Enrolled' AS stage_name),
         STRUCT(c.app_exit_date AS stage_day, 'Exit After Deposit' AS stage_name)
     ]) AS stage
-    WHERE i.name                              = 'Central Washington University'
+    WHERE i.name                              = @institution_name
         AND cca.entry_term_year               IN (2024,2025, 2026)
         AND cca.entry_term_semester           = 'Fall'
         AND c.person_is_international_student = FALSE
@@ -108,7 +108,7 @@ all_keys AS (
     FROM funnel_by_campaign
 )
 SELECT
-    COALESCE(f.institution_name, 'Central Washington University') AS institution_name,
+    COALESCE(f.institution_name, @institution_name) AS institution_name,
     k.term_year                                                    AS term_year,
     COALESCE(f.entry_term_semester, 'Fall')                        AS term_semester,
     cm.campaign_product_group                                      AS lead_source,

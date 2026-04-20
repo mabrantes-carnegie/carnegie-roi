@@ -1,4 +1,4 @@
-"""Carnegie ROI Dashboard — Reactive server logic."""
+"""Carnegie ROI Dashboard â€” Reactive server logic."""
 
 import logging
 from datetime import date
@@ -8,7 +8,7 @@ import pandas as pd
 
 _log = logging.getLogger("carnegie.roi")
 
-from data_loader import GOALS, PROGRAM_GOALS, ACAD_ORDER, MONTH_LABELS
+from dashboard_constants import GOALS, PROGRAM_GOALS, ACAD_ORDER, MONTH_LABELS
 from client_resolver import resolve_institution
 from data_loader_param import load_q6, load_q2, load_q3
 from digital_data_param import (
@@ -40,14 +40,14 @@ from digital_server import (
     _pct_change,
 )
 
-# ── Carnegie brand colors for Plotly ─────────────────────────
+# â”€â”€ Carnegie brand colors for Plotly â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 CARNEGIE_NAVY = "#021326"
 
-# Chart data palette — red is NEVER used for data series
+# Chart data palette â€” red is NEVER used for data series
 CHART_COLORS = [
-    "#021326",  # Carnegie Blue dark — primary
-    "#A4B9D3",  # Carnegie Blue light — secondary
+    "#021326",  # Carnegie Blue dark â€” primary
+    "#A4B9D3",  # Carnegie Blue light â€” secondary
     "#C99D44",  # Carnegie Gold
     "#6B8F71",  # Muted green
     "#8B7355",  # Warm brown
@@ -65,7 +65,7 @@ CARNEGIE_AMBER = "#c8962d"
 MONTH_ORDER = ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
                "Jan", "Feb", "Mar", "Apr", "May", "Jun"]
 
-# ── Primary funnel stages (6) ───────────────────────────────
+# â”€â”€ Primary funnel stages (6) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 PRIMARY_KEYS = [
     "total_inquiries", "total_app_starts", "total_app_submits",
     "total_admits", "total_deposits", "total_net_deposits",
@@ -154,9 +154,27 @@ def _add_line_label_annotations(fig, series_defs, chart_height=320, min_gap_px=2
 
 def server_logic(input, output, session):
 
-    # ══════════════════════════════════════════════════════════
-    # CLIENT RESOLUTION — sage_id → institution_name
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    # CLIENT RESOLUTION â€” sage_id â†’ institution_name
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+    _client_data_error = reactive.Value(None)
+
+    def _set_client_data_error(dataset: str, headline: str, message: str):
+        _client_data_error.set({
+            "dataset": dataset,
+            "headline": headline,
+            "message": message,
+        })
+
+    def _clear_client_data_error(dataset: str):
+        current = _client_data_error.get()
+        if current and current.get("dataset") == dataset:
+            _client_data_error.set(None)
+
+    def _stop_for_client_data(dataset: str, headline: str, message: str):
+        _set_client_data_error(dataset, headline, message)
+        req(False)
 
     @reactive.calc
     def _sage_id() -> str | None:
@@ -175,7 +193,22 @@ def server_logic(input, output, session):
 
     @reactive.calc
     def _institution_name() -> str | None:
-        return resolve_institution(_sage_id())
+        sid = _sage_id()
+        if sid is None:
+            return None
+        try:
+            name = resolve_institution(sid)
+        except Exception:
+            _log.exception("institution_resolution_failed sage_id=%s", sid)
+            _set_client_data_error(
+                "client_resolution",
+                "Dashboard unavailable",
+                "We couldn't resolve your dashboard access. "
+                "Please contact your Carnegie account team.",
+            )
+            return None
+        _clear_client_data_error("client_resolution")
+        return name
 
     @render.ui
     def session_error():
@@ -185,9 +218,15 @@ def server_logic(input, output, session):
                 headline="Session expired",
                 message="Please return to the MyCarnegie portal and reopen your dashboard.",
             ))
+        data_error = _client_data_error.get()
+        if data_error:
+            return ui.HTML(render_banner_html(
+                headline=data_error["headline"],
+                message=data_error["message"],
+            ))
         if _institution_name() is None:
             _log.warning(
-                "unknown_sage_id sage_id=%s — not found in udp_udl.institution", sid
+                "unknown_sage_id sage_id=%s â€” not found in udp_udl.institution", sid
             )
             return ui.HTML(render_banner_html(
                 headline="Dashboard unavailable",
@@ -196,67 +235,80 @@ def server_logic(input, output, session):
             ))
         return ui.TagList()
 
-    # ── Session-scoped data (loaded once per session per institution) ──
+    # â”€â”€ Session-scoped data (loaded once per session per institution) â”€â”€
+
+    def _load_required_frame(dataset: str, loader):
+        name = _institution_name()
+        req(name is not None)
+        try:
+            df = loader(name)
+        except Exception:
+            _log.exception(
+                "client_data_load_failed sage_id=%s institution=%s dataset=%s",
+                _sage_id(),
+                name,
+                dataset,
+            )
+            _stop_for_client_data(
+                dataset,
+                "Dashboard unavailable",
+                f"We couldn't load {dataset} for your account. "
+                "Please contact your Carnegie account team.",
+            )
+        if df is None or df.empty:
+            _log.warning(
+                "client_data_empty sage_id=%s institution=%s dataset=%s",
+                _sage_id(),
+                name,
+                dataset,
+            )
+            _stop_for_client_data(
+                dataset,
+                "No dashboard data",
+                f"No {dataset} is available for your account.",
+            )
+        _clear_client_data_error(dataset)
+        return df
 
     @reactive.calc
     def _session_q6():
-        name = _institution_name()
-        req(name is not None)
-        return load_q6(name)
+        return _load_required_frame("funnel data", load_q6)
 
     @reactive.calc
     def _session_q2():
-        name = _institution_name()
-        req(name is not None)
-        return load_q2(name)
+        return _load_required_frame("campaign cost data", load_q2)
 
     @reactive.calc
     def _session_q3():
-        name = _institution_name()
-        req(name is not None)
-        return load_q3(name)
+        return _load_required_frame("geography data", load_q3)
 
     @reactive.calc
     def _session_q8():
-        name = _institution_name()
-        req(name is not None)
-        return load_q8(name)
+        return _load_required_frame("digital overview data", load_q8)
 
     @reactive.calc
     def _session_q9():
-        name = _institution_name()
-        req(name is not None)
-        return load_q9(name)
+        return _load_required_frame("digital action data", load_q9)
 
     @reactive.calc
     def _session_q10():
-        name = _institution_name()
-        req(name is not None)
-        return load_q10(name)
+        return _load_required_frame("digital geography data", load_q10)
 
     @reactive.calc
     def _session_q11_creative():
-        name = _institution_name()
-        req(name is not None)
-        return load_q11_creative(name)
+        return _load_required_frame("digital creative data", load_q11_creative)
 
     @reactive.calc
     def _session_q11_keywords():
-        name = _institution_name()
-        req(name is not None)
-        return load_q11_keywords(name)
+        return _load_required_frame("digital keyword data", load_q11_keywords)
 
     @reactive.calc
     def _session_q11_youtube():
-        name = _institution_name()
-        req(name is not None)
-        return load_q11_youtube(name)
+        return _load_required_frame("YouTube creative data", load_q11_youtube)
 
     @reactive.calc
     def _session_q12():
-        name = _institution_name()
-        req(name is not None)
-        return load_q12(name)
+        return _load_required_frame("digital insights data", load_q12)
 
     # Update institution select to match resolved institution_name
     @reactive.effect
@@ -268,7 +320,7 @@ def server_logic(input, output, session):
     @render.ui
     def navbar_title():
         name = _institution_name()
-        label = f"ROI Report — {name}" if name else "ROI Report"
+        label = f"ROI Report â€” {name}" if name else "ROI Report"
         return ui.tags.span(label, class_="navbar-title-text")
 
     # Update term_year choices from session Q6 + Q2
@@ -282,7 +334,12 @@ def server_logic(input, output, session):
             if choices:
                 ui.update_select("term_year", choices=choices, selected=choices[0])
         except Exception:
-            pass
+            _log.exception("term_year_filter_sync_failed sage_id=%s", _sage_id())
+            _stop_for_client_data(
+                "term year choices",
+                "Dashboard unavailable",
+                "We couldn't initialize the term year filter for your account.",
+            )
 
     # Update digital filter choices from session Q8
     @reactive.effect
@@ -326,15 +383,22 @@ def server_logic(input, output, session):
                 selected=_selected_for("dig_campaign", campaigns, input.dig_campaign()),
             )
         except Exception:
-            pass
+            _log.exception("digital_filter_sync_failed sage_id=%s", _sage_id())
+            _stop_for_client_data(
+                "digital filter choices",
+                "Dashboard unavailable",
+                "We couldn't initialize the digital filters for your account.",
+            )
 
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # SHARED REACTIVE DATA
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     def _apply_global_filters(df):
         """Apply sidebar global filters to a Q6 DataFrame."""
-        df = df[df["institution_name"] == input.institution()]
+        name = _institution_name()
+        req(name is not None)
+        df = df[df["institution_name"] == name]
         df = df[df["term_semester"] == input.term_semester()]
         st = input.student_type()
         if isinstance(st, (list, tuple)) and len(st) > 0:
@@ -370,7 +434,7 @@ def server_logic(input, output, session):
 
     @reactive.calc
     def trending_main():
-        """Q6 filtered by global filters — ALL term_years (for trending)."""
+        """Q6 filtered by global filters â€” ALL term_years (for trending)."""
         return _apply_global_filters(_session_q6())
 
     @reactive.calc
@@ -413,7 +477,9 @@ def server_logic(input, output, session):
     def filtered_q2():
         """Q2 for cost metrics only (no page-specific source filter)."""
         df = _session_q2()
-        df = df[df["institution_name"] == input.institution()]
+        name = _institution_name()
+        req(name is not None)
+        df = df[df["institution_name"] == name]
         df = df[df["term_year"] == int(input.term_year())]
         df = df[df["term_semester"] == input.term_semester()]
         return df
@@ -421,7 +487,9 @@ def server_logic(input, output, session):
     @reactive.calc
     def prior_q2():
         df = _session_q2()
-        df = df[df["institution_name"] == input.institution()]
+        name = _institution_name()
+        req(name is not None)
+        df = df[df["institution_name"] == name]
         df = df[df["term_year"] == int(input.term_year()) - 1]
         df = df[df["term_semester"] == input.term_semester()]
         return df
@@ -430,7 +498,9 @@ def server_logic(input, output, session):
     def filtered_q3():
         """Q3 for city-level detail only."""
         df = _session_q3()
-        df = df[df["institution_name"] == input.institution()]
+        name = _institution_name()
+        req(name is not None)
+        df = df[df["institution_name"] == name]
         df = df[df["term_year"] == int(input.term_year())]
         df = df[df["term_semester"] == input.term_semester()]
         return df
@@ -439,7 +509,9 @@ def server_logic(input, output, session):
     def prior_q3():
         """Prior-year Q3 for city-level detail."""
         df = _session_q3()
-        df = df[df["institution_name"] == input.institution()]
+        name = _institution_name()
+        req(name is not None)
+        df = df[df["institution_name"] == name]
         df = df[df["term_year"] == int(input.term_year()) - 1]
         df = df[df["term_semester"] == input.term_semester()]
         return df
@@ -479,13 +551,15 @@ def server_logic(input, output, session):
         df = _apply_global_filters(_session_q6())
         return _apply_geo_page_filters(df)
 
-    # ── Update filter choices ─────────────────────────────────
+    # â”€â”€ Update filter choices â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @reactive.effect
     def _update_student_type_choices():
         """Populate Student Type filter from Q6 (unfiltered by student_type to avoid circularity)."""
         df = _session_q6()
-        df = df[df["institution_name"] == input.institution()]
+        name = _institution_name()
+        req(name is not None)
+        df = df[df["institution_name"] == name]
         df = df[df["term_semester"] == input.term_semester()]
         df = df[df["term_year"] == int(input.term_year())]
         if df.empty:
@@ -575,9 +649,9 @@ def server_logic(input, output, session):
             })
         ui.update_selectize("geo_program", selected=raw_selected)
 
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # KPI CALCULATIONS (from Q6)
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     def _aggregate_kpis(df):
         """Sum funnel columns from a Q6 DataFrame into a KPI dict."""
@@ -606,13 +680,14 @@ def server_logic(input, output, session):
     def yoy_changes():
         return compute_yoy_change(current_kpis(), prior_kpis())
 
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # PAGE 1: ROI OVERVIEW
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @render.ui
     def page_subtitle():
-        return ui.tags.span(f"\u2014 {input.institution()}", class_="page-subtitle")
+        name = _institution_name()
+        return ui.tags.span(f"\u2014 {name}" if name else "", class_="page-subtitle")
 
     @render.ui
     def period_badge():
@@ -736,7 +811,7 @@ def server_logic(input, output, session):
         return _yoy_badge("total_enrolled")
 
     def _cost_yoy_badge(denominator_key):
-        """YoY badge for a cost metric — inverted sentiment (cost down = green)."""
+        """YoY badge for a cost metric â€” inverted sentiment (cost down = green)."""
         curr_spend = filtered_q2()["total_cost"].sum()
         curr_denom = current_kpis().get(denominator_key, 0)
         curr_val = (curr_spend / curr_denom) if curr_denom > 0 and curr_spend > 0 else None
@@ -970,7 +1045,7 @@ def server_logic(input, output, session):
                 curr_v = values[i]
                 if prev and prev != 0:
                     pct = (curr_v - prev) / prev * 100
-                    arrow = "▲" if pct >= 0 else "▼"
+                    arrow = "â–²" if pct >= 0 else "â–¼"
                     color = "#132B23" if pct >= 0 else "#560422"
                     # Label centered between the two bars
                     annotations.append(dict(
@@ -983,13 +1058,13 @@ def server_logic(input, output, session):
                     ))
                     line_color = "#9B9893"
                     lw = 1
-                    # Left vertical leg: top of left bar → connector height
+                    # Left vertical leg: top of left bar â†’ connector height
                     shapes.append(dict(
                         type="line", xref="x", yref="y",
                         x0=i - 1, y0=prev, x1=i - 1, y1=line_y,
                         line=dict(color=line_color, width=lw, dash="dot"),
                     ))
-                    # Right vertical leg: top of right bar → connector height
+                    # Right vertical leg: top of right bar â†’ connector height
                     shapes.append(dict(
                         type="line", xref="x", yref="y",
                         x0=i, y0=curr_v, x1=i, y1=line_y,
@@ -1016,7 +1091,7 @@ def server_logic(input, output, session):
                 range=[0, y_max * 1.22],
             )
         else:
-            # Monthly mode — cumulative by academic month, current vs prior year
+            # Monthly mode â€” cumulative by academic month, current vs prior year
             def _monthly_series(term_year, cap_current_month=False):
                 sub = df[df["term_year"] == term_year]
                 if sub.empty:
@@ -1197,7 +1272,7 @@ def server_logic(input, output, session):
                 f'{fmt_number(val)}</text>'
             )
 
-            # YoY badge — centred on each stage block, to the right
+            # YoY badge â€” centred on each stage block, to the right
             prior_stage_val = prior.get(key, 0)
             center_y = y + STEP_H / 2
             pill_w = 42
@@ -1227,7 +1302,7 @@ def server_logic(input, output, session):
                 f'fill="{rc}">{badge_text}</text>'
             )
 
-            # Melt Rate — below the Net Deposits badge
+            # Melt Rate â€” below the Net Deposits badge
             if i == n - 1:
                 deposits = kpis.get("total_deposits", 0)
                 net_deposits = kpis.get("total_net_deposits", 0)
@@ -1307,11 +1382,11 @@ def server_logic(input, output, session):
             melt = (1 - net_deposits / deposits) * 100
             melt_cls = "fg-melt--good" if melt < 3 else "fg-melt--warn" if melt <= 5 else "fg-melt--bad"
 
-            # vs PY delta — for melt rate, lower is better → invert sentiment
+            # vs PY delta â€” for melt rate, lower is better â†’ invert sentiment
             if prior_deps > 0:
                 prior_melt = (1 - prior_net / prior_deps) * 100
                 diff = round(melt - prior_melt)
-                # higher melt = worse → up arrow is negative sentiment
+                # higher melt = worse â†’ up arrow is negative sentiment
                 if diff > 0:
                     yoy_text = f"\u25b2 {diff}pp YoY"
                     sentiment = "negative"
@@ -1338,16 +1413,16 @@ def server_logic(input, output, session):
         return ui.tags.div(
             ui.tags.div("Melt Rate", class_="secondary-label"),
             ui.tags.div(
-                ui.tags.div("—", class_="secondary-value"),
+                ui.tags.div("â€”", class_="secondary-value"),
                 ui.tags.span("N/A", class_="kpi-badge kpi-badge--na"),
                 class_="secondary-value-row",
             ),
             class_="secondary-badge secondary-badge--stacked",
         )
 
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # PAGE 2: FUNNEL DEEP DIVE
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     # --- Funnel Waterfall (uses Q6 KPIs) ---
 
@@ -1389,12 +1464,12 @@ def server_logic(input, output, session):
         shapes = []
         all_vals = curr_vals + prior_vals
         y_max = max(v for v in all_vals if v > 0) if any(v > 0 for v in all_vals) else 1
-        # In grouped bar mode with 2 traces, bar centers are at x ± 0.2
+        # In grouped bar mode with 2 traces, bar centers are at x Â± 0.2
         bar_half = 0.2
         for i, (cv, pv) in enumerate(zip(curr_vals, prior_vals)):
             if pv and pv != 0:
                 pct = (cv - pv) / pv * 100
-                arrow = "▲" if pct >= 0 else "▼"
+                arrow = "â–²" if pct >= 0 else "â–¼"
                 font_color = "#132B23" if pct >= 0 else "#560422"
                 bg_color   = "#D1FAE5" if pct >= 0 else "#FFE4E6"
                 # Per-group heights: badge sits just above the taller bar
@@ -1444,11 +1519,11 @@ def server_logic(input, output, session):
         fig.update_layout(**layout)
         return _plotly_html(fig)
 
-    # --- Source Performance Table (Q2 — campaign attribution) ---
+    # --- Source Performance Table (Q2 â€” campaign attribution) ---
 
     @render.ui
     def source_table():
-        """Source performance table — same columns as program detail, grouped by lead source."""
+        """Source performance table â€” same columns as program detail, grouped by lead source."""
         df_curr = filtered_deep_dive()
         if df_curr.empty:
             return ui.tags.div("No data available.", class_="empty-state")
@@ -1464,28 +1539,28 @@ def server_logic(input, output, session):
         total_enrolled = curr["total_enrolled"].sum()
 
         curr["% Inquiries"] = curr["total_inquiries"].apply(
-            lambda v: f"{v / total_inq * 100:.1f}%" if total_inq > 0 else "—"
+            lambda v: f"{v / total_inq * 100:.1f}%" if total_inq > 0 else "â€”"
         )
         curr["% App Starts"] = curr["total_app_starts"].apply(
-            lambda v: f"{v / total_starts * 100:.1f}%" if total_starts > 0 else "—"
+            lambda v: f"{v / total_starts * 100:.1f}%" if total_starts > 0 else "â€”"
         )
         curr["Start Rate"] = curr.apply(
             lambda r: f"{r['total_app_starts'] / r['total_inquiries'] * 100:.1f}%"
-            if r["total_inquiries"] > 0 else "—", axis=1
+            if r["total_inquiries"] > 0 else "â€”", axis=1
         )
         curr["% App Submits"] = curr["total_app_submits"].apply(
-            lambda v: f"{v / total_submits * 100:.1f}%" if total_submits > 0 else "—"
+            lambda v: f"{v / total_submits * 100:.1f}%" if total_submits > 0 else "â€”"
         )
         curr["Submit Rate"] = curr.apply(
             lambda r: f"{r['total_app_submits'] / r['total_app_starts'] * 100:.1f}%"
-            if r["total_app_starts"] > 0 else "—", axis=1
+            if r["total_app_starts"] > 0 else "â€”", axis=1
         )
         curr["% Enrolled"] = curr["total_enrolled"].apply(
-            lambda v: f"{v / total_enrolled * 100:.1f}%" if total_enrolled > 0 else "—"
+            lambda v: f"{v / total_enrolled * 100:.1f}%" if total_enrolled > 0 else "â€”"
         )
-        curr["Inq→Enroll Rate"] = curr.apply(
+        curr["Inqâ†’Enroll Rate"] = curr.apply(
             lambda r: f"{r['total_enrolled'] / r['total_inquiries'] * 100:.1f}%"
-            if r["total_inquiries"] > 0 else "—", axis=1
+            if r["total_inquiries"] > 0 else "â€”", axis=1
         )
 
         display = curr.rename(columns={
@@ -1502,14 +1577,14 @@ def server_logic(input, output, session):
             "Inquiries", "% Inquiries",
             "App Starts", "% App Starts", "Start Rate",
             "App Submits", "% App Submits", "Submit Rate",
-            "Enrolled", "% Enrolled", "Inq→Enroll Rate",
+            "Enrolled", "% Enrolled", "Inqâ†’Enroll Rate",
             "Deposits", "Net Deposits",
         ]
         heatmap_cols = ["Inquiries", "App Starts", "App Submits",
                         "Enrolled", "Deposits", "Net Deposits"]
         return _heatmap_table(display[cols], heatmap_cols, paginated=True)
 
-    # --- Origin Source Trend Chart (Q6 — first-touch, monthly) ---
+    # --- Origin Source Trend Chart (Q6 â€” first-touch, monthly) ---
 
     @render.ui
     def source_trend_chart():
@@ -1619,13 +1694,13 @@ def server_logic(input, output, session):
 
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            x=x_labels, y=bd["inq_to_app_rate"], name="Inquiry → App Rate",
+            x=x_labels, y=bd["inq_to_app_rate"], name="Inquiry â†’ App Rate",
             marker=dict(color="#EA332D", line=dict(width=0)),
             text=[f"{v:.0f}%" for v in bd["inq_to_app_rate"]],
             textposition="outside",
             textfont=dict(family="Manrope", size=10, color="#021326"),
             cliponaxis=False,
-            hovertemplate="<b>%{x}</b><br>Inquiry → App Rate: %{y:.1f}%<extra></extra>",
+            hovertemplate="<b>%{x}</b><br>Inquiry â†’ App Rate: %{y:.1f}%<extra></extra>",
         ))
         fig.add_trace(go.Bar(
             x=x_labels, y=bd["app_completion_rate"], name="App Completion Rate",
@@ -1659,13 +1734,13 @@ def server_logic(input, output, session):
         fig.update_layout(**layout)
         return _plotly_html(fig)
 
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # PAGE 3: GEOGRAPHY
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-    # ══════════════════════════════════════════════════════════
-    # PAGE 3 — PROGRAMS TAB
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    # PAGE 3 â€” PROGRAMS TAB
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     def _clean_program_name(name) -> str:
         """Title-case a program name, fixing common acronyms."""
@@ -1767,7 +1842,7 @@ def server_logic(input, output, session):
 
         sel = input.program_name_filter()
 
-        # ── Both years: global + student_type + lead_source, NO period filter.
+        # â”€â”€ Both years: global + student_type + lead_source, NO period filter.
         #    The chart uses term_year + acad_pos for its time axis, so the
         #    event_date-based Period filter must NOT be applied here.
         trend_base = _apply_global_filters(_session_q6())
@@ -1793,7 +1868,7 @@ def server_logic(input, output, session):
         if trend_base.empty:
             return ui.tags.div("No program data for the selected filters.", class_="empty-state")
 
-        # Goal — pro-rated by program selection
+        # Goal â€” pro-rated by program selection
         goal_total = GOALS.get(metric_col)
         if goal_total:
             all_named = _apply_global_filters(_session_q6())
@@ -1823,7 +1898,7 @@ def server_logic(input, output, session):
         curr_agg = curr_agg[curr_agg["acad_pos"] <= current_acad_pos]
         curr_agg["cumulative"] = curr_agg[metric_col].cumsum()
 
-        # Prior year — full year, no period cap
+        # Prior year â€” full year, no period cap
         prior_df = trend_base[trend_base["term_year"] == current_ty - 1].copy()
         prior_agg = None
         if not prior_df.empty:
@@ -1856,7 +1931,7 @@ def server_logic(input, output, session):
 
         fig = go.Figure()
 
-        # Current year line — first so it appears first in legend
+        # Current year line â€” first so it appears first in legend
         fig.add_trace(go.Scatter(
             x=curr_agg["month_label"], y=curr_agg["cumulative"],
             mode="lines+markers",
@@ -1877,7 +1952,7 @@ def server_logic(input, output, session):
                 hovertemplate=f"<b>%{{x}} {prior_label}</b><br>{metric_label}: %{{y:,.0f}}<extra></extra>",
             ))
 
-        # Goal line — horizontal at goal_value, label only at the end
+        # Goal line â€” horizontal at goal_value, label only at the end
         if goal_value:
             goal_text = [""] * (len(MONTH_ORDER) - 1) + [f"{goal_value:,}"]
             fig.add_trace(go.Scatter(
@@ -1994,7 +2069,7 @@ def server_logic(input, output, session):
                 g = goal_map.loc[prog_lower, goal_col]
                 if pd.notna(g) and float(g) > 0:
                     return f"{actual / g * 100:.0f}%"
-            return "—"
+            return "â€”"
 
         show_inquiry_goals = has_program_goals and (goal_map["goal_inquiries"].fillna(0) > 0).any()
         show_deposit_goals = has_program_goals and (goal_map["goal_deposits"].fillna(0) > 0).any()
@@ -2002,7 +2077,7 @@ def server_logic(input, output, session):
         if show_inquiry_goals:
             curr["Inq Goal"] = curr.apply(
                 lambda r: f"{int(goal_map.loc[r['_prog_lower'], 'goal_inquiries']):,}"
-                if r["_prog_lower"] in goal_map.index and goal_map.loc[r["_prog_lower"], "goal_inquiries"] > 0 else "—", axis=1
+                if r["_prog_lower"] in goal_map.index and goal_map.loc[r["_prog_lower"], "goal_inquiries"] > 0 else "â€”", axis=1
             )
             curr["% to Inq Goal"] = curr.apply(
                 lambda r: _pct_to_goal(r["total_inquiries"], r["_prog_lower"], "goal_inquiries"), axis=1
@@ -2011,7 +2086,7 @@ def server_logic(input, output, session):
         if show_deposit_goals:
             curr["Dep Goal"] = curr.apply(
                 lambda r: f"{int(goal_map.loc[r['_prog_lower'], 'goal_deposits']):,}"
-                if r["_prog_lower"] in goal_map.index and goal_map.loc[r["_prog_lower"], "goal_deposits"] > 0 else "—", axis=1
+                if r["_prog_lower"] in goal_map.index and goal_map.loc[r["_prog_lower"], "goal_deposits"] > 0 else "â€”", axis=1
             )
             curr["% to Dep Goal"] = curr.apply(
                 lambda r: _pct_to_goal(r["total_deposits"], r["_prog_lower"], "goal_deposits"), axis=1
@@ -2023,19 +2098,19 @@ def server_logic(input, output, session):
         total_enrolled = curr["total_enrolled"].sum()
 
         curr["% Inquiries"] = curr["total_inquiries"].apply(
-            lambda v: f"{v / total_inq * 100:.1f}%" if total_inq > 0 else "—"
+            lambda v: f"{v / total_inq * 100:.1f}%" if total_inq > 0 else "â€”"
         )
         curr["Start Rate"] = curr.apply(
             lambda r: f"{r['total_app_starts'] / r['total_inquiries'] * 100:.1f}%"
-            if r["total_inquiries"] > 0 else "—", axis=1
+            if r["total_inquiries"] > 0 else "â€”", axis=1
         )
         curr["Submit Rate"] = curr.apply(
             lambda r: f"{r['total_app_submits'] / r['total_app_starts'] * 100:.1f}%"
-            if r["total_app_starts"] > 0 else "—", axis=1
+            if r["total_app_starts"] > 0 else "â€”", axis=1
         )
-        curr["Inq→Enroll Rate"] = curr.apply(
+        curr["Inqâ†’Enroll Rate"] = curr.apply(
             lambda r: f"{r['total_enrolled'] / r['total_inquiries'] * 100:.1f}%"
-            if r["total_inquiries"] > 0 else "—", axis=1
+            if r["total_inquiries"] > 0 else "â€”", axis=1
         )
 
         display = curr.rename(columns={
@@ -2054,7 +2129,7 @@ def server_logic(input, output, session):
             "% Inquiries",
             "App Starts", "Start Rate",
             "App Submits", "Submit Rate",
-            "Enrolled", "Inq→Enroll Rate",
+            "Enrolled", "Inqâ†’Enroll Rate",
             "Deposits",
         ]
         if show_deposit_goals:
@@ -2251,7 +2326,7 @@ def server_logic(input, output, session):
             class_="map-layout",
         )
 
-    # --- Geography City Detail Table (Q3 — US only by default) ---
+    # --- Geography City Detail Table (Q3 â€” US only by default) ---
 
     @render.ui
     def geo_detail_table():
@@ -2311,9 +2386,9 @@ def server_logic(input, output, session):
 
         return _yoy_delta_table(rows, "State / City", metric_cols, paginated=True)
 
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # PAGE 4: DIGITAL PERFORMANCE
-    # ══════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     digital_server(
         input, output, session,
         get_q8=_session_q8,

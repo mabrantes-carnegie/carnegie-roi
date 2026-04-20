@@ -35,7 +35,7 @@ SELECT
     SUM(video_75)                                           AS video_75pct,
     SUM(video_100)                                          AS video_completions
 FROM `carnegie-dartlet-1528198422380.tinman.v_kpi_campaign`
-WHERE client_name = 'Central Washington University'
+WHERE client_name = @client_name
     AND day >= '2024-01-01'
 GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 ORDER BY day, product_name;
@@ -138,7 +138,7 @@ SELECT
     SUM(cost)                                               AS cost,
     SUM(budget)                                             AS budget
 FROM `carnegie-dartlet-1528198422380.tinman.v_kpi_conversion`
-WHERE client_name = 'Central Washington University'
+WHERE client_name = @client_name
     AND day >= '2024-01-01'
 GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 ORDER BY day, interaction_category, conversion_name;
@@ -171,7 +171,7 @@ SELECT
     SUM(cost)                                               AS cost,
     SUM(budget)                                             AS budget
 FROM `carnegie-dartlet-1528198422380.tinman.v_kpi_geo`
-WHERE client_name = 'Central Washington University'
+WHERE client_name = @client_name
     AND day >= '2024-01-01'
 GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
 ORDER BY day, impressions DESC;
@@ -186,7 +186,7 @@ ORDER BY day, impressions DESC;
 --   Display Creative      → ad_group IS NOT NULL
 --   Display by Ad Size    → creative IS NOT NULL AND product_name IN display list
 --   Meta/YouTube/etc      → creative IS NOT NULL AND product_name NOT IN display list
--- Validated: Display=12, Display by Ad Size=95 for CWU Jul 25–Jun 26 ✅
+-- Validated with client-scoped source data.
 -- ============================================================
 
 -- Part 1: Display products at ad_group level (v_kpi_ad_group)
@@ -226,7 +226,7 @@ SELECT
     SUM(video_100)                                          AS video_completions,
     CAST(NULL AS FLOAT64)                                   AS video_avg
 FROM `carnegie-dartlet-1528198422380.tinman.v_kpi_ad_group`
-WHERE client_name = 'Central Washington University'
+WHERE client_name = @client_name
     AND day >= '2024-01-01'
     AND product_name IN (
         'Display', 'IP Targeting', 'Audience Select',
@@ -273,7 +273,7 @@ SELECT
     SUM(video_100)                                          AS video_completions,
     AVG(video_avg)                                          AS video_avg
 FROM `carnegie-dartlet-1528198422380.tinman.v_kpi_creative`
-WHERE client_name = 'Central Washington University'
+WHERE client_name = @client_name
     AND day >= '2024-01-01'
 GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17
 ORDER BY product_name, day, impressions DESC;
@@ -303,7 +303,7 @@ SELECT
     SUM(cost)                                               AS cost,
     SUM(budget)                                             AS budget
 FROM `carnegie-dartlet-1528198422380.tinman.v_kpi_keyword`
-WHERE client_name = 'Central Washington University'
+WHERE client_name = @client_name
     AND day >= '2024-01-01'
 GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 ORDER BY day, impressions DESC;
@@ -348,7 +348,7 @@ SELECT
     SUM(video_100)                                          AS video_completions,
     AVG(video_avg)                                          AS video_avg
 FROM `carnegie-dartlet-1528198422380.tinman.v_kpi_creative`
-WHERE client_name = 'Central Washington University'
+WHERE client_name = @client_name
     AND day >= '2024-01-01'
     AND product_name IN ('YouTube', 'Youtube')
 GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
@@ -376,7 +376,7 @@ SELECT DISTINCT
     notes,
     created_by
 FROM `carnegie-dartlet-1528198422380.tinman.v_opnote`
-WHERE client_name = 'Central Washington University'
+WHERE client_name = @client_name
     AND day >= '2024-01-01'
     AND is_internal != '1'
 ORDER BY day DESC;

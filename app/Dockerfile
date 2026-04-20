@@ -6,9 +6,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app and data
+# Copy app and parameterized query templates only.
 COPY app/ ./app/
-COPY data/ ./data/
+COPY data/queries/ ./data/queries/
 
 EXPOSE 8080
 

@@ -6,7 +6,6 @@ No data is loaded at module import time — loading is triggered
 per session after sage_id resolution.
 
 This is the target pattern for the production multi-client app.
-The current app/data_loader.py (CWU-hardcoded) is not modified here.
 """
 
 import re
@@ -20,7 +19,7 @@ _QUERY_DIR = Path(__file__).parent.parent / "data" / "queries"
 BQ_PROJECT = "carnegie-roi-reports"
 _client = bigquery.Client(project=BQ_PROJECT)
 
-# Valid US state/territory 2-letter codes (copied from data_loader.py)
+# Valid US state/territory 2-letter codes.
 VALID_US_STATES = frozenset({
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
     "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
@@ -38,15 +37,15 @@ MONTH_LABELS = {1: "Jul", 2: "Aug", 3: "Sep", 4: "Oct", 5: "Nov", 6: "Dec",
 
 def _parameterize(sql: str, institution_name: str) -> tuple[str, bigquery.QueryJobConfig]:
     """
-    Replace the hardcoded institution name filter in a SQL query with a
-    BigQuery named parameter (@institution_name), and return the modified
-    SQL together with the job config carrying the parameter value.
+    Ensure institution filters use the BigQuery named parameter.
 
-    Handles both forms present in the queries:
-      WHERE i.name = 'Central Washington University'
-      WHERE institution_name = 'Central Washington University'
-      AND   institution_name = 'Central Washington University'
+    The source SQL files are expected to contain @institution_name directly,
+    but this helper also upgrades any quoted institution comparison left by
+    older query files.
     """
+    if not institution_name or not str(institution_name).strip():
+        raise ValueError("institution_name is required")
+
     # Replace any quoted string assigned to institution name comparisons
     parameterized = re.sub(
         r"((?:WHERE|AND)\s+(?:i\.name|institution_name)\s*=\s*)'[^']*'",
@@ -54,17 +53,29 @@ def _parameterize(sql: str, institution_name: str) -> tuple[str, bigquery.QueryJ
         sql,
         flags=re.IGNORECASE,
     )
-    # Also replace the hardcoded string literal used in SELECT for geo query
-    # e.g. 'Central Washington University' AS institution_name
+    # Also replace quoted literals used in SELECT projections.
     parameterized = re.sub(
-        r"'Central Washington University'\s+AS\s+institution_name",
+        r"'[^']*'\s+AS\s+institution_name",
         "@institution_name AS institution_name",
         parameterized,
         flags=re.IGNORECASE,
     )
+    if "@institution_name" not in parameterized:
+        raise ValueError("SQL is missing required @institution_name parameter")
+    if re.search(
+        r"\b(?:i\.name|institution_name)\s*=\s*'[^']+'",
+        parameterized,
+        flags=re.IGNORECASE,
+    ):
+        raise ValueError("SQL contains an unparameterized institution filter")
+
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
-            bigquery.ScalarQueryParameter("institution_name", "STRING", institution_name)
+            bigquery.ScalarQueryParameter(
+                "institution_name",
+                "STRING",
+                str(institution_name).strip(),
+            )
         ]
     )
     return parameterized, job_config
