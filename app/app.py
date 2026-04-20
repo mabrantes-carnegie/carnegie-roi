@@ -5,7 +5,7 @@ FILTER ARCHITECTURE
 
 GLOBAL FILTERS (affect all pages within their group):
 ------------------------------------------------------
-Funnel pages (ROI Overview, Program Breakdown, Lead Source, Funnel Geography):
+Funnel pages (Funnel Overview, Program Breakdown, Lead Source, Funnel Geography):
   - Period (funnel_month_start / funnel_month_end) — synced to geo_period & prog_period
   - Program (program_name_filter) — synced to geo_program
   - Student Type (student_type) — synced to geo_student_type
@@ -50,7 +50,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from shiny import App, ui
 
-from datetime import date
+import calendar
+import csv
+from datetime import date, datetime
 
 
 _DIG_TRENDING_METRIC_CHOICES = {
@@ -277,13 +279,13 @@ CAMPAIGN_METRIC_CHOICES = {
 }
 
 
-# --- Page 1: ROI Overview ---
+# --- Page 1: Funnel Overview ---
 
 page_overview = ui.nav_panel(
-    "ROI Overview",
+    "Funnel Overview",
     ui.tags.div(
         _page_context_note(
-            "ROI Overview",
+            "Funnel Overview",
             "How is overall enrollment marketing performing this academic year?",
             "AY 2025\u201326 vs. AY 2024\u201325",
         ),
@@ -463,12 +465,58 @@ PROGRAM_TREND_METRICS = {
 }
 
 
-# --- Shared date range and month helpers (used by Geography, Programs, Digital) ---
-# Default date range — server updates pickers reactively once session data loads.
+# --- Shared date range helpers (used by Funnel + Digital filters) ---
 
-from datetime import datetime
-_dig_min = datetime(2024, 1, 1)
-_dig_max = datetime.today()
+
+def _load_default_digital_bounds() -> tuple[date, date]:
+    """Read the bundled digital data bounds for first-render date defaults."""
+    fallback_min = date(2024, 1, 1)
+    fallback_max = date.today()
+    path = Path(__file__).parent.parent / "data" / "q8_digital_overview.csv"
+    if not path.exists():
+        return fallback_min, fallback_max
+
+    min_day: date | None = None
+    max_day: date | None = None
+    try:
+        with path.open(newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                raw = (row.get("day") or "").strip()
+                if not raw:
+                    continue
+                try:
+                    day = date.fromisoformat(raw[:10])
+                except ValueError:
+                    continue
+                min_day = day if min_day is None or day < min_day else min_day
+                max_day = day if max_day is None or day > max_day else max_day
+    except Exception:
+        return fallback_min, fallback_max
+
+    return min_day or fallback_min, max_day or fallback_max
+
+
+_dig_min_date, _dig_max_date = _load_default_digital_bounds()
+_dig_min = datetime.combine(_dig_min_date, datetime.min.time())
+_dig_max = datetime.combine(_dig_max_date, datetime.min.time())
+
+
+def _month_end(d: date) -> date:
+    return date(d.year, d.month, calendar.monthrange(d.year, d.month)[1])
+
+
+def _previous_full_month_range(anchor: date) -> tuple[date, date]:
+    month_start = date(anchor.year, anchor.month, 1)
+    if month_start.month == 1:
+        prev_start = date(month_start.year - 1, 12, 1)
+    else:
+        prev_start = date(month_start.year, month_start.month - 1, 1)
+    return prev_start, _month_end(prev_start)
+
+
+def _academic_year_range(anchor: date) -> tuple[date, date]:
+    start_year = anchor.year if anchor.month >= 7 else anchor.year - 1
+    return date(start_year, 7, 1), anchor
 
 
 def _month_options(min_dt, max_dt):
@@ -486,50 +534,166 @@ def _month_options(min_dt, max_dt):
     return opts
 
 
-def _funnel_filters():
-    """Shared inline filter bar for ROI + Funnel pages, plus hidden synced inputs."""
-    today = date.today()
-    data_max = _dig_max.date()
-    period_start = date(today.year - 1, 7, 1)
-    period_end = date(data_max.year, data_max.month, 1)
-    period_start_val = period_start.strftime("%Y-%m-%d")
-    period_end_val = period_end.strftime("%Y-%m-%d")
-    month_opts = _month_options(_dig_min.date(), _dig_max.date())
-
-    def _month_select(select_id, default_val):
-        options = [
-            ui.tags.option(label, value=val, selected=(val == default_val))
-            for val, label in month_opts
-        ]
-        return ui.tags.div(
-            ui.tags.select(
-                *options,
-                id=select_id,
-                class_="ios-month-select",
-                onchange=(
-                    "var s=document.getElementById('funnel_month_start').value;"
-                    "var e=document.getElementById('funnel_month_end').value;"
-                    "var ep=e.split('-'); var ey=+ep[0]; var em=+ep[1];"
-                    "var lastDay=new Date(ey, em, 0).getDate();"
-                    "var endStr=ep[0]+'-'+ep[1]+'-'+lastDay.toString().padStart(2,'0');"
-                    "Shiny.setInputValue('geo_period',[s, endStr],{priority:'event'});"
-                    "Shiny.setInputValue('prog_period',[s, endStr],{priority:'event'});"
-                ),
-            ),
-            class_="ios-month-wrap",
-        )
+def _date_range_filter(
+    filter_id: str,
+    start: date,
+    end: date,
+    min_date: date,
+    max_date: date,
+    target_inputs: list[str] | tuple[str, ...],
+):
+    """Custom daily range picker that updates hidden Shiny date-range inputs."""
+    start_iso = start.strftime("%Y-%m-%d")
+    end_iso = end.strftime("%Y-%m-%d")
+    min_iso = min_date.strftime("%Y-%m-%d")
+    max_iso = max_date.strftime("%Y-%m-%d")
+    targets = ",".join(target_inputs)
+    start_input = f"{filter_id}_month_start"
+    end_input = f"{filter_id}_month_end"
 
     return ui.tags.div(
-        # Month range picker — same structure as _digital_filters()
+        ui.tags.input(type="hidden", id=start_input, value=start_iso),
+        ui.tags.input(type="hidden", id=end_input, value=end_iso),
         ui.tags.div(
-            ui.tags.span("Period", class_="ios-month-label"),
             ui.tags.div(
-                _month_select("funnel_month_start", period_start_val),
-                ui.tags.span("\u2192", class_="ios-month-sep"),
-                _month_select("funnel_month_end", period_end_val),
-                class_="ios-month-row",
+                ui.tags.div(
+                    ui.tags.span("Period", class_="drf-label"),
+                    ui.tags.span("", class_="drf-badge", **{"data-role": "badge"}),
+                    class_="drf-label-row",
+                ),
+                ui.tags.button(
+                    ui.tags.span(
+                        ui.HTML(
+                            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" '
+                            'xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+                            '<rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" stroke-width="2"/>'
+                            '<path d="M8 3v4M16 3v4M3 10h18" stroke="currentColor" stroke-width="2" '
+                            'stroke-linecap="round"/></svg>'
+                        ),
+                        class_="drf-icon",
+                    ),
+                    ui.tags.div(
+                        ui.tags.p("Select date", class_="drf-date-text", **{"data-role": "from-text"}),
+                        class_="drf-text",
+                    ),
+                    type="button",
+                    class_="drf-datebox",
+                    **{"data-field": "from", "aria-label": "Start date"},
+                ),
+                class_="drf-col",
             ),
-            class_="inline-filter ios-month-filter",
+            ui.tags.div(
+                ui.HTML(
+                    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" '
+                    'xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+                    '<path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2.5" '
+                    'stroke-linecap="round" stroke-linejoin="round"/></svg>'
+                ),
+                class_="drf-arrow",
+            ),
+            ui.tags.div(
+                ui.tags.button(
+                    ui.tags.span(
+                        ui.HTML(
+                            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" '
+                            'xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+                            '<rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" stroke-width="2"/>'
+                            '<path d="M8 3v4M16 3v4M3 10h18" stroke="currentColor" stroke-width="2" '
+                            'stroke-linecap="round"/></svg>'
+                        ),
+                        class_="drf-icon",
+                    ),
+                    ui.tags.div(
+                        ui.tags.p("Select date", class_="drf-date-text", **{"data-role": "to-text"}),
+                        class_="drf-text",
+                    ),
+                    type="button",
+                    class_="drf-datebox",
+                    **{"data-field": "to", "aria-label": "End date"},
+                ),
+                class_="drf-col",
+            ),
+            class_="drf-input-row",
+        ),
+        ui.tags.div(
+            ui.tags.div(
+                ui.tags.button("From", type="button", class_="drf-pill", **{"data-pill": "from"}),
+                ui.tags.button("To", type="button", class_="drf-pill", **{"data-pill": "to"}),
+                ui.tags.span("Select a start date, then an end date", class_="drf-hint"),
+                class_="drf-header",
+            ),
+            ui.tags.div(
+                ui.tags.div(
+                    ui.tags.button(
+                        ui.HTML(
+                            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" '
+                            'xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+                            '<path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" '
+                            'stroke-linecap="round" stroke-linejoin="round"/></svg>'
+                        ),
+                        type="button",
+                        class_="drf-nav-btn",
+                        **{"data-nav": "prev", "aria-label": "Previous month"},
+                    ),
+                    ui.tags.span("", class_="drf-month-label", **{"data-role": "month-label"}),
+                    ui.tags.button(
+                        ui.HTML(
+                            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" '
+                            'xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+                            '<path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.5" '
+                            'stroke-linecap="round" stroke-linejoin="round"/></svg>'
+                        ),
+                        type="button",
+                        class_="drf-nav-btn",
+                        **{"data-nav": "next", "aria-label": "Next month"},
+                    ),
+                    class_="drf-month-nav",
+                ),
+                ui.tags.div(
+                    *[ui.tags.div(day, class_="drf-weekday") for day in ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]],
+                    class_="drf-weekdays",
+                ),
+                ui.tags.div(class_="drf-days", **{"data-role": "days"}),
+                class_="drf-calendar",
+            ),
+            ui.tags.div(
+                ui.tags.button("Cancel", type="button", class_="drf-cancel", **{"data-action": "cancel"}),
+                ui.tags.button("Apply", type="button", class_="drf-apply", **{"data-action": "apply"}),
+                class_="drf-footer",
+            ),
+            class_="drf-dropdown",
+            **{"data-role": "dropdown"},
+        ),
+        class_="date-range-filter",
+        **{
+            "data-filter-id": filter_id,
+            "data-start-input": start_input,
+            "data-end-input": end_input,
+            "data-target-inputs": targets,
+            "data-start": start_iso,
+            "data-end": end_iso,
+            "data-min": min_iso,
+            "data-max": max_iso,
+        },
+    )
+
+
+def _funnel_filters():
+    """Shared inline filter bar for ROI + Funnel pages, plus hidden synced inputs."""
+    period_start, period_end = _academic_year_range(_dig_max.date())
+
+    return ui.tags.div(
+        # Daily range picker
+        ui.tags.div(
+            _date_range_filter(
+                "funnel",
+                period_start,
+                period_end,
+                _dig_min.date(),
+                _dig_max.date(),
+                ("geo_period", "prog_period"),
+            ),
+            class_="inline-filter",
         ),
         ui.tags.div(
             ui.input_selectize(
@@ -557,6 +721,18 @@ def _funnel_filters():
                 options={"placeholder": "All"},
             ),
             class_="inline-filter",
+        ),
+        ui.tags.div(
+            ui.tags.button(
+                "Share Filtered View",
+                id="funnel-copy-link-btn",
+                class_="pill-dropdown-btn",
+                style="font-size:11px;padding:4px 10px;margin-top:18px;",
+                onclick="window._copyFilteredLink(this)",
+                title="Copy a shareable link for the current dashboard view and filters",
+            ),
+            class_="inline-filter",
+            style="align-self:flex-end;",
         ),
         # Hidden inputs needed by server logic
         ui.tags.div(
@@ -669,14 +845,15 @@ def _geo_filters():
 
     return ui.tags.div(
         ui.tags.div(
-            ui.tags.span("Period", class_="ios-month-label"),
-            ui.tags.div(
-                _month_select("geo_month_start", geo_start_val),
-                ui.tags.span("→", class_="ios-month-sep"),
-                _month_select("geo_month_end", geo_end_val),
-                class_="ios-month-row",
+            _date_range_filter(
+                "geo",
+                geo_start,
+                geo_end,
+                _dig_min.date(),
+                _dig_max.date(),
+                ("geo_period",),
             ),
-            class_="inline-filter ios-month-filter",
+            class_="inline-filter",
         ),
         ui.tags.div(
             ui.input_selectize(
@@ -810,7 +987,7 @@ def _programs_filters():
             ui.tags.span("Period", class_="ios-month-label"),
             ui.tags.div(
                 _month_select("prog_month_start", prog_start_val),
-                ui.tags.span("→", class_="ios-month-sep"),
+                ui.tags.span("\u2192", class_="ios-month-sep"),
                 _month_select("prog_month_end", prog_end_val),
                 class_="ios-month-row",
             ),
@@ -899,63 +1076,21 @@ page_programs = ui.nav_panel(
 
 def _digital_filters():
     """Shared filter bar for digital performance page."""
-    import calendar
-    # Default: previous month (one month before latest available data month).
-    data_max = _dig_max.date()
-    latest_month_start = date(data_max.year, data_max.month, 1)
-    # Shift back one month for the default
-    if latest_month_start.month == 1:
-        default_month_start = date(latest_month_start.year - 1, 12, 1)
-    else:
-        default_month_start = date(latest_month_start.year, latest_month_start.month - 1, 1)
-    default_month_end_day = calendar.monthrange(default_month_start.year, default_month_start.month)[1]
-    default_month_end = date(default_month_start.year, default_month_start.month, default_month_end_day)
-    prev_month_start = default_month_start
-    # month_opts uses "%Y-%m-%d" (first day of month) as values
-    prev_month_val = default_month_start.strftime("%Y-%m-%d")
-    prev_month_end = default_month_end
-    # End dropdown uses first-of-month value; JS converts to last day on the fly
-    default_end_val = default_month_start.strftime("%Y-%m-%d")
-
-    month_opts = _month_options(_dig_min.date(), _dig_max.date())
-
-    def _month_select(select_id, default_val):
-        options = [
-            ui.tags.option(
-                label,
-                value=val,
-                selected=(val == default_val),
-            )
-            for val, label in month_opts
-        ]
-        return ui.tags.div(
-            ui.tags.select(
-                *options,
-                id=select_id,
-                class_="ios-month-select",
-                onchange=(
-                    "var s=document.getElementById('dig_month_start').value;"
-                    "var e=document.getElementById('dig_month_end').value;"
-                    "var ep=e.split('-'); var ey=+ep[0]; var em=+ep[1];"
-                    "var lastDay=new Date(ey, em, 0).getDate();"
-                    "var endStr=ep[0]+'-'+ep[1]+'-'+lastDay.toString().padStart(2,'0');"
-                    "Shiny.setInputValue('dig_period',[s, endStr],{priority:'event'});"
-                ),
-            ),
-            class_="ios-month-wrap",
-        )
+    # Default: previous full month relative to the latest available data day.
+    prev_month_start, prev_month_end = _previous_full_month_range(_dig_max.date())
 
     return ui.tags.div(
-        # Month range picker
+        # Daily range picker
         ui.tags.div(
-            ui.tags.span("Period", class_="ios-month-label"),
-            ui.tags.div(
-                _month_select("dig_month_start", prev_month_val),
-                ui.tags.span("→", class_="ios-month-sep"),
-                _month_select("dig_month_end", default_end_val),
-                class_="ios-month-row",
+            _date_range_filter(
+                "dig",
+                prev_month_start,
+                prev_month_end,
+                _dig_min.date(),
+                _dig_max.date(),
+                ("dig_period",),
             ),
-            class_="inline-filter ios-month-filter",
+            class_="inline-filter",
         ),
         ui.tags.div(
             ui.input_selectize(
@@ -1011,7 +1146,7 @@ def _digital_filters():
                 id="copy-link-btn",
                 class_="pill-dropdown-btn",
                 style="font-size:11px;padding:4px 10px;margin-top:18px;",
-                onclick="window._copyFilteredLink()",
+                onclick="window._copyFilteredLink(this)",
                 title="Copy a shareable link for the current dashboard view and filters",
             ),
             class_="inline-filter",
@@ -1209,55 +1344,54 @@ _dig_overview_yoy_content = ui.tags.div(
     ),
     ui.tags.div(
         ui.tags.div(
+            ui.tags.span("Trending Performance (YoY)", class_="card-heading"),
             ui.tags.div(
-                ui.tags.span("Trending Performance (YoY)", class_="card-heading"),
                 ui.tags.div(
-                    ui.tags.div(
-                        _metric_chip_picker(
-                            "dig_trending_metric_yoy",
-                            _DIG_TRENDING_METRIC_CHOICES,
-                            ["clicks"],
-                        ),
-                        class_="metric-chip-picker-wrap",
-                        style="flex:1 1 520px;min-width:280px;",
+                    _metric_chip_picker(
+                        "dig_trending_metric_yoy",
+                        _DIG_TRENDING_METRIC_CHOICES,
+                        ["clicks"],
                     ),
-                    ui.tags.div(
-                        ui.input_radio_buttons(
-                            "dig_trending_granularity_yoy", None,
-                            choices={
-                                "daily": "Daily",
-                                "weekly": "Weekly",
-                                "monthly": "Monthly",
-                            },
-                            selected="monthly",
-                            inline=True,
-                        ),
-                        class_="pill-toggle pill-toggle--secondary",
-                    ),
-                    class_="toggle-group",
+                    class_="metric-chip-picker-wrap",
+                    style="flex:1 1 520px;min-width:280px;",
                 ),
-                class_="card-header-row",
+                ui.tags.div(
+                    ui.input_radio_buttons(
+                        "dig_trending_granularity_yoy", None,
+                        choices={
+                            "daily": "Daily",
+                            "weekly": "Weekly",
+                            "monthly": "Monthly",
+                        },
+                        selected="monthly",
+                        inline=True,
+                    ),
+                    class_="pill-toggle pill-toggle--secondary",
+                ),
+                class_="toggle-group",
             ),
-            ui.output_ui("dig_trending_chart_yoy"),
-            class_="chart-card",
-            style="flex:3;",
+            class_="card-header-row",
         ),
+        ui.output_ui("dig_trending_chart_yoy"),
+        class_="chart-card",
+    ),
+    ui.tags.div(
         ui.tags.div(
-            ui.tags.span("Engagement & Spend", class_="card-heading"),
-            ui.tags.div(
-                _dig_metric_card("Direct Key Actions", "direct_conv_yoy"),
-                _dig_metric_card("Cost per Direct Key Act.", "cpdc_yoy"),
-                _dig_metric_card("In-Platform Leads", "ipl_yoy"),
-                _dig_metric_card("Cost per In-Plat. Lead", "cpipl_yoy"),
-                _dig_metric_card("View-through Act.", "vtc_yoy"),
-                _dig_metric_card("Cost per View-through Act.", "cpvtc_yoy"),
-                class_="dig-metric-grid",
-                style="grid-template-columns:repeat(2, 1fr);grid-template-rows:repeat(3, auto);",
-            ),
-            class_="chart-card",
-            style="flex:2;",
+            ui.tags.span("Strategy Trend", class_="card-heading"),
+            _pill_dropdown("dig_strategy_trend_metric_yoy", {
+                "total_interactions": "Total Actions",
+                "clicks": "Clicks",
+                "ctr": "CTR",
+                "direct_conversions": "Direct Actions",
+                "view_through_conversions": "View-through Actions",
+                "in_platform_leads": "In-Platform Leads",
+                "budget": "Budget",
+                "cost_per_total_interaction": "Cost Per Total Action",
+            }, "total_interactions"),
+            class_="card-header-row",
         ),
-        class_="main-content-row",
+        ui.output_ui("dig_strategy_trend_yoy"),
+        class_="chart-card",
     ),
     ui.tags.div(
         ui.tags.div(
@@ -1275,28 +1409,23 @@ _dig_overview_yoy_content = ui.tags.div(
             ),
             ui.output_ui("dig_strategy_bar_yoy"),
             class_="chart-card",
-            style="flex:1;",
         ),
         ui.tags.div(
+            ui.tags.span("Engagement & Spend", class_="card-heading"),
             ui.tags.div(
-                ui.tags.span("Strategy Trend", class_="card-heading"),
-                _pill_dropdown("dig_strategy_trend_metric_yoy", {
-                    "total_interactions": "Total Actions",
-                    "clicks": "Clicks",
-                    "ctr": "CTR",
-                    "direct_conversions": "Direct Actions",
-                    "view_through_conversions": "View-through Actions",
-                    "in_platform_leads": "In-Platform Leads",
-                    "budget": "Budget",
-                    "cost_per_total_interaction": "Cost Per Total Action",
-                }, "total_interactions"),
-                class_="card-header-row",
+                _dig_metric_card("Direct Key Actions", "direct_conv_yoy"),
+                _dig_metric_card("Cost per Direct Key Act.", "cpdc_yoy"),
+                _dig_metric_card("In-Platform Leads", "ipl_yoy"),
+                _dig_metric_card("Cost per In-Plat. Lead", "cpipl_yoy"),
+                _dig_metric_card("View-through Act.", "vtc_yoy"),
+                _dig_metric_card("Cost per View-through Act.", "cpvtc_yoy"),
+                class_="dig-metric-grid",
+                style="grid-template-columns:repeat(2, 1fr);grid-template-rows:repeat(3, auto);",
             ),
-            ui.output_ui("dig_strategy_trend_yoy"),
             class_="chart-card",
-            style="flex:1;",
         ),
         class_="main-content-row",
+        style="grid-template-columns: 58fr 42fr;",
     ),
     ui.tags.h2("Performance By Subgroup", class_="section-heading"),
     ui.tags.div(
@@ -1779,9 +1908,12 @@ navbar_title = ui.tags.div(
 # JS that reads filter params from URL on page load and provides a copy-link fn
 _url_state_js = ui.tags.script("""
 (function() {
+  var DIG_TABS = ['Overview','Overview YoY','Actions','dig_geography','Creative','Insights','Media Plan'];
+  var FUNNEL_TABS = ['Funnel Overview','ROI Overview','Program Breakdown','Lead Source','Funnel Geography'];
   var MULTI_KEYS = [
     'dig_group', 'dig_subgroup', 'dig_product', 'dig_campaign',
-    'dig_interaction_cat', 'dig_conversion_name'
+    'dig_interaction_cat', 'dig_conversion_name',
+    'program_name_filter', 'student_type', 'source_filter'
   ];
   var RADIO_KEYS = ['crv_sub', 'insights_view'];
 
@@ -1827,23 +1959,44 @@ _url_state_js = ui.tags.script("""
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  function _lastDayOfMonthIso(value) {
+    var ep = value ? value.split('-') : [];
+    if (ep.length !== 3) return value;
+    var lastDay = new Date(+ep[0], +ep[1], 0).getDate();
+    return ep[0] + '-' + ep[1] + '-' + String(lastDay).padStart(2, '0');
+  }
+
+  function _normalizeSharedEnd(value) {
+    if (!value) return value;
+    var ep = value.split('-');
+    if (ep.length === 3 && ep[2] === '01') return _lastDayOfMonthIso(value);
+    return value;
+  }
+
   function _setMonthRange(startVal, endVal, attempts) {
     if (!startVal && !endVal) return;
-    var startEl = document.getElementById('dig_month_start');
-    var endEl = document.getElementById('dig_month_end');
-    if (!startEl || !endEl) {
+    if (!window._setDateRangeFilter) {
       if (attempts > 0) setTimeout(function() { _setMonthRange(startVal, endVal, attempts - 1); }, 250);
       return;
     }
-    if (startVal) startEl.value = startVal;
-    if (endVal) endEl.value = endVal;
-    var rawEnd = endVal || endEl.value;
-    var ep = rawEnd ? rawEnd.split('-') : [];
-    if (ep.length === 3) {
-      var lastDay = new Date(+ep[0], +ep[1], 0).getDate();
-      var endStr = ep[0] + '-' + ep[1] + '-' + String(lastDay).padStart(2, '0');
-      Shiny.setInputValue('dig_period', [startVal || startEl.value, endStr], {priority:'event'});
+    var startEl = document.getElementById('dig_month_start');
+    var endEl = document.getElementById('dig_month_end');
+    var startStr = startVal || (startEl ? startEl.value : null);
+    var endStr = _normalizeSharedEnd(endVal || (endEl ? endEl.value : null));
+    window._setDateRangeFilter('dig', startStr, endStr, true);
+  }
+
+  function _setFunnelMonthRange(startVal, endVal, attempts) {
+    if (!startVal && !endVal) return;
+    if (!window._setDateRangeFilter) {
+      if (attempts > 0) setTimeout(function() { _setFunnelMonthRange(startVal, endVal, attempts - 1); }, 250);
+      return;
     }
+    var startEl = document.getElementById('funnel_month_start');
+    var endEl = document.getElementById('funnel_month_end');
+    var startStr = startVal || (startEl ? startEl.value : null);
+    var endStr = _normalizeSharedEnd(endVal || (endEl ? endEl.value : null));
+    window._setDateRangeFilter('funnel', startStr, endStr, true);
   }
 
   function _activateTab(tabValue, attempts) {
@@ -1859,6 +2012,7 @@ _url_state_js = ui.tags.script("""
   function _applyFilterState() {
     var params = _getParams();
     _setMonthRange(params.get('dig_month_start'), params.get('dig_month_end'), 20);
+    _setFunnelMonthRange(params.get('funnel_month_start'), params.get('funnel_month_end'), 20);
 
     MULTI_KEYS.forEach(function(key) {
       var vals = _getMultiParam(params, key);
@@ -1874,6 +2028,7 @@ _url_state_js = ui.tags.script("""
   function _applyUrlState() {
     var params = _getParams();
     var tab = params.get('tab');
+    if (tab === 'ROI Overview') tab = 'Funnel Overview';
     if (tab) _activateTab(tab, 20);
     setTimeout(_applyFilterState, 500);
   }
@@ -1883,11 +2038,13 @@ _url_state_js = ui.tags.script("""
   }
 
   window._copyFilteredLink = function() {
+    var clickedBtn = arguments.length ? arguments[0] : null;
     var url = new URL(window.location.href);
     [
       'dig_month_start', 'dig_month_end', 'dig_group', 'dig_subgroup', 'dig_product',
       'dig_campaign', 'dig_interaction_cat', 'dig_conversion_name', 'tab', 'crv_sub',
-      'insights_view'
+      'insights_view', 'funnel_month_start', 'funnel_month_end', 'program_name_filter',
+      'student_type', 'source_filter'
     ].forEach(function(key) {
       url.searchParams.delete(key);
     });
@@ -1916,30 +2073,44 @@ _url_state_js = ui.tags.script("""
       });
     }
 
-    var ms = _getVal('dig_month_start');
-    var me = _getVal('dig_month_end');
-    if (ms) url.searchParams.set('dig_month_start', ms);
-    if (me) url.searchParams.set('dig_month_end', me);
-
-    _appendMulti('dig_group', 'dig_group');
-    _appendMulti('dig_subgroup', 'dig_subgroup');
-    _appendMulti('dig_product', 'dig_product');
-    _appendMulti('dig_campaign', 'dig_campaign');
-    _appendMulti('dig_interaction_cat', 'dig_interaction_cat');
-    _appendMulti('dig_conversion_name', 'dig_conversion_name');
-
+    var nav = null;
     try {
-      var nav = Shiny.shinyapp.$inputValues['nav'];
+      nav = Shiny.shinyapp.$inputValues['nav'];
       if (nav) url.searchParams.set('tab', nav);
     } catch(e) {}
 
-    var crvSub = document.querySelector('input[name=\"crv_sub\"]:checked');
-    if (crvSub && crvSub.value) url.searchParams.set('crv_sub', crvSub.value);
-    var insightsView = document.querySelector('input[name=\"insights_view\"]:checked');
-    if (insightsView && insightsView.value) url.searchParams.set('insights_view', insightsView.value);
+    if (!nav || DIG_TABS.indexOf(nav) !== -1) {
+      var ms = _getVal('dig_month_start');
+      var me = _getVal('dig_month_end');
+      if (ms) url.searchParams.set('dig_month_start', ms);
+      if (me) url.searchParams.set('dig_month_end', me);
+
+      _appendMulti('dig_group', 'dig_group');
+      _appendMulti('dig_subgroup', 'dig_subgroup');
+      _appendMulti('dig_product', 'dig_product');
+      _appendMulti('dig_campaign', 'dig_campaign');
+      _appendMulti('dig_interaction_cat', 'dig_interaction_cat');
+      _appendMulti('dig_conversion_name', 'dig_conversion_name');
+
+      var crvSub = document.querySelector('input[name=\"crv_sub\"]:checked');
+      if (crvSub && crvSub.value) url.searchParams.set('crv_sub', crvSub.value);
+      var insightsView = document.querySelector('input[name=\"insights_view\"]:checked');
+      if (insightsView && insightsView.value) url.searchParams.set('insights_view', insightsView.value);
+    }
+
+    if (nav && FUNNEL_TABS.indexOf(nav) !== -1) {
+      var fms = _getVal('funnel_month_start');
+      var fme = _getVal('funnel_month_end');
+      if (fms) url.searchParams.set('funnel_month_start', fms);
+      if (fme) url.searchParams.set('funnel_month_end', fme);
+
+      _appendMulti('program_name_filter', 'program_name_filter');
+      _appendMulti('student_type', 'student_type');
+      _appendMulti('source_filter', 'source_filter');
+    }
 
     navigator.clipboard.writeText(url.toString()).then(function() {
-      var btn = document.getElementById('copy-link-btn');
+      var btn = clickedBtn || document.getElementById('copy-link-btn') || document.getElementById('funnel-copy-link-btn');
       if (btn) {
         btn.textContent = 'Link Copied';
         setTimeout(function(){ btn.textContent = 'Share Filtered View'; }, 2000);
@@ -1962,11 +2133,12 @@ app_ui = ui.page_navbar(
     header=[
         ui.output_ui("session_error"),
         ui.head_content(
-            ui.tags.link(rel="stylesheet", href="styles.css?v=45"),
+            ui.tags.link(rel="stylesheet", href="styles.css?v=48"),
             ui.tags.script(src="https://cdn.plot.ly/plotly-3.4.0.min.js"),
             ui.tags.script(src="sortable-tables.js"),
             ui.tags.script(src="paginated-tables.js?v=2"),
             ui.tags.script(src="metric-chip-picker.js?v=1"),
+            ui.tags.script(src="date-range-filter.js?v=2"),
             ui.tags.script(
                 "document.addEventListener('click',function(){"
                 "document.querySelectorAll('.pill-dropdown-menu').forEach(function(m){"
@@ -1977,15 +2149,17 @@ app_ui = ui.page_navbar(
             ui.tags.script("""
 (function() {
   var DIG_TABS  = ['Overview','Overview YoY','Actions','dig_geography','Creative','Insights','Media Plan'];
-  var FUNNEL_TABS = ['ROI Overview','Program Breakdown','Lead Source','Funnel Geography'];
+  var FUNNEL_TABS = ['Funnel Overview','Program Breakdown','Lead Source','Funnel Geography'];
   // Tabs that default to academic-year start → current month
-  var ACAD_TABS = ['Overview YoY', 'dig_geography', 'Creative'];
+  var ACAD_TABS = ['Overview YoY', 'dig_geography', 'Creative', 'Insights', 'Media Plan'];
 
   // Helper: get the last available month option value from the end dropdown
   // (this is the latest month with data, e.g. "2026-03-01")
-  function _lastDataMonth() {
+  function _lastDataDate() {
+    var picker = document.querySelector('.date-range-filter[data-filter-id="dig"]');
+    if (picker && picker.dataset.max) return picker.dataset.max;
     var me = document.getElementById('dig_month_end');
-    if (me && me.options.length > 0) return me.options[me.options.length - 1].value;
+    if (me && me.value) return me.value;
     return null;
   }
 
@@ -1999,7 +2173,7 @@ app_ui = ui.page_navbar(
   // Data-month range: previous month relative to last available data month
   // Used for Overview & Actions (current/open month should not be default)
   function _dataMonthRange() {
-    var sel = _lastDataMonth();
+    var sel = _lastDataDate();
     if (!sel) return null;
     var p = sel.split('-'); var y = +p[0]; var m = +p[1];
     // Go back one month
@@ -2011,18 +2185,18 @@ app_ui = ui.page_navbar(
   // Academic-year range: Jul of current AY → last data month
   // Used for Overview YoY, Geography, Creative
   function _acadRange() {
-    var sel = _lastDataMonth();
+    var sel = _lastDataDate();
     if (!sel) return null;
     var p = sel.split('-'); var ey = +p[0]; var em = +p[1]; // 1-based month
     var ayStartYear = (em >= 7) ? ey : ey - 1;
     var startStr = ayStartYear + '-07-01';
-    return {start: startStr, end: _lastDayOf(sel), startSel: startStr, endSel: sel};
+    return {start: startStr, end: sel};
   }
 
   // Insights default: Jul of current AY → last data month (if AY 2025-26),
   // or Jul AY-start → Jun AY-end for subsequent academic years.
   function _insightsAcadRange() {
-    var sel = _lastDataMonth();
+    var sel = _lastDataDate();
     if (!sel) return null;
     var p = sel.split('-'); var ey = +p[0]; var em = +p[1]; // 1-based month
     var ayStartYear = (em >= 7) ? ey : ey - 1;
@@ -2039,15 +2213,13 @@ app_ui = ui.page_navbar(
     return {start: startStr, end: endStr, startSel: startStr, endSel: endSel};
   }
 
-  function _setDigPeriod(startStr, endStr, startSel, endSel) {
-    // Update the visible month dropdowns IMMEDIATELY (prevents flash)
-    var ms = document.getElementById('dig_month_start');
-    var me = document.getElementById('dig_month_end');
-    if (ms) ms.value = startSel;
-    if (me) me.value = endSel;
-    // Defer Shiny input update to next tick
+  function _setDigPeriod(startStr, endStr) {
     setTimeout(function() {
-      Shiny.setInputValue('dig_period', [startStr, endStr], {priority:'event'});
+      if (window._setDateRangeFilter) {
+        window._setDateRangeFilter('dig', startStr, endStr, true);
+      } else if (window.Shiny && Shiny.setInputValue) {
+        Shiny.setInputValue('dig_period', [startStr, endStr], {priority:'event'});
+      }
     }, 50);
   }
 
@@ -2074,15 +2246,15 @@ app_ui = ui.page_navbar(
     if (ACAD_TABS.indexOf(tabVal) !== -1) {
       // → Overview YoY / Geography / Creative: AY start → last data month
       r = _acadRange();
-      if (r) _setDigPeriod(r.start, r.end, r.startSel, r.endSel);
+      if (r) _setDigPeriod(r.start, r.end);
     } else if (tabVal === 'Insights') {
       // → Insights: own academic-year rule
       r = _insightsAcadRange();
-      if (r) _setDigPeriod(r.start, r.end, r.startSel, r.endSel);
+      if (r) _setDigPeriod(r.start, r.end);
     } else if (tabVal === 'Overview' || tabVal === 'Actions') {
       // → Overview / Actions: always reset to last data month
       r = _dataMonthRange();
-      if (r) _setDigPeriod(r.start, r.end, r.startSel, r.endSel);
+      if (r) _setDigPeriod(r.start, r.end);
     }
     _prevTab = tabVal;
   }
@@ -2095,8 +2267,8 @@ app_ui = ui.page_navbar(
     try {
       var val = Shiny.shinyapp.$inputValues ? Shiny.shinyapp.$inputValues['nav'] : '';
       val = val || '';
-      _showHideBar(val);
-      _prevTab = val;
+      _prevTab = '';
+      updateDigFilters(val);
     } catch(err) {}
   });
 })();
