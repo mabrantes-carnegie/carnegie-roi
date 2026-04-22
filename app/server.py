@@ -237,7 +237,7 @@ def server_logic(input, output, session):
 
     # â”€â”€ Session-scoped data (loaded once per session per institution) â”€â”€
 
-    def _load_required_frame(dataset: str, loader):
+    def _load_required_frame(dataset: str, loader, *, allow_empty: bool = False):
         name = _institution_name()
         req(name is not None)
         try:
@@ -255,7 +255,28 @@ def server_logic(input, output, session):
                 f"We couldn't load {dataset} for your account. "
                 "Please contact your Carnegie account team.",
             )
-        if df is None or df.empty:
+        if df is None:
+            _log.warning(
+                "client_data_missing sage_id=%s institution=%s dataset=%s",
+                _sage_id(),
+                name,
+                dataset,
+            )
+            _stop_for_client_data(
+                dataset,
+                "No dashboard data",
+                f"No {dataset} is available for your account.",
+            )
+        if df.empty:
+            if allow_empty:
+                _log.info(
+                    "client_data_empty_optional sage_id=%s institution=%s dataset=%s",
+                    _sage_id(),
+                    name,
+                    dataset,
+                )
+                _clear_client_data_error(dataset)
+                return df
             _log.warning(
                 "client_data_empty sage_id=%s institution=%s dataset=%s",
                 _sage_id(),
@@ -276,39 +297,39 @@ def server_logic(input, output, session):
 
     @reactive.calc
     def _session_q2():
-        return _load_required_frame("campaign cost data", load_q2)
+        return _load_required_frame("campaign cost data", load_q2, allow_empty=True)
 
     @reactive.calc
     def _session_q3():
-        return _load_required_frame("geography data", load_q3)
+        return _load_required_frame("geography data", load_q3, allow_empty=True)
 
     @reactive.calc
     def _session_q8():
-        return _load_required_frame("digital overview data", load_q8)
+        return _load_required_frame("digital overview data", load_q8, allow_empty=True)
 
     @reactive.calc
     def _session_q9():
-        return _load_required_frame("digital action data", load_q9)
+        return _load_required_frame("digital action data", load_q9, allow_empty=True)
 
     @reactive.calc
     def _session_q10():
-        return _load_required_frame("digital geography data", load_q10)
+        return _load_required_frame("digital geography data", load_q10, allow_empty=True)
 
     @reactive.calc
     def _session_q11_creative():
-        return _load_required_frame("digital creative data", load_q11_creative)
+        return _load_required_frame("digital creative data", load_q11_creative, allow_empty=True)
 
     @reactive.calc
     def _session_q11_keywords():
-        return _load_required_frame("digital keyword data", load_q11_keywords)
+        return _load_required_frame("digital keyword data", load_q11_keywords, allow_empty=True)
 
     @reactive.calc
     def _session_q11_youtube():
-        return _load_required_frame("YouTube creative data", load_q11_youtube)
+        return _load_required_frame("YouTube creative data", load_q11_youtube, allow_empty=True)
 
     @reactive.calc
     def _session_q12():
-        return _load_required_frame("digital insights data", load_q12)
+        return _load_required_frame("digital insights data", load_q12, allow_empty=True)
 
     # Update institution select to match resolved institution_name
     @reactive.effect
@@ -320,7 +341,7 @@ def server_logic(input, output, session):
     @render.ui
     def navbar_title():
         name = _institution_name()
-        label = f"ROI Report â€” {name}" if name else "ROI Report"
+        label = f"ROI Report - {name}" if name else "ROI Report"
         return ui.tags.span(label, class_="navbar-title-text")
 
     # Update term_year choices from session Q6 + Q2
