@@ -11,3 +11,10 @@ resource "google_project_iam_member" "cloud_run_sa_bq_job_user" {
   role    = "roles/bigquery.jobUser"
   member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
+
+# Required for BigQuery Storage API (faster to_dataframe via gRPC).
+resource "google_project_iam_member" "cloud_run_sa_bq_read_session" {
+  project = var.project_id
+  role    = "roles/bigquery.readSessionUser"
+  member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
