@@ -6,9 +6,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app and parameterized query templates only.
+# Copy app, parameterized query templates, and CSV exports for the stakeholder
+# test build.
 COPY app/ ./app/
 COPY data/queries/ ./data/queries/
+COPY data/*.csv ./data/
 
 EXPOSE 8080
 

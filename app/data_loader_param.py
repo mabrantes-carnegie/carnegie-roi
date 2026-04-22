@@ -1,38 +1,17 @@
-"""
-Parameterized data loader for client-specific BigQuery queries.
+"""CSV-backed data loaders for local client-specific testing."""
 
-All functions accept institution_name as an explicit argument.
-No data is loaded at module import time — loading is triggered
-per session after sage_id resolution.
+from __future__ import annotations
 
-This is the target pattern for the production multi-client app.
-"""
-
-import re
-import threading
 from datetime import date
-from pathlib import Path
+
 import pandas as pd
-from cachetools import TTLCache
-from google.cloud import bigquery
 
-_QUERY_DIR = Path(__file__).parent.parent / "data" / "queries"
+from local_config import get_data_dir
 
-BQ_PROJECT = "carnegie-roi-reports"
-_client = bigquery.Client(project=BQ_PROJECT)
 
-# Process-local TTL cache for BigQuery results, keyed by (sql_file, institution_name).
-# Each Cloud Run instance holds its own cache; entries expire after ttl seconds.
-# Sized in bytes (deep memory usage) to protect the container's memory ceiling.
-_CACHE_MAX_BYTES = 512 * 1024 * 1024  # 512 MB
+_DATA_DIR = get_data_dir()
 
-def _df_bytes(df: pd.DataFrame) -> int:
-    return int(df.memory_usage(deep=True).sum())
-
-_cache: TTLCache = TTLCache(maxsize=_CACHE_MAX_BYTES, ttl=3600, getsizeof=_df_bytes)
-_cache_lock = threading.Lock()
-
-# Valid US state/territory 2-letter codes.
+# Valid US state/territory 2-letter codes
 VALID_US_STATES = frozenset({
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
     "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
@@ -48,76 +27,16 @@ MONTH_LABELS = {1: "Jul", 2: "Aug", 3: "Sep", 4: "Oct", 5: "Nov", 6: "Dec",
                 7: "Jan", 8: "Feb", 9: "Mar", 10: "Apr", 11: "May", 12: "Jun"}
 
 
-def _parameterize(sql: str, institution_name: str) -> tuple[str, bigquery.QueryJobConfig]:
-    """
-    Ensure institution filters use the BigQuery named parameter.
+def _read_csv(csv_name: str, **kwargs) -> pd.DataFrame:
+    path = _DATA_DIR / csv_name
+    if not path.exists():
+        raise FileNotFoundError(f"Local CSV not found: {path}")
+    return pd.read_csv(path, **kwargs)
 
-    The source SQL files are expected to contain @institution_name directly,
-    but this helper also upgrades any quoted institution comparison left by
-    older query files.
-    """
-    if not institution_name or not str(institution_name).strip():
-        raise ValueError("institution_name is required")
-
-    # Replace any quoted string assigned to institution name comparisons
-    parameterized = re.sub(
-        r"((?:WHERE|AND)\s+(?:i\.name|institution_name)\s*=\s*)'[^']*'",
-        r"\1@institution_name",
-        sql,
-        flags=re.IGNORECASE,
-    )
-    # Also replace quoted literals used in SELECT projections.
-    parameterized = re.sub(
-        r"'[^']*'\s+AS\s+institution_name",
-        "@institution_name AS institution_name",
-        parameterized,
-        flags=re.IGNORECASE,
-    )
-    if "@institution_name" not in parameterized:
-        raise ValueError("SQL is missing required @institution_name parameter")
-    if re.search(
-        r"\b(?:i\.name|institution_name)\s*=\s*'[^']+'",
-        parameterized,
-        flags=re.IGNORECASE,
-    ):
-        raise ValueError("SQL contains an unparameterized institution filter")
-
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter(
-                "institution_name",
-                "STRING",
-                str(institution_name).strip(),
-            )
-        ]
-    )
-    return parameterized, job_config
-
-
-def _run(sql_file: str, institution_name: str) -> pd.DataFrame:
-    key = (sql_file, str(institution_name).strip())
-    with _cache_lock:
-        hit = _cache.get(key)
-    if hit is not None:
-        return hit.copy()
-
-    sql = (_QUERY_DIR / sql_file).read_text(encoding="utf-8", errors="replace")
-    parameterized_sql, job_config = _parameterize(sql, institution_name)
-    df = _client.query(parameterized_sql, job_config=job_config).to_dataframe()
-
-    try:
-        with _cache_lock:
-            _cache[key] = df
-    except ValueError:
-        pass  # DataFrame larger than cache cap; skip caching, still return result
-    return df.copy()
-
-
-# ── Public loaders ─────────────────────────────────────────────────────────────
 
 def load_q6(institution_name: str) -> pd.DataFrame:
-    """Q6 — Principal funnel data with daily rows and month helper columns."""
-    df = _run("ROI_Principal.sql", institution_name)
+    """Q6 - Principal funnel data with daily rows and month helper columns."""
+    df = _read_csv("q6_fbc_monthly.csv")
     if "day" in df.columns:
         df["day"] = pd.to_datetime(df["day"], errors="coerce")
     df["student_type"] = df["student_type"].fillna("Unknown").replace("", "Unknown")
@@ -136,28 +55,33 @@ def load_q6(institution_name: str) -> pd.DataFrame:
     df["acad_pos"] = df["event_month"].map(ACAD_ORDER)
     df["month_label"] = df["acad_pos"].map(MONTH_LABELS)
     df["event_date"] = pd.to_datetime(
-        df["event_year"].astype(str) + "-" + df["event_month"].astype(str).str.zfill(2) + "-01"
+        df["event_year"].astype(str) + "-" + df["event_month"].astype(str).str.zfill(2) + "-01",
+        errors="coerce",
     )
     today_first = pd.Timestamp(date.today().replace(day=1))
     df = df[df["event_date"] <= today_first]
+    if "institution_name" in df.columns:
+        df = df[df["institution_name"] == institution_name]
     return df.reset_index(drop=True)
 
 
 def load_q2(institution_name: str) -> pd.DataFrame:
-    """Q2 — Campaign cost + lead source with daily rows."""
-    df = _run("ROI_Campaign_Cost.sql", institution_name)
+    """Q2 - Campaign cost + lead source with daily rows."""
+    df = _read_csv("q2_campaign_cost.csv")
     if "day" in df.columns:
         df["day"] = pd.to_datetime(df["day"], errors="coerce")
     df["term_year"] = df["term_year"].astype(int)
     for col in ["institution_name", "lead_source", "campaign_service", "campaign_funnel_target"]:
         if col in df.columns:
-            df[col] = df[col].str.strip()
-    return df
+            df[col] = df[col].fillna("").astype(str).str.strip()
+    if "institution_name" in df.columns:
+        df = df[df["institution_name"] == institution_name]
+    return df.reset_index(drop=True)
 
 
 def load_q3(institution_name: str) -> pd.DataFrame:
-    """Q3 — City-level geography detail with daily rows."""
-    df = _run("ROI_Geography.sql", institution_name)
+    """Q3 - City-level geography detail with daily rows."""
+    df = _read_csv("q3_geography.csv")
     if "day" in df.columns:
         df["day"] = pd.to_datetime(df["day"], errors="coerce")
     df["student_state"] = df["student_state"].fillna("").str.strip()
@@ -170,4 +94,6 @@ def load_q3(institution_name: str) -> pd.DataFrame:
     df["student_city"] = df["student_city"].fillna("").str.strip()
     df.loc[df["student_city"] == "", "student_city"] = "Unknown"
     df["term_year"] = df["term_year"].astype(int)
+    if "institution_name" in df.columns:
+        df = df[df["institution_name"] == institution_name]
     return df.reset_index(drop=True)

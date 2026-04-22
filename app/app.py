@@ -10,7 +10,7 @@ Funnel pages (Funnel Overview, Program Breakdown, Lead Source, Funnel Geography)
   - Program (program_name_filter) — synced to geo_program
   - Student Type (student_type) — synced to geo_student_type
   - Lead Source (source_filter) — synced to geo_lead_source
-  - Institution (hidden, populated from signed session)
+  - Institution (hidden, resolved from bundled CSV data)
   - Term Year (hidden, default: 2026)
   - Term Semester (hidden, default: Fall)
   - Is International (hidden, default: True)
@@ -35,7 +35,7 @@ PAGE-SPECIFIC FILTERS:
   - Funnel Geography: Include international & unknown (include_intl_unknown)
 
 SINGLE-VALUE FILTERS (always show one value, limited utility):
-  - Institution: resolved from sage_id and kept hidden
+  - Institution: resolved from bundled CSV data
   - Term Semester: always "Fall" (only one semester in data)
   - Note: These are kept hidden and do not clutter the UI.
 """
@@ -51,6 +51,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from shiny import App, ui
 
 import calendar
+import csv
 from datetime import date, datetime
 
 
@@ -467,14 +468,35 @@ PROGRAM_TREND_METRICS = {
 # --- Shared date range helpers (used by Funnel + Digital filters) ---
 
 
-def _default_digital_bounds() -> tuple[date, date]:
-    """Client-neutral first-render date bounds."""
-    today = date.today()
-    month_end = date(today.year, today.month, calendar.monthrange(today.year, today.month)[1])
-    return date(2024, 1, 1), month_end
+def _load_default_digital_bounds() -> tuple[date, date]:
+    """Read the bundled digital data bounds for first-render date defaults."""
+    fallback_min = date(2024, 1, 1)
+    fallback_max = date.today()
+    path = Path(__file__).parent.parent / "data" / "q8_digital_overview.csv"
+    if not path.exists():
+        return fallback_min, fallback_max
+
+    min_day: date | None = None
+    max_day: date | None = None
+    try:
+        with path.open(newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                raw = (row.get("day") or "").strip()
+                if not raw:
+                    continue
+                try:
+                    day = date.fromisoformat(raw[:10])
+                except ValueError:
+                    continue
+                min_day = day if min_day is None or day < min_day else min_day
+                max_day = day if max_day is None or day > max_day else max_day
+    except Exception:
+        return fallback_min, fallback_max
+
+    return min_day or fallback_min, max_day or fallback_max
 
 
-_dig_min_date, _dig_max_date = _default_digital_bounds()
+_dig_min_date, _dig_max_date = _load_default_digital_bounds()
 _dig_min = datetime.combine(_dig_min_date, datetime.min.time())
 _dig_max = datetime.combine(_dig_max_date, datetime.min.time())
 
