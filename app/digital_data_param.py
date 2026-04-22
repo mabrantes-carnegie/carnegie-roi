@@ -6,8 +6,10 @@ No data is loaded at module import time.
 """
 
 import re
+import threading
 from pathlib import Path
 import pandas as pd
+from cachetools import TTLCache
 from google.cloud import bigquery
 
 _QUERY_DIR = Path(__file__).parent.parent / "data" / "queries"
@@ -15,6 +17,17 @@ _DATA_DIR = Path(__file__).parent.parent / "data"
 
 BQ_PROJECT = "carnegie-roi-reports"
 _client = bigquery.Client(project=BQ_PROJECT)
+
+# Process-local TTL cache for BigQuery results, keyed by (export_label, client_name).
+# Each Cloud Run instance holds its own cache; entries expire after ttl seconds.
+# Sized in bytes (deep memory usage) to protect the container's memory ceiling.
+_CACHE_MAX_BYTES = 256 * 1024 * 1024  # 256 MB
+
+def _df_bytes(df: pd.DataFrame) -> int:
+    return int(df.memory_usage(deep=True).sum())
+
+_cache: TTLCache = TTLCache(maxsize=_CACHE_MAX_BYTES, ttl=3600, getsizeof=_df_bytes)
+_cache_lock = threading.Lock()
 
 # ── Region sanitizer ──────────────────────────────────────────────────────────
 
@@ -175,10 +188,20 @@ def _parameterize_digital(sql: str, client_name: str) -> tuple[str, bigquery.Que
 
 
 def _run_digital(export_label: str, client_name: str) -> pd.DataFrame:
+    key = (export_label, str(client_name).strip())
+    with _cache_lock:
+        hit = _cache.get(key)
+    if hit is not None:
+        return hit.copy()
+
     sql_full = (_QUERY_DIR / "ROI_All_Digital.sql").read_text(encoding="utf-8", errors="replace")
     sql = _extract_query(sql_full, export_label)
     parameterized_sql, job_config = _parameterize_digital(sql, client_name)
-    return _client.query(parameterized_sql, job_config=job_config).to_dataframe()
+    df = _client.query(parameterized_sql, job_config=job_config).to_dataframe()
+
+    with _cache_lock:
+        _cache[key] = df
+    return df.copy()
 
 
 # ── Public loaders ────────────────────────────────────────────────────────────

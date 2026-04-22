@@ -9,15 +9,28 @@ This is the target pattern for the production multi-client app.
 """
 
 import re
+import threading
 from datetime import date
 from pathlib import Path
 import pandas as pd
+from cachetools import TTLCache
 from google.cloud import bigquery
 
 _QUERY_DIR = Path(__file__).parent.parent / "data" / "queries"
 
 BQ_PROJECT = "carnegie-roi-reports"
 _client = bigquery.Client(project=BQ_PROJECT)
+
+# Process-local TTL cache for BigQuery results, keyed by (sql_file, institution_name).
+# Each Cloud Run instance holds its own cache; entries expire after ttl seconds.
+# Sized in bytes (deep memory usage) to protect the container's memory ceiling.
+_CACHE_MAX_BYTES = 256 * 1024 * 1024  # 256 MB
+
+def _df_bytes(df: pd.DataFrame) -> int:
+    return int(df.memory_usage(deep=True).sum())
+
+_cache: TTLCache = TTLCache(maxsize=_CACHE_MAX_BYTES, ttl=3600, getsizeof=_df_bytes)
+_cache_lock = threading.Lock()
 
 # Valid US state/territory 2-letter codes.
 VALID_US_STATES = frozenset({
@@ -82,9 +95,19 @@ def _parameterize(sql: str, institution_name: str) -> tuple[str, bigquery.QueryJ
 
 
 def _run(sql_file: str, institution_name: str) -> pd.DataFrame:
+    key = (sql_file, str(institution_name).strip())
+    with _cache_lock:
+        hit = _cache.get(key)
+    if hit is not None:
+        return hit.copy()
+
     sql = (_QUERY_DIR / sql_file).read_text(encoding="utf-8", errors="replace")
     parameterized_sql, job_config = _parameterize(sql, institution_name)
-    return _client.query(parameterized_sql, job_config=job_config).to_dataframe()
+    df = _client.query(parameterized_sql, job_config=job_config).to_dataframe()
+
+    with _cache_lock:
+        _cache[key] = df
+    return df.copy()
 
 
 # ── Public loaders ─────────────────────────────────────────────────────────────
