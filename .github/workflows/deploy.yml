@@ -13,6 +13,7 @@ env:
 jobs:
   deploy:
     name: Build, Push, and Deploy
+    if: github.repository == 'CarnegieHigherEd/roi-report'
     runs-on: ubuntu-latest
     permissions:
       contents: read
