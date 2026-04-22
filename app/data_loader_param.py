@@ -24,7 +24,7 @@ _client = bigquery.Client(project=BQ_PROJECT)
 # Process-local TTL cache for BigQuery results, keyed by (sql_file, institution_name).
 # Each Cloud Run instance holds its own cache; entries expire after ttl seconds.
 # Sized in bytes (deep memory usage) to protect the container's memory ceiling.
-_CACHE_MAX_BYTES = 256 * 1024 * 1024  # 256 MB
+_CACHE_MAX_BYTES = 512 * 1024 * 1024  # 512 MB
 
 def _df_bytes(df: pd.DataFrame) -> int:
     return int(df.memory_usage(deep=True).sum())
@@ -105,8 +105,11 @@ def _run(sql_file: str, institution_name: str) -> pd.DataFrame:
     parameterized_sql, job_config = _parameterize(sql, institution_name)
     df = _client.query(parameterized_sql, job_config=job_config).to_dataframe()
 
-    with _cache_lock:
-        _cache[key] = df
+    try:
+        with _cache_lock:
+            _cache[key] = df
+    except ValueError:
+        pass  # DataFrame larger than cache cap; skip caching, still return result
     return df.copy()
 
 
