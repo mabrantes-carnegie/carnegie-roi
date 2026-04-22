@@ -1,0 +1,17 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy app, parameterized query templates, and CSV exports for the stakeholder
+# test build.
+COPY app/ ./app/
+COPY data/queries/ ./data/queries/
+COPY data/*.csv ./data/
+
+EXPOSE 8080
+
+CMD ["shiny", "run", "app/app.py", "--host", "0.0.0.0", "--port", "8080"]

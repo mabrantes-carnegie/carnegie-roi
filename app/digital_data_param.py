@@ -1,18 +1,15 @@
-"""Legacy digital loader module.
+"""CSV-backed digital data loaders for local client-specific testing."""
 
-Unparameterized startup data loading is disabled for the multi-client
-dashboard. Use digital_data_param.py and pass the resolved client_name
-explicitly from the signed session.
-"""
+from __future__ import annotations
 
-from pathlib import Path
 import re
+
 import pandas as pd
 
-_QUERY_DIR = Path(__file__).parent.parent / "data" / "queries"
-_DATA_DIR = Path(__file__).parent.parent / "data"
+from local_config import get_data_dir
 
-# ── Region sanitizer — maps messy Q10 region field to US state abbreviations ──
+
+_DATA_DIR = get_data_dir()
 
 _STATE_NAME_TO_ABBR = {
     "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
@@ -31,12 +28,10 @@ _STATE_NAME_TO_ABBR = {
 }
 
 _VALID_ABBR = set(_STATE_NAME_TO_ABBR.values())
-
 _INTERNATIONAL_PATTERNS = [
     "british columbia", "santo domingo", "dominican republic",
     "province", "ontario", "quebec",
 ]
-
 _SPECIAL_MAP = {
     "san francisco bay area": "CA",
     "silicon valley": "CA",
@@ -70,17 +65,29 @@ _SPECIAL_MAP = {
     "rochester mn-mason city ia-austi": "MN",
     "paducah ky-cape girardeau mo-har": "KY",
 }
-
+_STATE_SUFFIX_RE = re.compile(r"^(.+)\s*\(State\)$", re.IGNORECASE)
 _US_COLON_RE = re.compile(r"^US:([a-zA-Z]{2})$", re.IGNORECASE)
 _US_STATE_RE = re.compile(r"^US:(.+)$", re.IGNORECASE)
-_STATE_SUFFIX_RE = re.compile(r"^(.+)\s*\(State\)$", re.IGNORECASE)
-_DMA_STATE_RE = re.compile(r"\b([A-Z]{2})(?:\s*$|-)")
+
+
+def _read_csv(csv_name: str, **kwargs) -> pd.DataFrame:
+    path = _DATA_DIR / csv_name
+    if not path.exists():
+        raise FileNotFoundError(f"Local CSV not found: {path}")
+    return pd.read_csv(path, **kwargs)
+
+
+def _filter_client(df: pd.DataFrame, client_name: str) -> pd.DataFrame:
+    if "client_name" in df.columns:
+        df["client_name"] = df["client_name"].fillna("").astype(str).str.strip()
+        return df[df["client_name"] == client_name]
+    return df
 
 
 def _sanitize_region(region: str) -> str:
-    if not region or region.strip() == "":
+    if not region or str(region).strip() == "":
         return "Unknown"
-    r = region.strip()
+    r = str(region).strip()
     r_lower = r.lower()
     if r_lower in _SPECIAL_MAP:
         return _SPECIAL_MAP[r_lower]
@@ -100,9 +107,7 @@ def _sanitize_region(region: str) -> str:
     m = _US_COLON_RE.match(r)
     if m:
         code = m.group(1).upper()
-        if code in _VALID_ABBR:
-            return code
-        return "Unknown"
+        return code if code in _VALID_ABBR else "Unknown"
     m = _US_STATE_RE.match(r)
     if m:
         val = m.group(1).strip()
@@ -122,8 +127,7 @@ def _sanitize_region(region: str) -> str:
     if valid_codes:
         return valid_codes[0]
     if "," in r:
-        parts = r.split(",")
-        for part in parts:
+        for part in r.split(","):
             part_clean = part.strip().lower()
             if part_clean in _STATE_NAME_TO_ABBR:
                 return _STATE_NAME_TO_ABBR[part_clean]
@@ -132,101 +136,66 @@ def _sanitize_region(region: str) -> str:
 
 def _sanitize_q10_regions(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df["region_original"] = df["region"]
-    df["region"] = df["region_original"].apply(_sanitize_region)
-
-    validation = df.groupby(["region", "region_original"]).agg(
-        rows=("impressions", "size"),
-        impressions=("impressions", "sum"),
-    ).reset_index()
-
-    total_impr = df["impressions"].sum()
-    state_summary = df.groupby("region").agg(
-        rows=("impressions", "size"),
-        impressions=("impressions", "sum"),
-    ).reset_index()
-    state_summary["pct_impressions"] = (state_summary["impressions"] / total_impr * 100).round(2)
-    state_summary = state_summary.sort_values("impressions", ascending=False)
-
-    validation.to_csv(_DATA_DIR / "q10_region_mapping_detail.csv", index=False)
-    state_summary.to_csv(_DATA_DIR / "q10_region_sanitization_summary.csv", index=False)
-
-    df = df.drop(columns=["region_original"])
+    df["region"] = df["region"].apply(_sanitize_region)
     return df
 
 
-def _extract_query(sql: str, export_label: str) -> str:
-    """Extract a single query block from the combined SQL file by its export label.
-
-    The file alternates: header_block (with 'Export as:') | sql_block | header_block | ...
-    so we find the header index and return the next block's SQL.
-    """
-    blocks = re.split(r"\n--\s*={10,}", sql)
-    for i, block in enumerate(blocks):
-        if f"Export as: {export_label}" in block:
-            # The actual SQL is in the next block
-            sql_block = blocks[i + 1] if i + 1 < len(blocks) else ""
-            m = re.search(r"((?:WITH\b|SELECT\b).*)", sql_block, re.DOTALL | re.IGNORECASE)
-            if m:
-                return m.group(1).strip()
-    raise ValueError(f"Query block for '{export_label}' not found in SQL file")
-
-
-def _run_digital(export_label: str) -> pd.DataFrame:
-    raise RuntimeError(
-        "Unparameterized digital data loading is disabled. "
-        "Use digital_data_param.py with an explicit client_name."
-    )
-
-
-def _load_q8() -> pd.DataFrame:
-    """Q8 — Digital overview (daily grain)."""
-    df = _run_digital("q8_digital_overview.csv")
-    df["day"] = pd.to_datetime(df["day"])
+def load_q8(client_name: str) -> pd.DataFrame:
+    """Q8 - Digital overview (daily grain)."""
+    df = _filter_client(_read_csv("q8_digital_overview.csv"), client_name)
+    df["day"] = pd.to_datetime(df["day"], errors="coerce")
     for col in ["group_name", "subgroup_name", "product_name", "campaign_name"]:
-        df[col] = df[col].fillna("").str.strip()
+        if col in df.columns:
+            df[col] = df[col].fillna("").str.strip()
     for col in ["impressions", "clicks", "direct_conversions",
                 "view_through_conversions", "total_interactions",
                 "in_platform_leads", "cost", "budget",
                 "followers", "likes", "shares", "comments"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-    return df
+    return df.reset_index(drop=True)
 
 
-def _load_q9() -> pd.DataFrame:
-    """Q9 — Digital interactions (daily grain with interaction categories)."""
-    df = _run_digital("q9_digital_interactions.csv")
-    df["day"] = pd.to_datetime(df["day"])
+def load_q9(client_name: str) -> pd.DataFrame:
+    """Q9 - Digital interactions (daily grain with interaction categories)."""
+    df = _filter_client(_read_csv("q9_digital_interactions.csv"), client_name)
+    df["day"] = pd.to_datetime(df["day"], errors="coerce")
     for col in ["group_name", "subgroup_name", "product_name",
                 "campaign_name", "conversion_name", "interaction_category"]:
-        df[col] = df[col].fillna("").str.strip()
+        if col in df.columns:
+            df[col] = df[col].fillna("").str.strip()
     for col in ["direct_conversions", "view_through_conversions",
                 "in_platform_leads", "total_interactions", "cost", "budget"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-    df["interaction_category"] = df["interaction_category"].replace("Campus Visit", "Visit/Event")
-    return df
+    if "interaction_category" in df.columns:
+        df["interaction_category"] = df["interaction_category"].replace("Campus Visit", "Visit/Event")
+    return df.reset_index(drop=True)
 
 
-def _load_q10() -> pd.DataFrame:
-    """Q10 — Digital geography (monthly grain by region)."""
-    df = _run_digital("q10_digital_geo.csv")
+def load_q10(client_name: str) -> pd.DataFrame:
+    """Q10 - Digital geography with daily rows by region."""
+    df = _filter_client(_read_csv("q10_digital_geo.csv"), client_name)
+    if "day" in df.columns:
+        df["day"] = pd.to_datetime(df["day"], errors="coerce")
     for col in ["group_name", "subgroup_name", "product_name", "region"]:
-        df[col] = df[col].fillna("").str.strip()
+        if col in df.columns:
+            df[col] = df[col].fillna("").str.strip()
     for col in ["impressions", "clicks", "direct_conversions",
                 "view_through_conversions", "in_platform_leads",
                 "total_conversions", "cost", "budget"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-    return df
+    return _sanitize_q10_regions(df).reset_index(drop=True)
 
 
-def _load_q11_creative() -> pd.DataFrame:
-    """Q11a — Digital creative (ALL platforms, excludes YouTube)."""
-    df = _run_digital("q11_digital_creative.csv")
-    # Exclude YouTube rows — served from Q11c instead
-    df = df[~df["product_name"].str.strip().isin({"YouTube", "Youtube"})]
+def load_q11_creative(client_name: str) -> pd.DataFrame:
+    """Q11a - Digital creative with daily rows (excludes YouTube)."""
+    df = _filter_client(_read_csv("q11_digital_creative.csv"), client_name)
+    if "day" in df.columns:
+        df["day"] = pd.to_datetime(df["day"], errors="coerce")
+    if "product_name" in df.columns:
+        df = df[~df["product_name"].fillna("").str.strip().isin({"YouTube", "Youtube"})]
     for col in ["group_name", "subgroup_name", "product_name",
                 "campaign_name", "platform_campaign_name",
                 "creative", "ad_description", "ad_url",
@@ -240,12 +209,12 @@ def _load_q11_creative() -> pd.DataFrame:
                 "video_starts", "video_completions"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-    return df
+    return df.reset_index(drop=True)
 
 
-def _load_q11_youtube() -> pd.DataFrame:
-    """Q11c — YouTube creative (daily grain for correct video_avg)."""
-    df = _run_digital("q11_youtube_creative.csv")
+def load_q11_youtube(client_name: str) -> pd.DataFrame:
+    """Q11c - YouTube creative (daily grain for correct video_avg)."""
+    df = _filter_client(_read_csv("q11_youtube_creative.csv"), client_name)
     df["day"] = pd.to_datetime(df["day"], errors="coerce")
     for col in ["group_name", "subgroup_name", "product_name",
                 "campaign_name", "platform_campaign_name",
@@ -261,59 +230,33 @@ def _load_q11_youtube() -> pd.DataFrame:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
     if "video_avg" in df.columns:
         df["video_avg"] = pd.to_numeric(df["video_avg"], errors="coerce")
-    return df
+    return df.reset_index(drop=True)
 
 
-def _load_q11_keywords() -> pd.DataFrame:
-    """Q11b — PPC keyword performance (monthly grain)."""
-    df = _run_digital("q11_digital_keywords.csv")
+def load_q11_keywords(client_name: str) -> pd.DataFrame:
+    """Q11b - PPC keyword performance with daily rows."""
+    df = _filter_client(_read_csv("q11_digital_keywords.csv"), client_name)
+    if "day" in df.columns:
+        df["day"] = pd.to_datetime(df["day"], errors="coerce")
     for col in ["platform_campaign_name", "campaign_name",
                 "product_name", "keyword", "match_type"]:
-        df[col] = df[col].fillna("").str.strip()
+        if col in df.columns:
+            df[col] = df[col].fillna("").str.strip()
     for col in ["impressions", "clicks", "direct_conversions", "cost", "budget"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-    return df
+    return df.reset_index(drop=True)
 
 
-def _load_q12() -> pd.DataFrame:
-    """Q12 — Digital notes / insights."""
-    df = _run_digital("q12_digital_notes.csv")
+def load_q12(client_name: str) -> pd.DataFrame:
+    """Q12 - Digital notes / insights."""
+    df = _filter_client(_read_csv("q12_digital_notes.csv"), client_name)
     df["day"] = pd.to_datetime(df["day"], errors="coerce")
     for col in ["group_name", "subgroup_name", "product_name",
                 "strategy", "campaign_name", "note_type",
                 "is_milestone", "notes", "created_by"]:
         if col in df.columns:
             df[col] = df[col].fillna("").str.strip()
-    df = df.drop_duplicates(subset=["day", "note_type", "notes"])
-    return df
-
-
-# Import-time client data loading is disabled.
-Q8 = pd.DataFrame()
-Q9 = pd.DataFrame()
-Q10 = pd.DataFrame()
-Q11_CREATIVE = pd.DataFrame()
-Q11_KEYWORDS = pd.DataFrame()
-Q11_YOUTUBE = pd.DataFrame()
-Q12 = pd.DataFrame()
-
-
-def get_digital_date_range() -> tuple:
-    return pd.NaT, pd.NaT
-
-
-def get_digital_groups() -> list[str]:
-    return []
-
-
-def get_digital_subgroups() -> list[str]:
-    return []
-
-
-def get_digital_products() -> list[str]:
-    return []
-
-
-def get_digital_campaigns() -> list[str]:
-    return []
+    if {"day", "note_type", "notes"}.issubset(df.columns):
+        df = df.drop_duplicates(subset=["day", "note_type", "notes"])
+    return df.reset_index(drop=True)

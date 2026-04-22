@@ -1,0 +1,83 @@
+name: Build and Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+env:
+  PROJECT_ID: carnegie-roi-reports
+  REGION: us-east4
+
+jobs:
+  deploy:
+    name: Build, Push, and Deploy
+    if: github.repository == 'CarnegieHigherEd/roi-report'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Required for WIF OIDC token
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set environment
+        run: |
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            ENV="prod"
+          else
+            ENV="dev"
+          fi
+          echo "ENVIRONMENT=${ENV}" >> "$GITHUB_ENV"
+          echo "SERVICE_NAME=roi-reports-${ENV}" >> "$GITHUB_ENV"
+          echo "REPO_NAME=roi-reports-${ENV}" >> "$GITHUB_ENV"
+          echo "IMAGE=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/roi-reports-${ENV}/roi-reports-app" >> "$GITHUB_ENV"
+
+      - name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build Docker image
+        run: docker build -f app/Dockerfile -t ${{ env.IMAGE }}:latest .
+
+      - name: Push Docker image
+        run: docker push ${{ env.IMAGE }}:latest
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.5"
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: |
+          terraform init \
+            -backend-config="prefix=roi-report/terraform/state/${{ env.ENVIRONMENT }}"
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: |
+          terraform apply -auto-approve \
+            -var-file="envs/${{ env.ENVIRONMENT }}.tfvars" \
+            -var="image_tag=latest"
+
+      - name: Force new Cloud Run revision
+        run: |
+          gcloud run services update ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --image=${{ env.IMAGE }}:latest \
+            --project=${{ env.PROJECT_ID }}
+
+      - name: Output Cloud Run URL
+        working-directory: terraform
+        run: terraform output cloud_run_url

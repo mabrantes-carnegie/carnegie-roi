@@ -1,10 +1,16 @@
-"""Load and clean CSV data once at startup."""
+"""Legacy loader module.
+
+Unparameterized startup data loading is disabled for the multi-client
+dashboard. Use data_loader_param.py and pass the resolved institution_name
+explicitly from the signed session.
+"""
 
 import re
 from datetime import date
 from pathlib import Path
 import pandas as pd
 
+_QUERY_DIR = Path(__file__).parent.parent / "data" / "queries"
 _DATA_DIR = Path(__file__).parent.parent / "data"
 
 # Valid US state/territory 2-letter codes
@@ -24,9 +30,16 @@ MONTH_LABELS = {1: "Jul", 2: "Aug", 3: "Sep", 4: "Oct", 5: "Nov", 6: "Dec",
                 7: "Jan", 8: "Feb", 9: "Mar", 10: "Apr", 11: "May", 12: "Jun"}
 
 
+def _run_query(sql_file: str) -> pd.DataFrame:
+    raise RuntimeError(
+        "Unparameterized data loading is disabled. "
+        "Use data_loader_param.py with an explicit institution_name."
+    )
+
+
 def _load_q6() -> pd.DataFrame:
     """Load Q6 Source of Truth (funnel_benchmark_current monthly)."""
-    df = pd.read_csv(_DATA_DIR / "q6_fbc_monthly.csv")
+    df = _run_query("ROI_Principal.sql")
     df["student_type"] = df["student_type"].fillna("Unknown").replace("", "Unknown")
     df["is_international"] = df["is_international"].astype(bool)
     df["term_year"] = df["term_year"].astype(int)
@@ -40,25 +53,22 @@ def _load_q6() -> pd.DataFrame:
     df.loc[mask, "student_state"] = "International"
     # Location type for easy filtering
     df["location_type"] = df["student_state"].apply(
-        lambda s: "US" if s in VALID_US_STATES else s  # "Unknown" or "International"
+        lambda s: "US" if s in VALID_US_STATES else s
     )
-
     # Academic month position and label
     df["acad_pos"] = df["event_month"].map(ACAD_ORDER)
     df["month_label"] = df["acad_pos"].map(MONTH_LABELS)
-
     # Event date for filtering future months
     df["event_date"] = pd.to_datetime(
         df["event_year"].astype(str) + "-" + df["event_month"].astype(str).str.zfill(2) + "-01"
     )
     today_first = pd.Timestamp(date.today().replace(day=1))
     df = df[df["event_date"] <= today_first]
-
     return df.reset_index(drop=True)
 
 
 def _load_q2() -> pd.DataFrame:
-    df = pd.read_csv(_DATA_DIR / "q2_campaign_cost.csv")
+    df = _run_query("ROI_Campaign_Cost.sql")
     df["term_year"] = df["term_year"].astype(int)
     for col in ["institution_name", "lead_source", "campaign_service",
                 "campaign_funnel_target"]:
@@ -70,7 +80,6 @@ def _clean_city(city: str, state: str) -> str:
     """Clean city name: remove trailing state abbreviation, title case."""
     if not city or city == "Unknown":
         return city
-    # Remove trailing state code case-insensitively (e.g., "Centralia WA", "centralia wa")
     if state and state in VALID_US_STATES:
         city = re.sub(r"\s+" + re.escape(state) + r"$", "", city, flags=re.IGNORECASE)
     result = city.strip()
@@ -79,16 +88,14 @@ def _clean_city(city: str, state: str) -> str:
 
 def _load_q3() -> pd.DataFrame:
     """Load city-level geography detail."""
-    df = pd.read_csv(_DATA_DIR / "q3_geography.csv")
+    df = _run_query("ROI_Geography.sql")
     df["student_state"] = df["student_state"].fillna("").str.strip()
     df.loc[df["student_state"] == "", "student_state"] = "Unknown"
     mask = ~df["student_state"].isin(VALID_US_STATES | {"Unknown"})
     df.loc[mask, "student_state"] = "International"
-    # Location type
     df["location_type"] = df["student_state"].apply(
         lambda s: "US" if s in VALID_US_STATES else s
     )
-    # City cleaning — clean before title case (title case is applied in _clean_city)
     df["student_city"] = df["student_city"].fillna("").str.strip()
     df.loc[df["student_city"] == "", "student_city"] = "Unknown"
     df["student_city"] = df.apply(
@@ -99,44 +106,48 @@ def _load_q3() -> pd.DataFrame:
 
 
 def _load_goals() -> dict:
-    """Load roi_goals.csv and aggregate to institution-level goals."""
-    df = pd.read_csv(_DATA_DIR / "roi_goals.csv")
-    return {
-        "total_inquiries": int(df["Inquiry Goal"].sum()),
-        "total_app_starts": int(df["App Starts Goal"].sum()),
-        "total_app_submits": int(df["App Submit Goal"].sum()),
-        "total_admits": int(df["Admit Goal"].sum()),
-        "total_deposits": int(df["Deposit Goal"].sum()),
-        "total_net_deposits": int(df["Net Deposit Goal"].sum()),
-    }
+    """Legacy local goals loading is disabled for multi-client safety."""
+    return {}
 
 
-# Load once at import time
-Q6 = _load_q6()  # PRIMARY — KPIs, trending, source trend, state geo
-Q2 = _load_q2()  # Cost and campaign lead source data
-Q3 = _load_q3()  # City-level geography detail only
-GOALS = _load_goals()
+def _load_program_goals() -> pd.DataFrame:
+    """Legacy local program goals loading is disabled for multi-client safety."""
+    empty_cols = [
+        "program", "goal_inquiries", "goal_app_starts", "goal_app_submits",
+        "goal_admits", "goal_deposits", "goal_net_deposits", "program_lower",
+    ]
+    return pd.DataFrame(columns=empty_cols)
+
+
+# Client data placeholders; no import-time loading.
+Q6 = pd.DataFrame()
+Q2 = pd.DataFrame()
+Q3 = pd.DataFrame()
+GOALS = {}
+PROGRAM_GOALS = pd.DataFrame(
+    columns=[
+        "program", "goal_inquiries", "goal_app_starts", "goal_app_submits",
+        "goal_admits", "goal_deposits", "goal_net_deposits", "program_lower",
+    ]
+)
 
 
 def get_institutions() -> list[str]:
-    return sorted(Q6["institution_name"].unique().tolist())
+    return []
 
 
 def get_term_years() -> list[str]:
-    years = set(Q6["term_year"].unique()) | set(Q2["term_year"].unique())
-    return [str(y) for y in sorted(years)]
+    return []
 
 
 def get_term_semesters() -> list[str]:
-    return sorted(Q6["term_semester"].unique().tolist())
+    return []
 
 
 def get_student_types() -> list[str]:
-    types = Q6["student_type"].unique().tolist()
-    priority = ["First Year", "Transfer", "Graduate", "Adult", "Readmit", "Other", "Unknown"]
-    return [t for t in priority if t in types]
+    return []
 
 
 def get_programs_date_range() -> tuple:
     """Return min/max event_date from Q6."""
-    return Q6["event_date"].min(), Q6["event_date"].max()
+    return pd.NaT, pd.NaT
