@@ -112,6 +112,8 @@ def _yoy_delta_table(
     label_col: str,      # header for the first column
     metric_cols: list,   # ordered list of metric names
     paginated: bool = False,
+    row_onclick_fn=None, # callable(label) -> JS onclick string; makes labels clickable
+    nav_html: str = "",  # optional HTML prepended before the table
 ) -> "ui.HTML":
     """
     Render a YoY comparison table: for each metric column show the value then
@@ -178,7 +180,12 @@ def _yoy_delta_table(
     # Data rows
     rows_html = []
     for r in rows:
-        cells = [f'<td style="{td_first}">{r["label"]}</td>']
+        if row_onclick_fn is not None:
+            drill_icon = ' <span style="color:#C99D44;font-size:10px;opacity:0.7;margin-left:4px;">▶</span>'
+            onclick_js = row_onclick_fn(r["label"])
+            cells = [f'<td style="{td_first}cursor:pointer;" onclick="{onclick_js}">{r["label"]}{drill_icon}</td>']
+        else:
+            cells = [f'<td style="{td_first}">{r["label"]}</td>']
         for col in metric_cols:
             val, delta = r["metrics"].get(col, ("—", ""))
             # Apply heatmap background to value cell
@@ -217,12 +224,13 @@ def _yoy_delta_table(
 
     tbl_class = "sortable-table paginated-table" if paginated else "sortable-table"
     html = (
-        '<div style="overflow-x:auto;">'
-        f'<table class="{tbl_class}" style="width:100%;border-collapse:collapse;">'
-        "<thead><tr>" + "".join(header_cells) + "</tr></thead>"
-        "<tbody>" + "".join(rows_html) + "</tbody>"
-        "<tfoot>" + rows_html_total + "</tfoot>"
-        "</table></div>"
+        nav_html
+        + '<div style="overflow-x:auto;">'
+        + f'<table class="{tbl_class}" style="width:100%;border-collapse:collapse;">'
+        + "<thead><tr>" + "".join(header_cells) + "</tr></thead>"
+        + "<tbody>" + "".join(rows_html) + "</tbody>"
+        + "<tfoot>" + rows_html_total + "</tfoot>"
+        + "</table></div>"
     )
     return ui.HTML(html)
 
@@ -1907,13 +1915,108 @@ def digital_server(
     def dig_strategy_trend_yoy():
         return _dig_strategy_trend_yoy_cache()
 
+    # ── Drill-down state ──────────────────────────────────────────────────────
+    _strategy_drill_level = reactive.Value("strategy")
+    _strategy_drill_filter = reactive.Value(None)
+    _subgroup_drill_level = reactive.Value("subgroup")
+    _subgroup_drill_filter = reactive.Value(None)
+
+    def _js_safe(s: str) -> str:
+        return s.replace("\\", "\\\\").replace("'", "\\'")
+
+    @reactive.effect
+    def _handle_strategy_row_click():
+        try:
+            clicked = input.dig_strategy_row_click()
+            if not clicked: return
+        except Exception: return
+        _strategy_drill_level.set("campaign")
+        _strategy_drill_filter.set(str(clicked))
+
+    @reactive.effect
+    def _handle_strategy_drill_up():
+        try:
+            v = input.dig_strategy_drill_up()
+            if v is None: return
+        except Exception: return
+        _strategy_drill_level.set("strategy")
+        _strategy_drill_filter.set(None)
+
+    @reactive.effect
+    def _handle_subgroup_row_click():
+        try:
+            clicked = input.dig_subgroup_row_click()
+            if not clicked: return
+        except Exception: return
+        _subgroup_drill_level.set("campaign")
+        _subgroup_drill_filter.set(str(clicked))
+
+    @reactive.effect
+    def _handle_subgroup_drill_up():
+        try:
+            v = input.dig_subgroup_drill_up()
+            if v is None: return
+        except Exception: return
+        _subgroup_drill_level.set("group")
+        _subgroup_drill_filter.set(None)
+
+    @reactive.effect
+    def _handle_subgroup_drill_back():
+        try:
+            v = input.dig_subgroup_drill_back()
+            if v is None: return
+        except Exception: return
+        _subgroup_drill_level.set("subgroup")
+        _subgroup_drill_filter.set(None)
+
+    def _make_strategy_table(df_c, df_p):
+        level = _strategy_drill_level.get()
+        filt = _strategy_drill_filter.get()
+        if level == "campaign":
+            if filt:
+                df_c = df_c[df_c["product_name"] == filt]
+                if not df_p.empty:
+                    df_p = df_p[df_p["product_name"] == filt]
+            back_js = "Shiny.setInputValue('dig_strategy_drill_up',Date.now())"
+            nav = _drill_nav_html("Campaign Name", back_label="Strategy", back_onclick=back_js, filter_pill=filt)
+            return _build_yoy_comparison_table(df_c, df_p, "campaign_name", "Campaign Name", nav_html=nav)
+        else:
+            nav = _drill_nav_html("Strategy")
+            onclick_fn = lambda lbl: (
+                f"Shiny.setInputValue('dig_strategy_row_click','{_js_safe(lbl)}',{{priority:'event'}})"
+            )
+            return _build_yoy_comparison_table(df_c, df_p, "product_name", "Strategy", row_onclick_fn=onclick_fn, nav_html=nav)
+
+    def _make_subgroup_table(df_c, df_p):
+        level = _subgroup_drill_level.get()
+        filt = _subgroup_drill_filter.get()
+        if level == "group":
+            back_js = "Shiny.setInputValue('dig_subgroup_drill_back',Date.now())"
+            nav = _drill_nav_html("Group", back_label="Subgroup", back_onclick=back_js)
+            return _build_yoy_comparison_table(df_c, df_p, "group_name", "Group", nav_html=nav)
+        elif level == "campaign":
+            if filt:
+                df_c = df_c[df_c["subgroup_name"] == filt]
+                if not df_p.empty:
+                    df_p = df_p[df_p["subgroup_name"] == filt]
+            back_js = "Shiny.setInputValue('dig_subgroup_drill_back',Date.now())"
+            nav = _drill_nav_html("Campaign Name", back_label="Subgroup", back_onclick=back_js, filter_pill=filt)
+            return _build_yoy_comparison_table(df_c, df_p, "campaign_name", "Campaign Name", nav_html=nav)
+        else:
+            up_js = "Shiny.setInputValue('dig_subgroup_drill_up',Date.now())"
+            nav = _drill_nav_html("Subgroup", back_label="Group", back_onclick=up_js)
+            onclick_fn = lambda lbl: (
+                f"Shiny.setInputValue('dig_subgroup_row_click','{_js_safe(lbl)}',{{priority:'event'}})"
+            )
+            return _build_yoy_comparison_table(df_c, df_p, "subgroup_name", "Subgroup", row_onclick_fn=onclick_fn, nav_html=nav)
+
     @reactive.calc
     def _dig_subgroup_table_yoy_cache():
         df_c = _dig_q8()
         df_p = _dig_q8_yoy()
         if df_c.empty:
             return ui.tags.div("No data available.", class_="empty-state")
-        return _build_yoy_comparison_table(df_c, df_p, group_col="subgroup_name", label_col="Subgroup")
+        return _make_subgroup_table(df_c, df_p)
 
     @render.ui
     def dig_subgroup_table_yoy():
@@ -1925,7 +2028,7 @@ def digital_server(
         df_p = _dig_q8_yoy()
         if df_c.empty:
             return ui.tags.div("No data available.", class_="empty-state")
-        return _build_yoy_comparison_table(df_c, df_p, group_col="product_name", label_col="Strategy")
+        return _make_strategy_table(df_c, df_p)
 
     @render.ui
     def dig_strategy_table_yoy():
@@ -2190,7 +2293,7 @@ def digital_server(
         df_p = _dig_q8_prior()
         if df_c.empty:
             return ui.tags.div("No data available.", class_="empty-state")
-        return _build_yoy_comparison_table(df_c, df_p, group_col="subgroup_name", label_col="Subgroup")
+        return _make_subgroup_table(df_c, df_p)
 
     @render.ui
     def dig_subgroup_table():
@@ -2204,7 +2307,7 @@ def digital_server(
         df_p = _dig_q8_prior()
         if df_c.empty:
             return ui.tags.div("No data available.", class_="empty-state")
-        return _build_yoy_comparison_table(df_c, df_p, group_col="product_name", label_col="Strategy")
+        return _make_strategy_table(df_c, df_p)
 
     @render.ui
     def dig_strategy_table():
@@ -4820,7 +4923,38 @@ def _pct_change(curr, prev):
     return f"{pct:+.1f}%"
 
 
-def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str) -> "ui.HTML":
+def _drill_nav_html(
+    current_label: str,
+    back_label: str | None = None,
+    back_onclick: str = "",
+    filter_pill: str | None = None,
+) -> str:
+    base = (
+        "display:flex;align-items:center;gap:6px;padding:4px 2px 10px 2px;"
+        "font-family:Manrope,sans-serif;font-size:12px;"
+    )
+    btn = (
+        "background:none;border:1px solid #d4cfc9;border-radius:4px;"
+        "padding:3px 8px;font-family:Manrope,sans-serif;font-size:11px;"
+        "color:#021326;cursor:pointer;font-weight:600;"
+    )
+    pill = (
+        "background:#f0eeea;border-radius:12px;padding:2px 8px;"
+        "font-size:11px;color:#021326;font-weight:600;"
+    )
+    sep = '<span style="color:#d4cfc9;margin:0 2px;">›</span>'
+    parts = []
+    if back_label:
+        parts.append(f'<button onclick="{back_onclick}" style="{btn}">◀ {back_label}</button>')
+        parts.append(sep)
+    if filter_pill:
+        parts.append(f'<span style="{pill}">{filter_pill}</span>')
+        parts.append(sep)
+    parts.append(f'<span style="font-weight:600;color:#021326;">{current_label}</span>')
+    return f'<div style="{base}">{"".join(parts)}</div>'
+
+
+def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str, row_onclick_fn=None, nav_html: str = "") -> "ui.HTML":
     """
     Build a YoY table with interleaved metric + Δ% columns.
     Columns: Impressions, Clicks, CTR, Direct Action, View-through Action,
@@ -4886,7 +5020,7 @@ def _build_yoy_comparison_table(df_c, df_p, group_col: str, label_col: str) -> "
         }
         rows.append({"label": grp, "metrics": metrics_data})
 
-    return _yoy_delta_table(rows, label_col=label_col, metric_cols=col_labels)
+    return _yoy_delta_table(rows, label_col=label_col, metric_cols=col_labels, row_onclick_fn=row_onclick_fn, nav_html=nav_html)
 
 
 def _df_to_html(df, title):
