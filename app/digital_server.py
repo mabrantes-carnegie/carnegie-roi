@@ -267,7 +267,13 @@ def _plain_table(df: "pd.DataFrame", paginated: bool = False) -> "ui.HTML":
     return ui.HTML(html)
 
 
-def _heatmap_table(df: "pd.DataFrame", heatmap_cols: list, paginated: bool = False) -> "ui.HTML":
+def _heatmap_table(
+    df: "pd.DataFrame",
+    heatmap_cols: list,
+    paginated: bool = False,
+    column_styles: dict | None = None,
+    header_labels: dict | None = None,
+) -> "ui.HTML":
     """Render a DataFrame as an HTML table with gold heatmap on specified columns."""
     r, g, b = _hex_to_rgb(_HEATMAP_COLOR)
 
@@ -320,13 +326,18 @@ def _heatmap_table(df: "pd.DataFrame", heatmap_cols: list, paginated: bool = Fal
                     ratio = (num - lo) / (hi - lo) if hi > lo else 0
                     alpha = round(0.08 + ratio * 0.62, 3)
                     style += f"background:rgba({r},{g},{b},{alpha});"
+            if column_styles and col in column_styles:
+                style += column_styles[col]
             cells.append(f'<td style="{style}">{val}</td>')
         rows_html.append("<tr>" + "".join(cells) + "</tr>")
 
     headers = []
     for ci, col in enumerate(df.columns):
         s = th_first_style if ci == 0 else th_style
-        headers.append(f'<th style="{s}">{col}</th>')
+        if column_styles and col in column_styles:
+            s += column_styles[col]
+        label = header_labels.get(col, col) if header_labels else col
+        headers.append(f'<th style="{s}">{label}</th>')
 
     total_row = _build_total_row(df, td_first, td_base)
     tbl_class = "sortable-table paginated-table" if paginated else "sortable-table"
@@ -674,9 +685,38 @@ def digital_server(
             df = df[df["campaign_name"].isin(camp)]
         return df
 
+    def _apply_dig_filters_media_plan(df, date_col="day"):
+        """Apply Media Plan filters without capping forecasted budget months."""
+        period = input.dig_period()
+        if period and len(period) == 2 and date_col in df.columns:
+            start = pd.Timestamp(period[0])
+            df = df[df[date_col] >= start]
+
+        grp = input.dig_group()
+        if grp and len(grp) > 0 and "group_name" in df.columns:
+            df = df[df["group_name"].isin(grp)]
+
+        sub = input.dig_subgroup()
+        if sub and len(sub) > 0 and "subgroup_name" in df.columns:
+            df = df[df["subgroup_name"].isin(sub)]
+
+        prod = input.dig_product()
+        if prod and len(prod) > 0 and "product_name" in df.columns:
+            df = df[df["product_name"].isin(prod)]
+
+        camp = input.dig_campaign()
+        if camp and len(camp) > 0 and "campaign_name" in df.columns:
+            df = df[df["campaign_name"].isin(camp)]
+
+        return df
+
     @reactive.calc
     def _dig_q8():
         return _apply_dig_filters(Q8())
+
+    @reactive.calc
+    def _dig_q8_media_plan():
+        return _apply_dig_filters_media_plan(Q8())
 
     @reactive.calc
     def _dig_q8_prior():
@@ -4497,26 +4537,26 @@ def digital_server(
 
     @render.text
     def dig_media_budget():
-        df = _dig_q8()
+        df = _dig_q8_media_plan()
         req(len(df) > 0)
         return fmt_currency(df["budget"].sum())
 
     @render.text
     def dig_media_spent():
-        df = _dig_q8()
+        df = _dig_q8_media_plan()
         req(len(df) > 0)
         return fmt_currency(df["cost"].sum())
 
     @render.text
     def dig_media_remaining():
-        df = _dig_q8()
+        df = _dig_q8_media_plan()
         req(len(df) > 0)
         remaining = df["budget"].sum() - df["cost"].sum()
         return fmt_currency(remaining)
 
     @render.text
     def dig_media_pct_spent():
-        df = _dig_q8()
+        df = _dig_q8_media_plan()
         req(len(df) > 0)
         budget = df["budget"].sum()
         cost = df["cost"].sum()
@@ -4527,7 +4567,7 @@ def digital_server(
 
     @reactive.calc
     def _media_plan_table_cache():
-        df = _dig_q8()
+        df = _dig_q8_media_plan()
         req(len(df) > 0)
 
         df = df.copy()
@@ -4540,12 +4580,13 @@ def digital_server(
         }
         df["month_key"] = df["month_period"].astype(str)
 
-        # Pivot: monthly spend
-        pivot_spend = df.pivot_table(
+        # Pivot: monthly budget allocation. Future rows usually carry budget
+        # without actual cost, so budget drives the visible month columns.
+        pivot_budget = df.pivot_table(
             index=["group_name", "subgroup_name", "product_name", "campaign_name"],
-            columns="month_key", values="cost", aggfunc="sum", fill_value=0,
+            columns="month_key", values="budget", aggfunc="sum", fill_value=0,
         )
-        pivot_spend = pivot_spend.reindex(columns=month_keys, fill_value=0)
+        pivot_budget = pivot_budget.reindex(columns=month_keys, fill_value=0)
 
         # Totals
         agg = df.groupby(["group_name", "subgroup_name", "product_name", "campaign_name"]).agg(
@@ -4553,7 +4594,7 @@ def digital_server(
             budget=("budget", "sum"),
         ).reset_index()
 
-        result = pivot_spend.reset_index()
+        result = pivot_budget.reset_index()
         result = result.merge(agg, on=["group_name", "subgroup_name", "product_name", "campaign_name"], how="left")
         result["remaining"] = result["budget"] - result["total_spent"]
         result["pct_spent"] = result.apply(
@@ -4577,8 +4618,36 @@ def digital_server(
         display_cols = ["Group", "Subgroup", "Strategy", "Campaign"] + display_month_cols + ["Total Spent", "Budget", "Remaining", "% Spent"]
         result = result[[c for c in display_cols if c in result.columns]]
 
-        heatmap_cols = display_month_cols + ["Total Spent", "Budget"]
-        return _heatmap_table(result, heatmap_cols=heatmap_cols, paginated=True)
+        current_month = pd.Timestamp.today().to_period("M")
+        future_month_cols = [
+            month_label_map[str(period)]
+            for period in month_periods
+            if period > current_month
+        ]
+        forecast_col_styles = {
+            col: (
+                "background:#fbf6ea !important;"
+                "border-left:1px dashed #d6b464;border-right:1px dashed #d6b464;"
+            )
+            for col in future_month_cols
+        }
+        forecast_headers = {
+            col: (
+                f'{col}<br><span style="font-size:9px;font-weight:700;'
+                'color:#9a6f16;text-transform:uppercase;letter-spacing:0.06em;">'
+                "Forecasted</span>"
+            )
+            for col in future_month_cols
+        }
+
+        heatmap_cols = [c for c in display_month_cols if c not in future_month_cols] + ["Total Spent", "Budget"]
+        return _heatmap_table(
+            result,
+            heatmap_cols=heatmap_cols,
+            paginated=True,
+            column_styles=forecast_col_styles,
+            header_labels=forecast_headers,
+        )
 
     @render.ui
     def media_plan_table():
@@ -4588,7 +4657,7 @@ def digital_server(
 
     @reactive.calc
     def _media_plan_stacked_bar_cache():
-        df = _dig_q8()
+        df = _dig_q8_media_plan()
         req(len(df) > 0)
         df = df.copy()
         df["month_period"] = df["day"].dt.to_period("M")
@@ -4599,29 +4668,69 @@ def digital_server(
             for period in month_periods
         }
         df["month_key"] = df["month_period"].astype(str)
-        grouped = df.groupby(["month_key", "product_name"])["cost"].sum().reset_index()
+        grouped = df.groupby(["month_key", "product_name"])["budget"].sum().reset_index()
 
         strategies = grouped["product_name"].unique().tolist()
         months = month_keys
-        max_month_total = grouped.groupby("month_key")["cost"].sum().max() if not grouped.empty else 0
+        current_month = pd.Timestamp.today().to_period("M")
+        future_months = {str(period) for period in month_periods if period > current_month}
+        max_month_total = grouped.groupby("month_key")["budget"].sum().max() if not grouped.empty else 0
         label_threshold = max_month_total * 0.08 if max_month_total else 0
 
         fig = go.Figure()
         for i, strat in enumerate(strategies):
             sdf = grouped[grouped["product_name"] == strat]
             sdf = sdf.set_index("month_key").reindex(months, fill_value=0).reset_index()
+            color = STRATEGY_COLORS[i % len(STRATEGY_COLORS)]
+            is_future = sdf["month_key"].isin(future_months)
+            actual_values = sdf["budget"].where(~is_future, 0)
+            forecast_values = sdf["budget"].where(is_future, 0)
             fig.add_trace(go.Bar(
                 x=[month_label_map[m] for m in sdf["month_key"]],
-                y=sdf["cost"],
+                y=actual_values,
                 name=strat,
-                marker_color=STRATEGY_COLORS[i % len(STRATEGY_COLORS)],
-                text=[f"${v:,.0f}" if v >= label_threshold and v > 0 else "" for v in sdf["cost"]],
-                hovertemplate=f"<b>{strat}</b><br>%{{x}}<br>Spend: $%{{y:,.0f}}<extra></extra>",
+                legendgroup=strat,
+                marker_color=color,
+                text=[f"${v:,.0f}" if v >= label_threshold and v > 0 else "" for v in actual_values],
+                hovertemplate=f"<b>{strat}</b><br>%{{x}}<br>Budget: $%{{y:,.0f}}<extra></extra>",
             ))
+            if future_months:
+                fig.add_trace(go.Bar(
+                    x=[month_label_map[m] for m in sdf["month_key"]],
+                    y=forecast_values,
+                    name=strat,
+                    legendgroup=strat,
+                    showlegend=False,
+                    marker=dict(
+                        color=color,
+                        pattern=dict(shape="/", fgcolor="#6b7280", bgcolor=color, solidity=0.18),
+                    ),
+                    opacity=0.55,
+                    text=[f"${v:,.0f}" if v >= label_threshold and v > 0 else "" for v in forecast_values],
+                    hovertemplate=f"<b>{strat}</b><br>%{{x}}<br>Forecasted budget: $%{{y:,.0f}}<extra></extra>",
+                ))
 
         layout = _base_layout(height=340)
         layout["barmode"] = "stack"
+        if future_months:
+            layout["margin"] = {**layout.get("margin", {}), "t": 34}
         fig.update_layout(**layout)
+        if future_months:
+            first_future = next((m for m in months if m in future_months), None)
+            if first_future:
+                fig.add_annotation(
+                    x=month_label_map[first_future],
+                    y=1.06,
+                    xref="x",
+                    yref="paper",
+                    text="Forecasted",
+                    showarrow=False,
+                    font=dict(family="Manrope, sans-serif", size=10, color="#9a6f16"),
+                    bgcolor="#fbf6ea",
+                    bordercolor="#d6b464",
+                    borderwidth=1,
+                    borderpad=3,
+                )
         _add_bar_labels(fig)
         return _plotly_html(fig)
 
@@ -4633,7 +4742,7 @@ def digital_server(
 
     @reactive.calc
     def _media_plan_strategy_pie_cache():
-        df = _dig_q8()
+        df = _dig_q8_media_plan()
         req(len(df) > 0)
         grouped = df.groupby("product_name")["budget"].sum().reset_index()
         grouped = grouped.sort_values("budget", ascending=False)
@@ -4658,7 +4767,7 @@ def digital_server(
 
     @reactive.calc
     def _media_plan_status_pie_cache():
-        df = _dig_q8()
+        df = _dig_q8_media_plan()
         req(len(df) > 0)
 
         # Determine most recent month in filtered data

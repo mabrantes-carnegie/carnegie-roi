@@ -18,6 +18,6 @@ files = [
   '/.posit/publish/ROI Report-ATTQ.toml',
   '/.posit/publish/deployments/deployment-KU4R.toml'
 ]
-title = 'ROI Report'
+title = 'Funnel Report'
 
 [python]

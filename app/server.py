@@ -341,7 +341,7 @@ def server_logic(input, output, session):
     @render.ui
     def navbar_title():
         name = _institution_name()
-        label = f"ROI Report - {name}" if name else "ROI Report"
+        label = name or ""
         return ui.tags.span(label, class_="navbar-title-text")
 
     # Update term_year choices from session Q6 + Q2

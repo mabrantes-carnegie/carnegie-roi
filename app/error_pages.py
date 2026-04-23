@@ -85,7 +85,7 @@ def render_banner_html(headline: str, message: str) -> str:
         f"{_BANNER_CSS}"
         f'<div class="carnegie-session-banner">'
         f'<div class="card" role="alert" aria-live="polite">'
-        f'<div class="brand">Carnegie ROI Report</div>'
+        f'<div class="brand">Carnegie</div>'
         f"<h2>{escape(headline)}</h2>"
         f"<p>{escape(message)}</p>"
         f"</div></div>"
